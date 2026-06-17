@@ -74,7 +74,10 @@ async function runImportMasters(): Promise<void> {
     await withTransaction(pool, async (client) => {
       for (const [target, relativePath] of selected) {
         const path = resolve(ROOT, relativePath!);
-        if (!existsSync(path)) throw new Error(`File not found: ${path}`);
+        if (!existsSync(path)) {
+          console.warn(`File not found: ${path}, skipping..`);
+          continue;
+        }
         const count = await importMasterCsv(client, target, path);
         console.log(`Imported ${count} rows into ${target} from ${relativePath}`);
       }

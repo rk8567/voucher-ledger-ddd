@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
+import pkg from 'pg-connection-string';
 
 export function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
@@ -9,7 +10,11 @@ export function requireDatabaseUrl(): string {
 }
 
 export function createPool(): Pool {
-  return new Pool({ connectionString: requireDatabaseUrl() });
+    const { parse } = pkg;
+    const dbConfig = parse(requireDatabaseUrl());
+    dbConfig.user = process.env.DATABASE_USER ?? "postgres"; // FIXME: nullable string in config
+    dbConfig.password = process.env.DATABASE_PASSWORD;
+    return new Pool(dbConfig);
 }
 
 export async function withTransaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
