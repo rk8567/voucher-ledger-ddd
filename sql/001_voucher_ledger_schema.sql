@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
   remarks text,                                                              -- 備考
 
   -- Amount/other value. Denomination quantities are in voucher_ledger_entry_denominations.
-  other_amount bigint NOT NULL DEFAULT 0 CHECK (other_amount >= 0),           -- その他金額
+  other_amount bigint NOT NULL DEFAULT 0,                                    -- その他金額
   other_amount_note text,                                                    -- その他金額備考
 
   -- 赤伝票 / 訂正 links
@@ -189,6 +189,9 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
   CHECK (counterparty_branch_code IS NULL OR counterparty_branch_code <> branch_code),
   CHECK (posted_at IS NULL OR registered_at IS NOT NULL)
 );
+
+ALTER TABLE voucher_ledger_entries
+  DROP CONSTRAINT IF EXISTS voucher_ledger_entries_other_amount_check;
 
 COMMENT ON TABLE voucher_ledger_entries IS 'Source-of-truth ledger rows migrated from T切手出納台帳 / T金券管理台帳.';
 COMMENT ON COLUMN voucher_ledger_entries.ledger_no IS 'Legacy 出納No. Use voucher_ledger_no_seq for new rows; reset sequence after importing legacy rows.';

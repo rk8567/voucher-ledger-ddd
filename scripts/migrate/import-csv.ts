@@ -10,6 +10,7 @@ import {
   readCsvFile,
   readCsvRowsFile,
 } from './csv.js';
+import { readHtmlTableFile } from './html.js';
 import {
   LEDGER_CSV_COLUMNS,
   LEDGER_QUANTITY_COLUMNS,
@@ -76,6 +77,10 @@ ON CONFLICT (ledger_no) DO NOTHING
 `;
 
 export async function importLedgerCsv(client: PoolClient, filePath: string): Promise<number> {
+  if (isHtmlFile(filePath)) {
+    return importRawLedgerRows(client, filePath, readHtmlTableFile(filePath));
+  }
+
   const rawRows = readCsvRowsFile(filePath);
   if (rawRows.length > 0 && !rawRows[0]!.includes('出納No')) {
     return importHeaderlessRawLedgerCsv(client, filePath, rawRows);
@@ -152,6 +157,10 @@ export async function importLedgerCsv(client: PoolClient, filePath: string): Pro
   return inserted;
 }
 
+function isHtmlFile(filePath: string): boolean {
+  return /\.html?$/i.test(filePath);
+}
+
 async function importHeaderlessRawLedgerCsv(
   client: PoolClient,
   filePath: string,
@@ -218,6 +227,68 @@ async function importHeaderlessRawLedgerCsv(
   return inserted;
 }
 
+async function importRawLedgerRows(
+  client: PoolClient,
+  filePath: string,
+  rows: Array<Record<string, string>>,
+): Promise<number> {
+  let inserted = 0;
+
+  for (const [index, row] of rows.entries()) {
+    const entryTypeCode = asNullableInt(row.入出区分CD);
+    const processingDate = asNullableDate(row.処理日);
+    const branchCode = asNullableInt(row.拠点CD);
+    const ledgerNo = asNullableInt(row.出納No);
+    if (entryTypeCode == null || processingDate == null || branchCode == null || ledgerNo == null) continue;
+
+    const originalLedgerNo = asNullableInt(row.元伝票No);
+    const reversalLedgerNo = asNullableInt(row.赤伝票No);
+    const correctionLedgerNo = asNullableInt(row.訂正伝票No);
+
+    const result = await client.query(STAGING_INSERT, [
+      filePath,
+      JSON.stringify({ rowNumber: index + 1, row }),
+      null,
+      ledgerNo,
+      asNullableInt(row.部門CD),
+      branchCode,
+      asNullableInt(row.年),
+      asNullableInt(row.月),
+      asNullableDate(row.申請処理日),
+      processingDate,
+      index + 1,
+      entryTypeCode,
+      null,
+      null,
+      null,
+      row.摘要 || row.内容 || '(raw legacy import)',
+      null,
+      null,
+      asNullableBigInt(row.その他金額)?.toString() ?? '0',
+      null,
+      row.備考 || null,
+      asNullableBoolean(row.Is削除) ?? false,
+      rawRedVoucherStatusCode({ originalLedgerNo, reversalLedgerNo }),
+      originalLedgerNo,
+      reversalLedgerNo,
+      correctionLedgerNo,
+      asNullableTimestamp(row.登録日時),
+      null,
+      asNullableTimestamp(row.更新日時) ?? asNullableTimestamp(row.登録日時),
+      null,
+      null,
+      null,
+      null,
+      null,
+      ...rawQuantitiesFromRow(row),
+    ]);
+
+    inserted += result.rowCount ?? 0;
+  }
+
+  return inserted;
+}
+
 function rawRedVoucherStatusCode(input: { originalLedgerNo: number | null; reversalLedgerNo: number | null }): 0 | 1 | 2 | 3 {
   if (input.originalLedgerNo == null && input.reversalLedgerNo != null) return 1;
   if (input.originalLedgerNo != null && input.reversalLedgerNo != null) return 3;
@@ -230,6 +301,15 @@ function rawQuantities(value: string | undefined): number[] {
   return Array.from({ length: 16 }, (_, index) => {
     const parsed = asNullableInt(parts[index]);
     return parsed ?? 0;
+  });
+}
+
+function rawQuantitiesFromRow(row: Record<string, string>): number[] {
+  if (row.枚数N?.includes('\x1d')) return rawQuantities(row.枚数N);
+
+  return Array.from({ length: 16 }, (_, index) => {
+    const key = index === 0 ? '枚数N' : `枚数N[${index + 1}]`;
+    return asNullableInt(row[key]) ?? 0;
   });
 }
 
@@ -295,6 +375,40 @@ async function upsertDepartments(client: PoolClient, mapped: Record<string, stri
 }
 
 async function upsertEmployees(client: PoolClient, mapped: Record<string, string>): Promise<void> {
+  const employeeNo = asRequiredInt(mapped.employee_no, 'employee_no');
+  if (employeeNo <= 0) return;
+
+  const companyCode = asNullableInt(mapped.company_code);
+  const departmentCode = asNullableInt(mapped.department_code);
+  const branchCode = asNullableInt(mapped.branch_code);
+
+  if (companyCode != null) {
+    await client.query(
+      `INSERT INTO companies (company_code, company_name)
+       VALUES ($1,$2)
+       ON CONFLICT (company_code) DO NOTHING`,
+      [companyCode, `Legacy company ${companyCode}`],
+    );
+  }
+
+  if (departmentCode != null) {
+    await client.query(
+      `INSERT INTO departments (department_code, department_name, active)
+       VALUES ($1,$2,false)
+       ON CONFLICT (department_code) DO NOTHING`,
+      [departmentCode, mapped.department_name || `Legacy department ${departmentCode}`],
+    );
+  }
+
+  if (branchCode != null) {
+    await client.query(
+      `INSERT INTO branches (branch_code, branch_name, active)
+       VALUES ($1,$2,false)
+       ON CONFLICT (branch_code) DO NOTHING`,
+      [branchCode, `Legacy branch ${branchCode}`],
+    );
+  }
+
   const retiredOn = asNullableDate(mapped.retired_on);
   await client.query(
     `INSERT INTO employees (
@@ -314,11 +428,11 @@ async function upsertEmployees(client: PoolClient, mapped: Record<string, string
       legacy_uuid = COALESCE(EXCLUDED.legacy_uuid, employees.legacy_uuid),
       updated_at = now()`,
     [
-      asRequiredInt(mapped.employee_no, 'employee_no'),
+      employeeNo,
       mapped.employee_name || `Employee ${mapped.employee_no}`,
-      asNullableInt(mapped.company_code),
-      asNullableInt(mapped.department_code),
-      asNullableInt(mapped.branch_code),
+      companyCode,
+      departmentCode,
+      branchCode,
       mapped.account_name || null,
       asNullableBoolean(mapped.is_approver) ?? false,
       asNullableBoolean(mapped.is_admin) ?? false,
@@ -422,7 +536,7 @@ export async function importMasterCsv(
   target: MasterImportTarget,
   filePath: string,
 ): Promise<number> {
-  const rows = readCsvFile(filePath);
+  const rows = isHtmlFile(filePath) ? readHtmlTableFile(filePath) : readCsvFile(filePath);
   const columnMap = MASTER_COLUMN_MAP[target];
   const upsert = MASTER_UPSERT[target];
   let count = 0;

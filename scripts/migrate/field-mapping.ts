@@ -74,6 +74,7 @@ export const EMPLOYEE_CSV_COLUMNS: Record<string, string> = {
   社員番号: 'employee_no',
   会社CD: 'company_code',
   部門CD: 'department_code',
+  部門NM: 'department_name',
   拠点CD: 'branch_code',
   氏名: 'employee_name',
   アカウント名: 'account_name',
