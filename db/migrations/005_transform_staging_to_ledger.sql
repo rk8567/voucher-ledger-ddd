@@ -134,7 +134,7 @@ INSERT INTO voucher_ledger_entry_denominations (entry_id, denomination_yen, quan
 SELECT
   e.id,
   d.denomination_yen,
-  GREATEST(COALESCE(q.quantity, 0), 0)
+  COALESCE(q.quantity, 0)
 FROM voucher_ledger_entries e
 JOIN legacy_filemaker_voucher_ledger_staging s ON s.ledger_no = e.ledger_no
 JOIN LATERAL (
@@ -157,7 +157,7 @@ JOIN LATERAL (
     (16, s.quantity_rep_16)
 ) AS q(rep_no, quantity) ON true
 JOIN denominations d ON d.legacy_repetition_no = q.rep_no
-WHERE COALESCE(q.quantity, 0) > 0
+WHERE COALESCE(q.quantity, 0) <> 0
   AND NOT EXISTS (
     SELECT 1
     FROM voucher_ledger_entry_denominations existing

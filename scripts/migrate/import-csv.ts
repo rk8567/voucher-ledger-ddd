@@ -8,6 +8,7 @@ import {
   asRequiredInt,
   mapRow,
   readCsvFile,
+  readCsvRowsFile,
 } from './csv.js';
 import {
   LEDGER_CSV_COLUMNS,
@@ -75,6 +76,11 @@ ON CONFLICT (ledger_no) DO NOTHING
 `;
 
 export async function importLedgerCsv(client: PoolClient, filePath: string): Promise<number> {
+  const rawRows = readCsvRowsFile(filePath);
+  if (rawRows.length > 0 && !rawRows[0]!.includes('出納No')) {
+    return importHeaderlessRawLedgerCsv(client, filePath, rawRows);
+  }
+
   const rows = readCsvFile(filePath);
   let inserted = 0;
 
@@ -144,6 +150,87 @@ export async function importLedgerCsv(client: PoolClient, filePath: string): Pro
   }
 
   return inserted;
+}
+
+async function importHeaderlessRawLedgerCsv(
+  client: PoolClient,
+  filePath: string,
+  rows: string[][],
+): Promise<number> {
+  let inserted = 0;
+
+  for (const [index, row] of rows.entries()) {
+    if (row.length < 69) continue;
+
+    const entryTypeCode = asNullableInt(row[17]);
+    const processingDate = asNullableDate(row[18]);
+    const branchCode = asNullableInt(row[3]);
+    const ledgerNo = asNullableInt(row[19]);
+    if (entryTypeCode == null || processingDate == null || branchCode == null || ledgerNo == null) continue;
+
+    const quantities = rawQuantities(row[45]);
+    const otherAmount = Math.max(asNullableInt(row[14]) ?? 0, 0);
+    const originalLedgerNo = asNullableInt(row[16]);
+    const reversalLedgerNo = asNullableInt(row[66]);
+    const correctionLedgerNo = asNullableInt(row[65]);
+
+    const result = await client.query(STAGING_INSERT, [
+      filePath,
+      JSON.stringify({ rowNumber: index + 1, columns: row }),
+      null,
+      ledgerNo,
+      asNullableInt(row[67]),
+      branchCode,
+      asNullableInt(row[2]),
+      asNullableInt(row[5]),
+      asNullableDate(row[62]),
+      processingDate,
+      index + 1,
+      entryTypeCode,
+      null,
+      null,
+      null,
+      row[42] || row[8] || '(raw legacy import)',
+      null,
+      null,
+      String(otherAmount),
+      null,
+      row[15] || null,
+      asNullableBoolean(row[6]) ?? false,
+      rawRedVoucherStatusCode({ originalLedgerNo, reversalLedgerNo }),
+      originalLedgerNo,
+      reversalLedgerNo,
+      correctionLedgerNo,
+      asNullableTimestamp(row[63]),
+      null,
+      asNullableTimestamp(row[44]) ?? asNullableTimestamp(row[63]),
+      null,
+      null,
+      null,
+      null,
+      null,
+      ...quantities,
+    ]);
+
+    inserted += result.rowCount ?? 0;
+  }
+
+  return inserted;
+}
+
+function rawRedVoucherStatusCode(input: { originalLedgerNo: number | null; reversalLedgerNo: number | null }): 0 | 1 | 2 | 3 {
+  if (input.originalLedgerNo == null && input.reversalLedgerNo != null) return 1;
+  if (input.originalLedgerNo != null && input.reversalLedgerNo != null) return 3;
+  if (input.originalLedgerNo != null) return 2;
+  return 0;
+}
+
+function rawQuantities(value: string | undefined): number[] {
+  const parts = (value ?? '').split('\x1d');
+  return Array.from({ length: 16 }, (_, index) => {
+    const parsed = asNullableInt(parts[index]);
+    return parsed ?? 0;
+  });
 }
 
 async function upsertBranches(client: PoolClient, mapped: Record<string, string>): Promise<void> {

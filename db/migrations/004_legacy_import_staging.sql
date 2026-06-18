@@ -74,6 +74,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_legacy_voucher_staging_ledger_no
   ON legacy_filemaker_voucher_ledger_staging(ledger_no)
   WHERE ledger_no IS NOT NULL;
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'uq_legacy_filemaker_voucher_ledger_staging_ledger_no'
+  ) THEN
+    ALTER TABLE legacy_filemaker_voucher_ledger_staging
+      ADD CONSTRAINT uq_legacy_filemaker_voucher_ledger_staging_ledger_no UNIQUE (ledger_no);
+  END IF;
+END;
+$$;
+
 -- After transforming legacy rows into voucher_ledger_entries, reset the sequence:
 -- SELECT setval(
 --   'voucher_ledger_no_seq',

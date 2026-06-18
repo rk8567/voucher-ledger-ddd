@@ -207,19 +207,21 @@ CREATE INDEX IF NOT EXISTS idx_voucher_entries_period
 CREATE INDEX IF NOT EXISTS idx_voucher_entries_red_links
   ON voucher_ledger_entries(original_ledger_no, reversal_ledger_no, correction_ledger_no);
 
--- FileMaker Get繰越データ件数 checks only 拠点CD + 入出区分CD=99, not 年/月.
--- This index preserves that legacy invariant. If the new business rule is monthly/periodic
--- opening balances, replace this with (branch_code, period_year, period_month).
-CREATE UNIQUE INDEX IF NOT EXISTS uq_voucher_opening_balance_per_branch
-  ON voucher_ledger_entries(branch_code)
+DROP INDEX IF EXISTS uq_voucher_opening_balance_per_branch;
+DROP INDEX IF EXISTS uq_voucher_opening_balance_per_branch_period;
+CREATE INDEX IF NOT EXISTS idx_voucher_opening_balance_lookup
+  ON voucher_ledger_entries(branch_code, period_year, period_month, ledger_no)
   WHERE entry_type_code = 99 AND is_deleted = false;
 
 CREATE TABLE IF NOT EXISTS voucher_ledger_entry_denominations (
   entry_id uuid NOT NULL REFERENCES voucher_ledger_entries(id) ON DELETE CASCADE,
   denomination_yen integer NOT NULL REFERENCES denominations(denomination_yen),
-  quantity integer NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+  quantity integer NOT NULL DEFAULT 0,
   PRIMARY KEY (entry_id, denomination_yen)
 );
+
+ALTER TABLE voucher_ledger_entry_denominations
+  DROP CONSTRAINT IF EXISTS voucher_ledger_entry_denominations_quantity_check;
 
 COMMENT ON TABLE voucher_ledger_entry_denominations IS 'Normalized replacement for FileMaker repeating field 枚数N[1..16].';
 

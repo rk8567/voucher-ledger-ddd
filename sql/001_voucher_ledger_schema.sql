@@ -207,19 +207,21 @@ CREATE INDEX IF NOT EXISTS idx_voucher_entries_period
 CREATE INDEX IF NOT EXISTS idx_voucher_entries_red_links
   ON voucher_ledger_entries(original_ledger_no, reversal_ledger_no, correction_ledger_no);
 
--- FileMaker Get繰越データ件数 checks only 拠点CD + 入出区分CD=99, not 年/月.
--- This index preserves that legacy invariant. If the new business rule is monthly/periodic
--- opening balances, replace this with (branch_code, period_year, period_month).
-CREATE UNIQUE INDEX IF NOT EXISTS uq_voucher_opening_balance_per_branch
-  ON voucher_ledger_entries(branch_code)
+DROP INDEX IF EXISTS uq_voucher_opening_balance_per_branch;
+DROP INDEX IF EXISTS uq_voucher_opening_balance_per_branch_period;
+CREATE INDEX IF NOT EXISTS idx_voucher_opening_balance_lookup
+  ON voucher_ledger_entries(branch_code, period_year, period_month, ledger_no)
   WHERE entry_type_code = 99 AND is_deleted = false;
 
 CREATE TABLE IF NOT EXISTS voucher_ledger_entry_denominations (
   entry_id uuid NOT NULL REFERENCES voucher_ledger_entries(id) ON DELETE CASCADE,
   denomination_yen integer NOT NULL REFERENCES denominations(denomination_yen),
-  quantity integer NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+  quantity integer NOT NULL DEFAULT 0,
   PRIMARY KEY (entry_id, denomination_yen)
 );
+
+ALTER TABLE voucher_ledger_entry_denominations
+  DROP CONSTRAINT IF EXISTS voucher_ledger_entry_denominations_quantity_check;
 
 COMMENT ON TABLE voucher_ledger_entry_denominations IS 'Normalized replacement for FileMaker repeating field 枚数N[1..16].';
 
@@ -791,6 +793,19 @@ CREATE INDEX IF NOT EXISTS idx_legacy_voucher_staging_branch
 CREATE UNIQUE INDEX IF NOT EXISTS uq_legacy_voucher_staging_ledger_no
   ON legacy_filemaker_voucher_ledger_staging(ledger_no)
   WHERE ledger_no IS NOT NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'uq_legacy_filemaker_voucher_ledger_staging_ledger_no'
+  ) THEN
+    ALTER TABLE legacy_filemaker_voucher_ledger_staging
+      ADD CONSTRAINT uq_legacy_filemaker_voucher_ledger_staging_ledger_no UNIQUE (ledger_no);
+  END IF;
+END;
+$$;
 
 -- After transforming legacy rows into voucher_ledger_entries, run db/migrations/005_transform_staging_to_ledger.sql
 

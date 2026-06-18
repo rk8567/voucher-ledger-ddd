@@ -4,7 +4,7 @@ import { TextDecoder } from 'node:util';
 export type CsvRow = Record<string, string>;
 
 /** Minimal RFC4180-ish CSV parser for FileMaker UTF-8 exports. */
-export function parseCsv(content: string): CsvRow[] {
+export function parseCsvRows(content: string): string[][] {
   const rows: string[][] = [];
   let current = '';
   let row: string[] = [];
@@ -53,6 +53,13 @@ export function parseCsv(content: string): CsvRow[] {
   row.push(current);
   if (row.some((cell) => cell.length > 0)) rows.push(row);
 
+  return rows;
+}
+
+/** Minimal RFC4180-ish CSV parser for FileMaker exports with a header row. */
+export function parseCsv(content: string): CsvRow[] {
+  const rows = parseCsvRows(content);
+
   if (rows.length === 0) return [];
 
   const headers = rows[0]!.map((header) => header.replace(/^\uFEFF/, '').trim());
@@ -68,6 +75,11 @@ export function parseCsv(content: string): CsvRow[] {
 export function readCsvFile(path: string): CsvRow[] {
   const content = readTextFile(path);
   return parseCsv(content);
+}
+
+export function readCsvRowsFile(path: string): string[][] {
+  const content = readTextFile(path);
+  return parseCsvRows(content);
 }
 
 function readTextFile(path: string): string {
