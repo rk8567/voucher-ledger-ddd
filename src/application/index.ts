@@ -5,3 +5,5 @@ export * from '@/application/usecases/RegisterVoucherMovement';
 export * from '@/application/usecases/RegisterInventoryCheck';
 export * from '@/application/usecases/IssueRedVoucherCorrection';
 export * from '@/application/queries/GetBranchCurrentBalance';
+export * from '@/application/queries/GetLedgerEntry';
+export * from '@/application/queries/ListLedgerEntries';

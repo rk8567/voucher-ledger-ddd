@@ -64,6 +64,23 @@ export type InventoryCheckRecord = Readonly<{
   discrepancyAmountYen: number;
 }>;
 
+export type LedgerEntryListFilter = Readonly<{
+  branchCode?: number | null;
+  periodYear?: number | null;
+  periodMonth?: number | null;
+  processingDateFrom?: string | null;
+  processingDateTo?: string | null;
+  entryTypeCode?: EntryTypeCode | null;
+  includeDeleted?: boolean;
+  limit?: number | null;
+  cursorLedgerNo?: number | null;
+}>;
+
+export type LedgerEntryListRecord = Readonly<{
+  items: readonly LedgerEntryRecord[];
+  nextCursorLedgerNo: number | null;
+}>;
+
 export interface VoucherLedgerRepository {
   lockBranch(branchCode: number): Promise<BranchRecord | null>;
   getBranch(branchCode: number): Promise<BranchRecord | null>;
@@ -80,6 +97,8 @@ export interface VoucherLedgerRepository {
   markOriginalWithReversal(originalLedgerNo: number, reversalLedgerNo: number, actorEmployeeNo?: number | null): Promise<void>;
   linkCorrection(originalLedgerNo: number, reversalLedgerNo: number, correctionLedgerNo: number, actorEmployeeNo?: number | null): Promise<void>;
 
+  listLedgerEntries(filter: LedgerEntryListFilter): Promise<LedgerEntryListRecord>;
+  getLedgerEntryByLedgerNo(ledgerNo: number): Promise<PostedLedgerEntryWithAmounts | null>;
   getCurrentBalance(branchCode: number): Promise<CurrentBalanceRecord>;
   getInventoryCheckResult(entryId: string): Promise<InventoryCheckRecord | null>;
 }

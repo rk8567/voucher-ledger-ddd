@@ -724,7 +724,7 @@ COMMENT ON VIEW voucher_inventory_check_denomination_results IS 'Per-denominatio
 
 COMMIT;
 -- Optional staging table for raw FileMaker export before normalizing into the DDD tables.
--- Keep one row per T切手出納台帳 record. Populate it from CSV/XML extraction, then transform.
+-- Keep one row per T切手出納台帳 record. Populate it from FileMaker HTML table exports, then transform.
 
 BEGIN;
 

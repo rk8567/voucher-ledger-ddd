@@ -1,19 +1,6 @@
 import type { PoolClient } from 'pg';
+import { readHtmlTableFile, type HtmlTableRow } from './html.js';
 import {
-  asNullableBigInt,
-  asNullableBoolean,
-  asNullableDate,
-  asNullableInt,
-  asNullableTimestamp,
-  asRequiredInt,
-  mapRow,
-  readCsvFile,
-  readCsvRowsFile,
-} from './csv.js';
-import { readHtmlTableFile } from './html.js';
-import {
-  LEDGER_CSV_COLUMNS,
-  LEDGER_QUANTITY_COLUMNS,
   MASTER_COLUMN_MAP,
   type MasterImportTarget,
 } from './field-mapping.js';
@@ -76,155 +63,70 @@ INSERT INTO legacy_filemaker_voucher_ledger_staging (
 ON CONFLICT (ledger_no) DO NOTHING
 `;
 
-export async function importLedgerCsv(client: PoolClient, filePath: string): Promise<number> {
-  if (isHtmlFile(filePath)) {
-    return importRawLedgerRows(client, filePath, readHtmlTableFile(filePath));
+function mapRow(row: HtmlTableRow, columnMap: Record<string, string>): Record<string, string> {
+  const mapped: Record<string, string> = {};
+  for (const [source, target] of Object.entries(columnMap)) {
+    if (source in row) mapped[target] = row[source] ?? '';
   }
-
-  const rawRows = readCsvRowsFile(filePath);
-  if (rawRows.length > 0 && !rawRows[0]!.includes('出納No')) {
-    return importHeaderlessRawLedgerCsv(client, filePath, rawRows);
-  }
-
-  const rows = readCsvFile(filePath);
-  let inserted = 0;
-
-  for (const row of rows) {
-    const mapped = {
-      ...mapRow(row, LEDGER_CSV_COLUMNS),
-      ...mapRow(row, LEDGER_QUANTITY_COLUMNS),
-    };
-
-    const ledgerNo = asNullableInt(mapped.ledger_no);
-    if (ledgerNo == null) continue;
-
-    const result = await client.query(STAGING_INSERT, [
-      filePath,
-      JSON.stringify(row),
-      mapped.legacy_uuid || null,
-      ledgerNo,
-      asNullableInt(mapped.department_code),
-      asRequiredInt(mapped.branch_code, 'branch_code'),
-      asNullableInt(mapped.period_year),
-      asNullableInt(mapped.period_month),
-      asNullableDate(mapped.application_date),
-      asNullableDate(mapped.processing_date) ?? asNullableDate(mapped.application_date),
-      asNullableInt(mapped.daily_sequence) ?? 0,
-      asRequiredInt(mapped.entry_type_code, 'entry_type_code'),
-      asNullableInt(mapped.transaction_category_code),
-      asNullableInt(mapped.counterparty_branch_code),
-      asNullableInt(mapped.status_code),
-      mapped.description || null,
-      asNullableInt(mapped.responsible_employee_no),
-      asNullableInt(mapped.company_code),
-      asNullableBigInt(mapped.other_amount)?.toString() ?? '0',
-      mapped.other_amount_note || null,
-      mapped.remarks || null,
-      asNullableBoolean(mapped.is_deleted) ?? false,
-      asNullableInt(mapped.red_voucher_status_code) ?? 0,
-      asNullableInt(mapped.original_ledger_no),
-      asNullableInt(mapped.reversal_ledger_no),
-      asNullableInt(mapped.correction_ledger_no),
-      asNullableTimestamp(mapped.registered_at),
-      asNullableInt(mapped.registered_by_employee_no),
-      asNullableTimestamp(mapped.updated_at),
-      asNullableInt(mapped.updated_by_employee_no),
-      asNullableTimestamp(mapped.filemaker_created_at),
-      mapped.filemaker_created_by || null,
-      asNullableTimestamp(mapped.filemaker_modified_at),
-      mapped.filemaker_modified_by || null,
-      asNullableInt(mapped.quantity_rep_01),
-      asNullableInt(mapped.quantity_rep_02),
-      asNullableInt(mapped.quantity_rep_03),
-      asNullableInt(mapped.quantity_rep_04),
-      asNullableInt(mapped.quantity_rep_05),
-      asNullableInt(mapped.quantity_rep_06),
-      asNullableInt(mapped.quantity_rep_07),
-      asNullableInt(mapped.quantity_rep_08),
-      asNullableInt(mapped.quantity_rep_09),
-      asNullableInt(mapped.quantity_rep_10),
-      asNullableInt(mapped.quantity_rep_11),
-      asNullableInt(mapped.quantity_rep_12),
-      asNullableInt(mapped.quantity_rep_13),
-      asNullableInt(mapped.quantity_rep_14),
-      asNullableInt(mapped.quantity_rep_15),
-      asNullableInt(mapped.quantity_rep_16),
-    ]);
-
-    inserted += result.rowCount ?? 0;
-  }
-
-  return inserted;
+  return mapped;
 }
 
-function isHtmlFile(filePath: string): boolean {
-  return /\.html?$/i.test(filePath);
+function asNullableInt(value: string | undefined): number | null {
+  if (value == null || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
 }
 
-async function importHeaderlessRawLedgerCsv(
-  client: PoolClient,
-  filePath: string,
-  rows: string[][],
-): Promise<number> {
-  let inserted = 0;
+function asRequiredInt(value: string | undefined, field: string): number {
+  const parsed = asNullableInt(value);
+  if (parsed == null) throw new Error(`${field} is required`);
+  return parsed;
+}
 
-  for (const [index, row] of rows.entries()) {
-    if (row.length < 69) continue;
-
-    const entryTypeCode = asNullableInt(row[17]);
-    const processingDate = asNullableDate(row[18]);
-    const branchCode = asNullableInt(row[3]);
-    const ledgerNo = asNullableInt(row[19]);
-    if (entryTypeCode == null || processingDate == null || branchCode == null || ledgerNo == null) continue;
-
-    const quantities = rawQuantities(row[45]);
-    const otherAmount = Math.max(asNullableInt(row[14]) ?? 0, 0);
-    const originalLedgerNo = asNullableInt(row[16]);
-    const reversalLedgerNo = asNullableInt(row[66]);
-    const correctionLedgerNo = asNullableInt(row[65]);
-
-    const result = await client.query(STAGING_INSERT, [
-      filePath,
-      JSON.stringify({ rowNumber: index + 1, columns: row }),
-      null,
-      ledgerNo,
-      asNullableInt(row[67]),
-      branchCode,
-      asNullableInt(row[2]),
-      asNullableInt(row[5]),
-      asNullableDate(row[62]),
-      processingDate,
-      index + 1,
-      entryTypeCode,
-      null,
-      null,
-      null,
-      row[42] || row[8] || '(raw legacy import)',
-      null,
-      null,
-      String(otherAmount),
-      null,
-      row[15] || null,
-      asNullableBoolean(row[6]) ?? false,
-      rawRedVoucherStatusCode({ originalLedgerNo, reversalLedgerNo }),
-      originalLedgerNo,
-      reversalLedgerNo,
-      correctionLedgerNo,
-      asNullableTimestamp(row[63]),
-      null,
-      asNullableTimestamp(row[44]) ?? asNullableTimestamp(row[63]),
-      null,
-      null,
-      null,
-      null,
-      null,
-      ...quantities,
-    ]);
-
-    inserted += result.rowCount ?? 0;
+function asNullableBigInt(value: string | undefined): bigint | null {
+  if (value == null || value === '') return null;
+  try {
+    return BigInt(value);
+  } catch {
+    return null;
   }
+}
 
-  return inserted;
+function asNullableBoolean(value: string | undefined): boolean | null {
+  if (value == null || value === '') return null;
+  if (value === '1' || value.toLowerCase() === 'true') return true;
+  if (value === '0' || value.toLowerCase() === 'false') return false;
+  return null;
+}
+
+function asNullableDate(value: string | undefined): string | null {
+  if (value == null || value === '') return null;
+  const slashMatch = /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/.exec(value);
+  if (slashMatch) {
+    const [, year, month, day] = slashMatch;
+    return `${year}-${month!.padStart(2, '0')}-${day!.padStart(2, '0')}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return null;
+}
+
+function asNullableTimestamp(value: string | undefined): string | null {
+  if (value == null || value === '') return null;
+  const normalized = value.replace(/\//g, '-').replace(' ', 'T');
+  const parsed = Date.parse(normalized);
+  if (Number.isNaN(parsed)) return null;
+  return new Date(parsed).toISOString();
+}
+
+export async function importLedgerHtml(client: PoolClient, filePath: string): Promise<number> {
+  assertHtmlFile(filePath);
+  return importRawLedgerRows(client, filePath, readHtmlTableFile(filePath));
+}
+
+function assertHtmlFile(filePath: string): void {
+  if (!/\.html?$/i.test(filePath)) {
+    throw new Error(`Only FileMaker HTML table exports are supported: ${filePath}`);
+  }
 }
 
 async function importRawLedgerRows(
@@ -545,12 +447,13 @@ function inferEntryTypeDefaults(code: number): {
   }
 }
 
-export async function importMasterCsv(
+export async function importMasterHtml(
   client: PoolClient,
   target: MasterImportTarget,
   filePath: string,
 ): Promise<number> {
-  const rows = isHtmlFile(filePath) ? readHtmlTableFile(filePath) : readCsvFile(filePath);
+  assertHtmlFile(filePath);
+  const rows = readHtmlTableFile(filePath);
   const columnMap = MASTER_COLUMN_MAP[target];
   const upsert = MASTER_UPSERT[target];
   let count = 0;

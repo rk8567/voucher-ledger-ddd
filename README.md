@@ -1,6 +1,6 @@
 # 金券管理台帳 DDD application layer + PostgreSQL scripts
 
-This bundle turns the FileMaker 金券管理台帳 rules into explicit PostgreSQL tables, views, triggers, and TypeScript application-layer use cases.
+This project turns the FileMaker 金券管理台帳 rules into explicit PostgreSQL tables, views, triggers, and TypeScript application-layer use cases. Next.js is expected to own both frontend and backend execution; the domain/application code should stay framework-neutral and be called from Next.js server-side code.
 
 ## Files
 
@@ -8,18 +8,19 @@ This bundle turns the FileMaker 金券管理台帳 rules into explicit PostgreSQ
 db/migrations/001_schema.sql                -- core master/ledger tables, constraints, triggers
 db/migrations/002_seed_legacy_codes.sql     -- inferred legacy code seeds and denominations
 db/migrations/003_views.sql                 -- FileMaker calculation/summary replacements
-db/migrations/004_legacy_import_staging.sql -- optional raw import staging table
+db/migrations/004_legacy_import_staging.sql -- raw legacy import staging table
 db/migrations/005_transform_staging_to_ledger.sql -- staging → voucher_ledger_entries
 sql/001_voucher_ledger_schema.sql           -- single-file concatenation of 001–004
-scripts/migrate/                            -- CSV import + migration CLI
+scripts/migrate/                            -- FileMaker HTML import + migration CLI
 filemaker/                                  -- FileMaker DDR XML (schema only, no row data)
-filemaker/exports/                          -- place CSV exports here before import
+filemaker/exports/                          -- place FileMaker HTML exports here before import
 src/domain/*                                -- value objects and domain policies
 src/application/dto.ts                      -- command/result DTOs
 src/application/usecases/*                  -- opening balance, movement, inventory check, 赤伝票 correction
-src/application/queries/*                   -- balance query use case
+src/application/queries/*                   -- balance/list/detail query use cases
 src/application/repositories/*              -- repository port
 src/infrastructure/postgres/*               -- pg implementation and UnitOfWork
+docs/legacy-api.md                          -- legacy functionality and Next.js boundary notes
 ```
 
 ## FileMaker source files
@@ -32,7 +33,7 @@ The XML files under `filemaker/` are **Database Design Reports (DDR)** exported 
 | `金券管理台帳_fmp12.xml` | UI file: `M入出区分`, `M出納区分`, `M赤伝票`, `M拠点L` |
 | `各種マスター_fmp12.xml` | `M会社`, `M部門`, `M拠点`, `M社員` (+ `pg_migration` Data API account) |
 
-Field mappings for CSV import are defined in `scripts/migrate/field-mapping.ts` from these DDR files.
+Field mappings for legacy imports are defined in `scripts/migrate/field-mapping.ts` from these DDR files. FileMaker HTML table exports are required because they carry headers and repeating fields reliably.
 
 ## Migration order
 
@@ -58,13 +59,25 @@ npm install
 npm run migrate -- schema
 ```
 
-### 2. Export CSV from FileMaker
+### 2. Export from FileMaker
 
-Export tables with **Japanese field names** (matching DDR) to `filemaker/exports/`:
+Export tables with **Japanese field names** (matching DDR) to `filemaker/exports/`. FileMaker HTML table exports (`.htm`) are required.
 
-- `M拠点L.csv` from `金券管理台帳.fmp12` (branches used by the ledger)
-- `M会社.csv`, `M部門.csv`, `M社員.csv` from `各種マスター.fmp12`
-- `T切手出納台帳.csv` from `DB金券管理台帳.fmp12` (include repeating field `枚数N[1]`…`枚数N[16]`)
+- `M拠点L.htm` from `金券管理台帳.fmp12` (branches used by the ledger)
+- `M入出区分.htm`, `M出納区分.htm`, `M_赤伝票.htm` from `金券管理台帳.fmp12`
+- `L_M社員.htm` from `各種マスター.fmp12`
+- `L_T金券管理台帳.htm` from the ledger export
+
+Known current exports in this repo are:
+
+```text
+filemaker/exports/M拠点L.htm
+filemaker/exports/M入出区分.htm
+filemaker/exports/M出納区分.htm
+filemaker/exports/M_赤伝票.htm
+filemaker/exports/L_M社員.htm
+filemaker/exports/L_T金券管理台帳.htm
+```
 
 Alternatively use the FileMaker Data API with the `pg_migration` account in `各種マスター.fmp12`.
 
@@ -74,23 +87,32 @@ Alternatively use the FileMaker Data API with the `pg_migration` account in `各
 export DATABASE_URL='postgres://...'
 
 npm run migrate -- import-masters \
-  --branches filemaker/exports/M拠点L.csv \
-  --companies filemaker/exports/M会社.csv \
-  --departments filemaker/exports/M部門.csv \
-  --employees filemaker/exports/M社員.csv
+  --branches filemaker/exports/M拠点L.htm \
+  --entry-types filemaker/exports/M入出区分.htm \
+  --transaction-categories filemaker/exports/M出納区分.htm \
+  --red-voucher-statuses filemaker/exports/M_赤伝票.htm \
+  --employees filemaker/exports/L_M社員.htm
 
-npm run migrate -- import-ledger --file filemaker/exports/T切手出納台帳.csv
+npm run migrate -- import-ledger --file filemaker/exports/L_T金券管理台帳.htm
 ```
 
-Or one shot (after CSVs are in place):
+PowerShell example:
+
+```powershell
+$env:DATABASE_URL='postgresql://localhost:5432/postgres'
+$env:DATABASE_USER='user'
+```
+
+Or one shot (after exports are in place):
 
 ```bash
 npm run migrate -- all \
-  --branches filemaker/exports/M拠点L.csv \
-  --companies filemaker/exports/M会社.csv \
-  --departments filemaker/exports/M部門.csv \
-  --employees filemaker/exports/M社員.csv \
-  --ledger filemaker/exports/T切手出納台帳.csv
+  --branches filemaker/exports/M拠点L.htm \
+  --entry-types filemaker/exports/M入出区分.htm \
+  --transaction-categories filemaker/exports/M出納区分.htm \
+  --red-voucher-statuses filemaker/exports/M_赤伝票.htm \
+  --employees filemaker/exports/L_M社員.htm \
+  --ledger filemaker/exports/L_T金券管理台帳.htm
 ```
 
 ### 4. Transform staging → ledger
@@ -118,19 +140,21 @@ SELECT setval(
 
 ## Encoded business decisions
 
-The schema keeps one posted `入出区分CD=99` opening balance per branch because FileMaker `Get繰越データ件数` checks only `拠点CD + 入出区分CD=99`. If the new business wants monthly opening balances, replace index `uq_voucher_opening_balance_per_branch` with a partial unique index on `(branch_code, period_year, period_month)`.
+Legacy data contains multiple `入出区分CD=99` opening-balance rows for some branch/period combinations. To avoid data loss, the database and application use case do not enforce uniqueness for opening balances. Keep this caveat visible for future product decisions: reintroducing uniqueness would require explicit data cleanup and a business rule that rejects some legacy-compatible rows.
 
 `posted_at` is the immutability boundary. The repository inserts an entry draft, inserts denomination quantities, then posts it. After posting, triggers block financial mutation; correction must be represented by 赤伝票 and optional 訂正伝票.
 
 Running balances are calculated by views, ordered by `ledger_no`, so balance no longer depends on FileMaker found-set or sort state.
 
-Legacy import maps FileMaker fields as follows:
+Legacy HTML import maps FileMaker fields as follows:
 
 - `元伝票No` → `original_ledger_no`
 - `赤伝票No` → `reversal_ledger_no`
 - `訂正伝票No` → `correction_ledger_no`
 - blank `赤伝票CD` → `red_voucher_status_code = 0`
 - `枚数N[1..16]` → `voucher_ledger_entry_denominations` via `denominations.legacy_repetition_no`
+
+Named master data from real exports is imported as active. Generated `Legacy ...` placeholders are inactive and exist only to preserve foreign-key compatibility for legacy rows whose master data was not available.
 
 ## Application-layer example
 
@@ -157,6 +181,22 @@ await useCase.execute({
 });
 ```
 
+## Next.js boundary
+
+Do not build a separate REST API for this project by default. Next.js can call the application layer from server components, server actions, or thin server-only modules.
+
+Recommended server functions:
+
+- `listLedgerEntries(input)` → `ListLedgerEntriesQuery`
+- `getLedgerEntry(ledgerNo)` → `GetLedgerEntryQuery`
+- `getBranchCurrentBalance(branchCode)` → `GetBranchCurrentBalanceQuery`
+- `registerOpeningBalance(input)` → `RegisterOpeningBalanceUseCase`
+- `registerVoucherMovement(input)` → `RegisterVoucherMovementUseCase`
+- `registerInventoryCheck(input)` → `RegisterInventoryCheckUseCase`
+- `issueRedVoucherCorrection(input)` → `IssueRedVoucherCorrectionUseCase`
+
+tRPC is a reasonable later adapter for interactive client-heavy screens, but routers should remain thin: validate input, call these server/application functions, and map domain errors for UI display. Keep ledger rules in `src/domain` and `src/application`.
+
 ## Development
 
 ```bash
@@ -168,4 +208,4 @@ The included TypeScript was type-checked after installing the declared dependenc
 
 ## Master data
 
-The seed migration includes inferred names for `M入出区分`, `M出納区分`, and `M赤伝票`. Replace those names with exact FileMaker master data exports when available. Load `branches`, `companies`, `departments`, and `employees` from `各種マスター.fmp12` / `M拠点L` exports before application use.
+The seed migration includes fallback names for `M入出区分`, `M出納区分`, and `M赤伝票`. Replace those names with exact FileMaker master data exports when available. Load branch, employee, entry-type, transaction-category, and red-voucher master data from the FileMaker exports before application use. Company and department data can be imported when source exports are available; otherwise the transform creates compatibility placeholders only where required.

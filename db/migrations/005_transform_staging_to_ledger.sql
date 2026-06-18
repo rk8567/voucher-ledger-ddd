@@ -1,5 +1,5 @@
 -- Transform legacy_filemaker_voucher_ledger_staging into voucher_ledger_entries.
--- Run after master data and ledger CSV imports. Safe to re-run: skips ledger_no already loaded.
+-- Run after master data and ledger HTML imports. Safe to re-run: skips ledger_no already loaded.
 
 BEGIN;
 

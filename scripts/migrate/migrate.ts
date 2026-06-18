@@ -2,7 +2,7 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createPool, queryCount, runSchemaMigrations, runSqlFile, withTransaction } from './db.js';
-import { importLedgerCsv, importMasterCsv } from './import-csv.js';
+import { importLedgerHtml, importMasterHtml } from './import-html.js';
 import type { MasterImportTarget } from './field-mapping.js';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -14,17 +14,17 @@ type Command = 'schema' | 'import-masters' | 'import-ledger' | 'transform' | 'al
 function usage(): never {
   console.error(`Usage:
   npm run migrate -- schema
-  npm run migrate -- import-masters --branches filemaker/exports/M拠点L.csv [--companies ...] [--departments ...] [--employees ...]
-  npm run migrate -- import-ledger --file filemaker/exports/T切手出納台帳.csv
+  npm run migrate -- import-masters --branches filemaker/exports/M拠点L.htm [--entry-types ...] [--transaction-categories ...] [--red-voucher-statuses ...] [--employees ...]
+  npm run migrate -- import-ledger --file filemaker/exports/L_T金券管理台帳.htm
   npm run migrate -- transform
-  npm run migrate -- all --ledger filemaker/exports/T切手出納台帳.csv [--branches ...] [--companies ...] [--departments ...] [--employees ...]
+  npm run migrate -- all --ledger filemaker/exports/L_T金券管理台帳.htm [--branches ...] [--entry-types ...] [--transaction-categories ...] [--red-voucher-statuses ...] [--employees ...]
   npm run migrate -- status
 
 Environment:
   DATABASE_URL  PostgreSQL connection string
 
 Note:
-  filemaker/*.xml are DDR schema reports (no row data). Export CSV from FileMaker Pro or use the Data API
+  filemaker/*.xml are DDR schema reports (no row data). Export FileMaker HTML tables from FileMaker Pro, or use the Data API
   (pg_migration account in 各種マスター.fmp12) before running import commands.`);
   process.exit(1);
 }
@@ -66,7 +66,7 @@ async function runImportMasters(): Promise<void> {
 
   const selected = imports.filter(([, path]) => path);
   if (selected.length === 0) {
-    throw new Error('import-masters requires at least one --branches|--companies|--departments|--employees CSV path');
+    throw new Error('import-masters requires at least one --branches|--companies|--departments|--employees|--entry-types|--transaction-categories|--red-voucher-statuses HTML export path');
   }
 
   const pool = createPool();
@@ -78,7 +78,7 @@ async function runImportMasters(): Promise<void> {
           console.warn(`File not found: ${path}, skipping..`);
           continue;
         }
-        const count = await importMasterCsv(client, target, path);
+        const count = await importMasterHtml(client, target, path);
         console.log(`Imported ${count} rows into ${target} from ${relativePath}`);
       }
     });
@@ -94,7 +94,7 @@ async function runImportLedger(fileArg?: string): Promise<void> {
   if (!existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
   const pool = createPool();
   try {
-    const inserted = await withTransaction(pool, (client) => importLedgerCsv(client, filePath));
+    const inserted = await withTransaction(pool, (client) => importLedgerHtml(client, filePath));
     console.log(`Loaded ${inserted} ledger rows into legacy_filemaker_voucher_ledger_staging.`);
   } finally {
     await pool.end();
@@ -134,7 +134,7 @@ async function runAll(): Promise<void> {
   ].some((flag) => readArg(flag));
   if (hasMasters) await runImportMasters();
   const ledgerPath = readArg('--ledger') ?? readArg('--file');
-  if (!ledgerPath) throw new Error('all requires --ledger <path> (T切手出納台帳 CSV export)');
+  if (!ledgerPath) throw new Error('all requires --ledger <path> (ledger HTML export)');
   await runImportLedger(ledgerPath);
   await runTransform();
 }

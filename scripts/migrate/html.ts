@@ -1,15 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { TextDecoder } from 'node:util';
-import type { CsvRow } from './csv.js';
 
-export function readHtmlTableFile(path: string): CsvRow[] {
+export type HtmlTableRow = Record<string, string>;
+
+export function readHtmlTableFile(path: string): HtmlTableRow[] {
   const html = readHtmlTextFile(path);
   const rows = parseFirstHtmlTable(html);
   if (rows.length === 0) return [];
 
   const headers = normalizeDuplicateHeaders(rows[0]!.map((header) => header.trim()));
   return rows.slice(1).map((cells) => {
-    const record: CsvRow = {};
+    const record: HtmlTableRow = {};
     headers.forEach((header, index) => {
       record[header] = (cells[index] ?? '').trim();
     });

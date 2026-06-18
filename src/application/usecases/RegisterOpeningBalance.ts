@@ -24,10 +24,6 @@ export class RegisterOpeningBalanceUseCase {
       if (!branch) throw new DomainError('BRANCH_NOT_FOUND', '拠点が見つかりません', { branchCode: command.branchCode });
       if (!branch.active) throw new DomainError('BRANCH_INACTIVE', '無効な拠点には登録できません', { branchCode: command.branchCode });
 
-      if (await voucherLedger.hasOpeningBalance(command.branchCode)) {
-        throw new DomainError('OPENING_BALANCE_ALREADY_EXISTS', '開始残高は既に登録されています', { branchCode: command.branchCode });
-      }
-
       const draft = await voucherLedger.insertDraftEntry({
         branchCode: command.branchCode,
         periodYear: command.periodYear,

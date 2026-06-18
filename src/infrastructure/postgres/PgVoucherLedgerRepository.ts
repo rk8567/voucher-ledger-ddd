@@ -4,6 +4,8 @@ import type {
   CurrentBalanceRecord,
   InventoryCheckRecord,
   LedgerEntryRecord,
+  LedgerEntryListFilter,
+  LedgerEntryListRecord,
   PostedLedgerEntryWithAmounts,
   VoucherLedgerRepository,
 } from '@/application/repositories/VoucherLedgerRepository';
@@ -313,6 +315,76 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     if (originalResult.rowCount !== 1 || reversalResult.rowCount !== 1) {
       throw new Error('Failed to link correction ledger entry.');
     }
+  }
+
+  async listLedgerEntries(filter: LedgerEntryListFilter): Promise<LedgerEntryListRecord> {
+    const limit = Math.min(Math.max(filter.limit ?? 100, 1), 500);
+    const values: unknown[] = [];
+    const where: string[] = [];
+
+    function add(value: unknown): string {
+      values.push(value);
+      return `$${values.length}`;
+    }
+
+    if (filter.branchCode != null) where.push(`branch_code = ${add(filter.branchCode)}`);
+    if (filter.periodYear != null) where.push(`period_year = ${add(filter.periodYear)}`);
+    if (filter.periodMonth != null) where.push(`period_month = ${add(filter.periodMonth)}`);
+    if (filter.processingDateFrom != null) where.push(`processing_date >= ${add(filter.processingDateFrom)}`);
+    if (filter.processingDateTo != null) where.push(`processing_date <= ${add(filter.processingDateTo)}`);
+    if (filter.entryTypeCode != null) where.push(`entry_type_code = ${add(filter.entryTypeCode)}`);
+    if (filter.cursorLedgerNo != null) where.push(`ledger_no > ${add(filter.cursorLedgerNo)}`);
+    if (!filter.includeDeleted) where.push('is_deleted = false');
+
+    const whereSql = where.length === 0 ? '' : `WHERE ${where.join(' AND ')}`;
+    const result = await this.db.query(
+      `SELECT *
+         FROM voucher_ledger_entries
+        ${whereSql}
+        ORDER BY ledger_no ASC
+        LIMIT ${add(limit + 1)}`,
+      values,
+    );
+
+    const rows = (result.rows as Record<string, unknown>[]).map(mapEntry);
+    const items = rows.slice(0, limit);
+    return {
+      items,
+      nextCursorLedgerNo: rows.length > limit ? items.at(-1)?.ledgerNo ?? null : null,
+    };
+  }
+
+  async getLedgerEntryByLedgerNo(ledgerNo: number): Promise<PostedLedgerEntryWithAmounts | null> {
+    const entryResult = await this.db.query(
+      `SELECT *
+         FROM voucher_ledger_entries
+        WHERE ledger_no = $1
+          AND posted_at IS NOT NULL`,
+      [ledgerNo],
+    );
+
+    if (entryResult.rowCount === 0) return null;
+
+    const entry = mapEntry(entryResult.rows[0] as Record<string, unknown>);
+    const quantityResult = await this.db.query(
+      `SELECT denomination_yen, quantity
+         FROM voucher_ledger_entry_denominations
+        WHERE entry_id = $1`,
+      [entry.id],
+    );
+
+    const quantities: QuantitySnapshot = {};
+    for (const row of quantityResult.rows as Record<string, unknown>[]) {
+      quantities[numberOf(row.denomination_yen)] = numberOf(row.quantity);
+    }
+
+    const stampAmount = stampAmountYen(quantities);
+    return {
+      ...entry,
+      quantities,
+      stampAmountYen: stampAmount,
+      totalAmountYen: stampAmount + entry.otherAmountYen,
+    };
   }
 
   async getCurrentBalance(branchCode: number): Promise<CurrentBalanceRecord> {
