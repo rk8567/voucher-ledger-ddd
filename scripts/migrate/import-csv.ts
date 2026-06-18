@@ -314,6 +314,7 @@ function rawQuantitiesFromRow(row: Record<string, string>): number[] {
 }
 
 async function upsertBranches(client: PoolClient, mapped: Record<string, string>): Promise<void> {
+  const explicitActive = asNullableBoolean(mapped.active);
   await client.query(
     `INSERT INTO branches (
       branch_code, branch_name, abbreviation, active, opening_balance_amount_legacy, notes, legacy_uuid
@@ -330,7 +331,7 @@ async function upsertBranches(client: PoolClient, mapped: Record<string, string>
       asRequiredInt(mapped.branch_code, 'branch_code'),
       mapped.branch_name || `Branch ${mapped.branch_code}`,
       mapped.abbreviation || null,
-      asNullableBoolean(mapped.active) ?? false,
+      explicitActive ?? Boolean(mapped.branch_name),
       asNullableBigInt(mapped.opening_balance_amount_legacy)?.toString() ?? null,
       mapped.notes || null,
       mapped.legacy_uuid || null,
@@ -360,15 +361,17 @@ async function upsertCompanies(client: PoolClient, mapped: Record<string, string
 
 async function upsertDepartments(client: PoolClient, mapped: Record<string, string>): Promise<void> {
   await client.query(
-    `INSERT INTO departments (department_code, department_name, legacy_uuid)
-     VALUES ($1,$2,$3)
+    `INSERT INTO departments (department_code, department_name, active, legacy_uuid)
+     VALUES ($1,$2,$3,$4)
      ON CONFLICT (department_code) DO UPDATE SET
        department_name = EXCLUDED.department_name,
+       active = EXCLUDED.active,
        legacy_uuid = COALESCE(EXCLUDED.legacy_uuid, departments.legacy_uuid),
        updated_at = now()`,
     [
       asRequiredInt(mapped.department_code, 'department_code'),
       mapped.department_name || `Department ${mapped.department_code}`,
+      Boolean(mapped.department_name),
       mapped.legacy_uuid || null,
     ],
   );
@@ -381,31 +384,42 @@ async function upsertEmployees(client: PoolClient, mapped: Record<string, string
   const companyCode = asNullableInt(mapped.company_code);
   const departmentCode = asNullableInt(mapped.department_code);
   const branchCode = asNullableInt(mapped.branch_code);
+  const companyName = mapped.company_name || (companyCode == null ? null : `Legacy company ${companyCode}`);
+  const departmentName = mapped.department_name || (departmentCode == null ? null : `Legacy department ${departmentCode}`);
+  const branchName = mapped.branch_name || (branchCode == null ? null : `Legacy branch ${branchCode}`);
 
   if (companyCode != null) {
     await client.query(
       `INSERT INTO companies (company_code, company_name)
        VALUES ($1,$2)
-       ON CONFLICT (company_code) DO NOTHING`,
-      [companyCode, `Legacy company ${companyCode}`],
+       ON CONFLICT (company_code) DO UPDATE SET
+         company_name = EXCLUDED.company_name,
+         updated_at = now()`,
+      [companyCode, companyName],
     );
   }
 
   if (departmentCode != null) {
     await client.query(
       `INSERT INTO departments (department_code, department_name, active)
-       VALUES ($1,$2,false)
-       ON CONFLICT (department_code) DO NOTHING`,
-      [departmentCode, mapped.department_name || `Legacy department ${departmentCode}`],
+       VALUES ($1,$2,$3)
+       ON CONFLICT (department_code) DO UPDATE SET
+         department_name = EXCLUDED.department_name,
+         active = EXCLUDED.active,
+         updated_at = now()`,
+      [departmentCode, departmentName, Boolean(mapped.department_name)],
     );
   }
 
   if (branchCode != null) {
     await client.query(
       `INSERT INTO branches (branch_code, branch_name, active)
-       VALUES ($1,$2,false)
-       ON CONFLICT (branch_code) DO NOTHING`,
-      [branchCode, `Legacy branch ${branchCode}`],
+       VALUES ($1,$2,$3)
+       ON CONFLICT (branch_code) DO UPDATE SET
+         branch_name = EXCLUDED.branch_name,
+         active = branches.active OR EXCLUDED.active,
+         updated_at = now()`,
+      [branchCode, branchName, Boolean(mapped.branch_name)],
     );
   }
 
