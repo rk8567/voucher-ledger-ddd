@@ -48,6 +48,22 @@ WHERE e.employee_no IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM employees emp WHERE emp.employee_no = e.employee_no)
 ON CONFLICT (employee_no) DO NOTHING;
 
+UPDATE voucher_ledger_entries e
+SET responsible_employee_no = s.responsible_employee_no,
+    registered_by_employee_no = s.registered_by_employee_no,
+    updated_by_employee_no = s.updated_by_employee_no,
+    registered_at = COALESCE(s.registered_at, e.registered_at),
+    updated_at = COALESCE(s.updated_at, e.updated_at)
+FROM legacy_filemaker_voucher_ledger_staging s
+WHERE s.ledger_no = e.ledger_no
+  AND (
+    e.responsible_employee_no IS DISTINCT FROM s.responsible_employee_no
+    OR e.registered_by_employee_no IS DISTINCT FROM s.registered_by_employee_no
+    OR e.updated_by_employee_no IS DISTINCT FROM s.updated_by_employee_no
+    OR (s.registered_at IS NOT NULL AND e.registered_at IS DISTINCT FROM s.registered_at)
+    OR (s.updated_at IS NOT NULL AND e.updated_at IS DISTINCT FROM s.updated_at)
+  );
+
 INSERT INTO voucher_ledger_entries (
   legacy_uuid,
   ledger_no,

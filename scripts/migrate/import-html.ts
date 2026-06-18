@@ -60,7 +60,56 @@ INSERT INTO legacy_filemaker_voucher_ledger_staging (
 ) VALUES (
   $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50
 )
-ON CONFLICT (ledger_no) DO NOTHING
+ON CONFLICT (ledger_no) DO UPDATE SET
+  source_file = EXCLUDED.source_file,
+  raw_record = EXCLUDED.raw_record,
+  legacy_uuid = COALESCE(EXCLUDED.legacy_uuid, legacy_filemaker_voucher_ledger_staging.legacy_uuid),
+  department_code = EXCLUDED.department_code,
+  branch_code = EXCLUDED.branch_code,
+  period_year = EXCLUDED.period_year,
+  period_month = EXCLUDED.period_month,
+  application_date = EXCLUDED.application_date,
+  processing_date = EXCLUDED.processing_date,
+  daily_sequence = EXCLUDED.daily_sequence,
+  entry_type_code = EXCLUDED.entry_type_code,
+  transaction_category_code = EXCLUDED.transaction_category_code,
+  counterparty_branch_code = EXCLUDED.counterparty_branch_code,
+  status_code = EXCLUDED.status_code,
+  description = EXCLUDED.description,
+  responsible_employee_no = EXCLUDED.responsible_employee_no,
+  company_code = EXCLUDED.company_code,
+  other_amount = EXCLUDED.other_amount,
+  other_amount_note = EXCLUDED.other_amount_note,
+  remarks = EXCLUDED.remarks,
+  is_deleted = EXCLUDED.is_deleted,
+  red_voucher_status_code = EXCLUDED.red_voucher_status_code,
+  original_ledger_no = EXCLUDED.original_ledger_no,
+  reversal_ledger_no = EXCLUDED.reversal_ledger_no,
+  correction_ledger_no = EXCLUDED.correction_ledger_no,
+  registered_at = EXCLUDED.registered_at,
+  registered_by_employee_no = EXCLUDED.registered_by_employee_no,
+  updated_at = EXCLUDED.updated_at,
+  updated_by_employee_no = EXCLUDED.updated_by_employee_no,
+  filemaker_created_at = EXCLUDED.filemaker_created_at,
+  filemaker_created_by = EXCLUDED.filemaker_created_by,
+  filemaker_modified_at = EXCLUDED.filemaker_modified_at,
+  filemaker_modified_by = EXCLUDED.filemaker_modified_by,
+  quantity_rep_01 = EXCLUDED.quantity_rep_01,
+  quantity_rep_02 = EXCLUDED.quantity_rep_02,
+  quantity_rep_03 = EXCLUDED.quantity_rep_03,
+  quantity_rep_04 = EXCLUDED.quantity_rep_04,
+  quantity_rep_05 = EXCLUDED.quantity_rep_05,
+  quantity_rep_06 = EXCLUDED.quantity_rep_06,
+  quantity_rep_07 = EXCLUDED.quantity_rep_07,
+  quantity_rep_08 = EXCLUDED.quantity_rep_08,
+  quantity_rep_09 = EXCLUDED.quantity_rep_09,
+  quantity_rep_10 = EXCLUDED.quantity_rep_10,
+  quantity_rep_11 = EXCLUDED.quantity_rep_11,
+  quantity_rep_12 = EXCLUDED.quantity_rep_12,
+  quantity_rep_13 = EXCLUDED.quantity_rep_13,
+  quantity_rep_14 = EXCLUDED.quantity_rep_14,
+  quantity_rep_15 = EXCLUDED.quantity_rep_15,
+  quantity_rep_16 = EXCLUDED.quantity_rep_16
 `;
 
 function mapRow(row: HtmlTableRow, columnMap: Record<string, string>): Record<string, string> {
@@ -112,6 +161,11 @@ function asNullableDate(value: string | undefined): string | null {
 
 function asNullableTimestamp(value: string | undefined): string | null {
   if (value == null || value === '') return null;
+  const slashMatch = /^(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(value);
+  if (slashMatch) {
+    const [, year, month, day, hour, minute, second = '00'] = slashMatch;
+    return `${year}-${month!.padStart(2, '0')}-${day!.padStart(2, '0')}T${hour!.padStart(2, '0')}:${minute}:${second.padStart(2, '0')}`;
+  }
   const normalized = value.replace(/\//g, '-').replace(' ', 'T');
   const parsed = Date.parse(normalized);
   if (Number.isNaN(parsed)) return null;
@@ -120,7 +174,8 @@ function asNullableTimestamp(value: string | undefined): string | null {
 
 export async function importLedgerHtml(client: PoolClient, filePath: string): Promise<number> {
   assertHtmlFile(filePath);
-  return importRawLedgerRows(client, filePath, readHtmlTableFile(filePath));
+  const resolveEmployeeNo = await loadEmployeeResolver(client);
+  return importRawLedgerRows(client, filePath, readHtmlTableFile(filePath), resolveEmployeeNo);
 }
 
 function assertHtmlFile(filePath: string): void {
@@ -133,6 +188,7 @@ async function importRawLedgerRows(
   client: PoolClient,
   filePath: string,
   rows: Array<Record<string, string>>,
+  resolveEmployeeNo: (name: string | undefined, branchCode: number) => number | null,
 ): Promise<number> {
   let inserted = 0;
 
@@ -146,6 +202,9 @@ async function importRawLedgerRows(
     const originalLedgerNo = asNullableInt(row.元伝票No);
     const reversalLedgerNo = asNullableInt(row.赤伝票No);
     const correctionLedgerNo = asNullableInt(row.訂正伝票No);
+    const responsibleEmployeeNo = asNullableInt(row.担当者CD) ?? resolveEmployeeNo(row.氏名, branchCode);
+    const registeredByEmployeeNo = asNullableInt(row.登録担当CD) ?? resolveEmployeeNo(row['氏名[2]'], branchCode);
+    const updatedByEmployeeNo = asNullableInt(row.更新担当CD) ?? resolveEmployeeNo(row['氏名[3]'], branchCode);
 
     const result = await client.query(STAGING_INSERT, [
       filePath,
@@ -164,7 +223,7 @@ async function importRawLedgerRows(
       null,
       null,
       row.摘要 || row.内容 || '(raw legacy import)',
-      null,
+      responsibleEmployeeNo,
       null,
       asNullableBigInt(row.その他金額)?.toString() ?? '0',
       null,
@@ -175,9 +234,9 @@ async function importRawLedgerRows(
       reversalLedgerNo,
       correctionLedgerNo,
       asNullableTimestamp(row.登録日時),
-      null,
+      registeredByEmployeeNo,
       asNullableTimestamp(row.更新日時) ?? asNullableTimestamp(row.登録日時),
-      null,
+      updatedByEmployeeNo,
       null,
       null,
       null,
@@ -189,6 +248,60 @@ async function importRawLedgerRows(
   }
 
   return inserted;
+}
+
+async function loadEmployeeResolver(
+  client: PoolClient,
+): Promise<(name: string | undefined, branchCode: number) => number | null> {
+  const result = await client.query<{
+    employee_no: number | string;
+    employee_name: string;
+    branch_code: number | string | null;
+  }>(`
+    SELECT employee_no, employee_name, branch_code
+      FROM employees
+     WHERE employee_no > 0
+       AND employee_name IS NOT NULL
+  `);
+
+  const byName = new Map<string, number[]>();
+  const byNameBranch = new Map<string, number[]>();
+
+  for (const row of result.rows) {
+    const employeeNo = Number(row.employee_no);
+    const name = normalizeEmployeeName(row.employee_name);
+    if (!name || !Number.isInteger(employeeNo)) continue;
+
+    const all = byName.get(name) ?? [];
+    all.push(employeeNo);
+    byName.set(name, all);
+
+    if (row.branch_code != null) {
+      const scopedKey = employeeNameBranchKey(name, Number(row.branch_code));
+      const scoped = byNameBranch.get(scopedKey) ?? [];
+      scoped.push(employeeNo);
+      byNameBranch.set(scopedKey, scoped);
+    }
+  }
+
+  return (rawName: string | undefined, branchCode: number): number | null => {
+    const name = normalizeEmployeeName(rawName);
+    if (!name) return null;
+
+    const scoped = byNameBranch.get(employeeNameBranchKey(name, branchCode)) ?? [];
+    if (scoped.length === 1) return scoped[0]!;
+
+    const all = byName.get(name) ?? [];
+    return all.length === 1 ? all[0]! : null;
+  };
+}
+
+function normalizeEmployeeName(value: string | undefined): string {
+  return (value ?? '').replace(/[\u3000\s]+/g, ' ').trim();
+}
+
+function employeeNameBranchKey(name: string, branchCode: number): string {
+  return `${name}\0${branchCode}`;
 }
 
 function rawRedVoucherStatusCode(input: { originalLedgerNo: number | null; reversalLedgerNo: number | null }): 0 | 1 | 2 | 3 {

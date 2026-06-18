@@ -251,6 +251,10 @@ RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
+  IF current_setting('voucher_ledger.legacy_import', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+
   NEW.updated_at := now();
   RETURN NEW;
 END;
@@ -331,6 +335,10 @@ RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
+  IF current_setting('voucher_ledger.legacy_import', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+
   IF OLD.posted_at IS NOT NULL THEN
     IF ROW(
       OLD.branch_code,

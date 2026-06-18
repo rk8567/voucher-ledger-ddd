@@ -34,8 +34,18 @@ function nullableStringOf(value: unknown): string | null {
 
 function nullableDateOnlyOf(value: unknown): string | null {
   if (value === null || value === undefined) return null;
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
   return String(value).slice(0, 10);
+}
+
+function nullableRecordOf(value: unknown): Record<string, unknown> | null {
+  if (value === null || value === undefined || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
 }
 
 function mapBranch(row: Record<string, unknown>): BranchRecord {
@@ -51,29 +61,88 @@ function mapEntry(row: Record<string, unknown>): LedgerEntryRecord {
     id: String(row.id),
     ledgerNo: numberOf(row.ledger_no),
     branchCode: numberOf(row.branch_code),
+    branchName: nullableStringOf(row.branch_name),
     departmentCode: nullableNumberOf(row.department_code),
+    departmentName: nullableStringOf(row.department_name),
     periodYear: nullableNumberOf(row.period_year),
     periodMonth: nullableNumberOf(row.period_month),
     applicationDate: nullableDateOnlyOf(row.application_date),
     processingDate: nullableDateOnlyOf(row.processing_date) ?? '',
     dailySequence: numberOf(row.daily_sequence),
     entryTypeCode: numberOf(row.entry_type_code) as EntryTypeCode,
+    entryTypeName: nullableStringOf(row.entry_type_name),
     transactionCategoryCode: nullableNumberOf(row.transaction_category_code),
+    transactionCategoryName: nullableStringOf(row.transaction_category_name),
     counterpartyBranchCode: nullableNumberOf(row.counterparty_branch_code),
+    counterpartyBranchName: nullableStringOf(row.counterparty_branch_name),
     statusCode: nullableNumberOf(row.status_code),
     companyCode: nullableNumberOf(row.company_code),
+    companyName: nullableStringOf(row.company_name),
     responsibleEmployeeNo: nullableNumberOf(row.responsible_employee_no),
+    responsibleEmployeeName: nullableStringOf(row.responsible_employee_name),
     description: String(row.description ?? ''),
     remarks: nullableStringOf(row.remarks),
     otherAmountYen: numberOf(row.other_amount),
     otherAmountNote: nullableStringOf(row.other_amount_note),
     redVoucherStatusCode: numberOf(row.red_voucher_status_code) as 0 | 1 | 2 | 3,
+    redVoucherStatusName: nullableStringOf(row.red_voucher_status_name),
     originalLedgerNo: nullableNumberOf(row.original_ledger_no),
     reversalLedgerNo: nullableNumberOf(row.reversal_ledger_no),
     correctionLedgerNo: nullableNumberOf(row.correction_ledger_no),
+    isDeleted: Boolean(row.is_deleted),
+    legacyRegisteredButtonClicked: row.legacy_registered_button_clicked == null
+      ? false
+      : Boolean(row.legacy_registered_button_clicked),
+    registeredAt: nullableStringOf(row.registered_at),
+    registeredByEmployeeNo: nullableNumberOf(row.registered_by_employee_no),
+    registeredByEmployeeName: nullableStringOf(row.registered_by_employee_name),
+    updatedAt: nullableStringOf(row.updated_at),
+    updatedByEmployeeNo: nullableNumberOf(row.updated_by_employee_no),
+    updatedByEmployeeName: nullableStringOf(row.updated_by_employee_name),
     postedAt: nullableStringOf(row.posted_at),
+    filemakerCreatedAt: nullableStringOf(row.filemaker_created_at),
+    filemakerCreatedBy: nullableStringOf(row.filemaker_created_by),
+    filemakerModifiedAt: nullableStringOf(row.filemaker_modified_at),
+    filemakerModifiedBy: nullableStringOf(row.filemaker_modified_by),
+    createdAt: nullableStringOf(row.created_at),
+    legacyRawRecord: nullableRecordOf(row.legacy_raw_record),
   };
 }
+
+const LEDGER_ENTRY_SELECT = `
+  SELECT e.*,
+         NULL::jsonb AS legacy_raw_record,
+         b.branch_name AS branch_name,
+         d.department_name AS department_name,
+         et.name_japanese AS entry_type_name,
+         tc.name_japanese AS transaction_category_name,
+         cb.branch_name AS counterparty_branch_name,
+         c.company_name AS company_name,
+         responsible.employee_name AS responsible_employee_name,
+         rvs.name_japanese AS red_voucher_status_name,
+         registered_by.employee_name AS registered_by_employee_name,
+         updated_by.employee_name AS updated_by_employee_name
+    FROM voucher_ledger_entries e
+    LEFT JOIN branches b ON b.branch_code = e.branch_code
+    LEFT JOIN departments d ON d.department_code = e.department_code
+    LEFT JOIN entry_types et ON et.code = e.entry_type_code
+    LEFT JOIN transaction_categories tc ON tc.code = e.transaction_category_code
+    LEFT JOIN branches cb ON cb.branch_code = e.counterparty_branch_code
+    LEFT JOIN companies c ON c.company_code = e.company_code
+    LEFT JOIN employees responsible ON responsible.employee_no = e.responsible_employee_no
+    LEFT JOIN red_voucher_statuses rvs ON rvs.code = e.red_voucher_status_code
+    LEFT JOIN employees registered_by ON registered_by.employee_no = e.registered_by_employee_no
+    LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no
+`;
+
+const LEDGER_ENTRY_DETAIL_SELECT = LEDGER_ENTRY_SELECT.replace(
+  'NULL::jsonb AS legacy_raw_record,',
+  's.raw_record AS legacy_raw_record,',
+).replace(
+  'LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no',
+  `LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no
+    LEFT JOIN legacy_filemaker_voucher_ledger_staging s ON s.ledger_no = e.ledger_no`,
+);
 
 export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
   constructor(private readonly db: DbClient) {}
@@ -327,21 +396,20 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
       return `$${values.length}`;
     }
 
-    if (filter.branchCode != null) where.push(`branch_code = ${add(filter.branchCode)}`);
-    if (filter.periodYear != null) where.push(`period_year = ${add(filter.periodYear)}`);
-    if (filter.periodMonth != null) where.push(`period_month = ${add(filter.periodMonth)}`);
-    if (filter.processingDateFrom != null) where.push(`processing_date >= ${add(filter.processingDateFrom)}`);
-    if (filter.processingDateTo != null) where.push(`processing_date <= ${add(filter.processingDateTo)}`);
-    if (filter.entryTypeCode != null) where.push(`entry_type_code = ${add(filter.entryTypeCode)}`);
-    if (filter.cursorLedgerNo != null) where.push(`ledger_no > ${add(filter.cursorLedgerNo)}`);
-    if (!filter.includeDeleted) where.push('is_deleted = false');
+    if (filter.branchCode != null) where.push(`e.branch_code = ${add(filter.branchCode)}`);
+    if (filter.periodYear != null) where.push(`e.period_year = ${add(filter.periodYear)}`);
+    if (filter.periodMonth != null) where.push(`e.period_month = ${add(filter.periodMonth)}`);
+    if (filter.processingDateFrom != null) where.push(`e.processing_date >= ${add(filter.processingDateFrom)}`);
+    if (filter.processingDateTo != null) where.push(`e.processing_date <= ${add(filter.processingDateTo)}`);
+    if (filter.entryTypeCode != null) where.push(`e.entry_type_code = ${add(filter.entryTypeCode)}`);
+    if (filter.cursorLedgerNo != null) where.push(`e.ledger_no > ${add(filter.cursorLedgerNo)}`);
+    if (!filter.includeDeleted) where.push('e.is_deleted = false');
 
     const whereSql = where.length === 0 ? '' : `WHERE ${where.join(' AND ')}`;
     const result = await this.db.query(
-      `SELECT *
-         FROM voucher_ledger_entries
+      `${LEDGER_ENTRY_SELECT}
         ${whereSql}
-        ORDER BY ledger_no ASC
+        ORDER BY e.ledger_no ASC
         LIMIT ${add(limit + 1)}`,
       values,
     );
@@ -356,10 +424,9 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
 
   async getLedgerEntryByLedgerNo(ledgerNo: number): Promise<PostedLedgerEntryWithAmounts | null> {
     const entryResult = await this.db.query(
-      `SELECT *
-         FROM voucher_ledger_entries
-        WHERE ledger_no = $1
-          AND posted_at IS NOT NULL`,
+      `${LEDGER_ENTRY_DETAIL_SELECT}
+        WHERE e.ledger_no = $1
+          AND e.posted_at IS NOT NULL`,
       [ledgerNo],
     );
 
