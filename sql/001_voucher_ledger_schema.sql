@@ -432,10 +432,12 @@ BEGIN
     RAISE EXCEPTION 'Unknown entry_type_code: %', NEW.entry_type_code;
   END IF;
 
-  SELECT COALESCE(SUM(d.quantity::bigint * d.denomination_yen::bigint), 0) + NEW.other_amount
+  SELECT COALESCE(SUM(d.quantity::bigint * d.denomination_yen::bigint), 0)
     INTO entered_total_amount
     FROM voucher_ledger_entry_denominations d
    WHERE d.entry_id = NEW.id;
+
+  entered_total_amount := entered_total_amount + NEW.other_amount;
 
   IF amount_required AND entered_total_amount <= 0 THEN
     RAISE EXCEPTION 'Amount or denomination quantity is required for entry_type_code=%', NEW.entry_type_code;
