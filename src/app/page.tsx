@@ -1,6 +1,7 @@
 import { DENOMINATIONS, quantityOf, stampQuantityCount } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
 import { getLedgerDashboardData, type LedgerSearchInput } from '@/server/ledger';
+import { EntryActionModals } from './EntryActionModals';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,9 @@ const ENTRY_TYPE_LABELS: Record<number, string> = {
   [EntryTypeCode.OpeningBalance]: '開始時残高',
 };
 
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
+const DEFAULT_PAGE_SIZE = 100;
+
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -30,9 +34,21 @@ function numberParam(value: string | string[] | undefined): number | null {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
+function positiveNumberParam(value: string | string[] | undefined): number | null {
+  const parsed = numberParam(value);
+  return parsed != null && parsed > 0 ? parsed : null;
+}
+
+function pageSizeParam(value: string | string[] | undefined): number | null {
+  const parsed = numberParam(value);
+  return PAGE_SIZE_OPTIONS.some((option) => option === parsed) ? parsed : null;
+}
+
 function dateParam(value: string | string[] | undefined): string | null {
   const raw = firstParam(value);
-  return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+  if (!raw) return null;
+  const normalized = raw.replaceAll('/', '-');
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
 }
 
 function yen(value: number): string {
@@ -56,7 +72,9 @@ function parseSearchParams(params: Record<string, string | string[] | undefined>
     processingDateFrom: dateParam(params.processingDateFrom),
     processingDateTo: dateParam(params.processingDateTo),
     entryTypeCode: entryType == null ? null : (entryType as EntryTypeCode),
-    ledgerNo: numberParam(params.ledgerNo),
+    ledgerNo: positiveNumberParam(params.ledgerNo),
+    limit: pageSizeParam(params.limit),
+    page: positiveNumberParam(params.page),
   };
 }
 
@@ -67,6 +85,20 @@ export default async function Page({ searchParams }: PageProps) {
   try {
     const data = await getLedgerDashboardData(input);
     const selected = data.selectedEntry;
+    const defaultProcessingDate = input.processingDateFrom ?? selected?.processingDate ?? todayInTokyo();
+    const defaultPeriodYear = input.periodYear ?? selected?.periodYear ?? Number(defaultProcessingDate.slice(0, 4));
+    const defaultPeriodMonth = input.periodMonth ?? selected?.periodMonth ?? Number(defaultProcessingDate.slice(5, 7));
+    const defaultBranchCode = input.branchCode ?? selected?.branchCode ?? data.currentBalance?.branchCode ?? null;
+    const defaultResponsibleEmployeeNo = selected?.responsibleEmployeeNo ?? null;
+    const defaultActorEmployeeNo = selected?.filemakerLoginEmployeeNo ?? selected?.updatedByEmployeeNo ?? null;
+    const actionMessage = firstParam(params.actionMessage);
+    const clearDraft = firstParam(params.clearDraft);
+    const pageSize = input.limit ?? DEFAULT_PAGE_SIZE;
+    const currentPage = input.page ?? 1;
+    const totalPages = Math.max(Math.ceil(data.entries.totalCount / pageSize), 1);
+    const previousHref = currentPage > 1 ? pageHref(params, currentPage - 1) : null;
+    const nextHref = currentPage < totalPages ? pageHref(params, currentPage + 1) : null;
+    const pageNumbers = paginationItems(currentPage, totalPages);
 
     return (
       <main className="shell">
@@ -76,7 +108,7 @@ export default async function Page({ searchParams }: PageProps) {
             <h1>金券管理台帳</h1>
           </div>
           <div className="headerStats">
-            <span>{data.entries.items.length} entries</span>
+            <span>{data.entries.totalCount} entries</span>
             <span>{data.currentBalance ? `Branch ${data.currentBalance.branchCode}` : 'No balance'}</span>
           </div>
         </header>
@@ -108,11 +140,30 @@ export default async function Page({ searchParams }: PageProps) {
             </label>
             <label>
               <span>処理日 From</span>
-              <input type="date" name="processingDateFrom" defaultValue={firstParam(params.processingDateFrom) ?? ''} />
+              <input
+                name="processingDateFrom"
+                pattern="\d{4}/\d{2}/\d{2}"
+                placeholder="yyyy/mm/dd"
+                defaultValue={dateInputText(firstParam(params.processingDateFrom))}
+              />
             </label>
             <label>
               <span>処理日 To</span>
-              <input type="date" name="processingDateTo" defaultValue={firstParam(params.processingDateTo) ?? ''} />
+              <input
+                name="processingDateTo"
+                pattern="\d{4}/\d{2}/\d{2}"
+                placeholder="yyyy/mm/dd"
+                defaultValue={dateInputText(firstParam(params.processingDateTo))}
+              />
+            </label>
+            <label>
+              <span>表示件数</span>
+              <select name="limit" defaultValue={String(pageSize)}>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+              </select>
             </label>
             <button type="submit">検索</button>
           </form>
@@ -125,12 +176,24 @@ export default async function Page({ searchParams }: PageProps) {
           <Metric label="基準出納No" value={data.currentBalance?.asOfLedgerNo?.toString() ?? '-'} />
         </section>
 
+        {actionMessage ? <p className="notice successNotice">{actionMessage}</p> : null}
+
         <div className="contentGrid">
           <section className="panel ledgerPanel" aria-label="Ledger entries">
             <div className="panelHeader">
               <h2>出納一覧</h2>
-              <span>latest query limit 50</span>
+              <span>{pageRangeText(currentPage, pageSize, data.entries.items.length, data.entries.totalCount)}</span>
             </div>
+            <EntryActionModals
+              defaultBranchCode={defaultBranchCode}
+              defaultProcessingDate={defaultProcessingDate}
+              defaultPeriodYear={defaultPeriodYear}
+              defaultPeriodMonth={defaultPeriodMonth}
+              defaultResponsibleEmployeeNo={defaultResponsibleEmployeeNo}
+              defaultActorEmployeeNo={defaultActorEmployeeNo}
+              clearDraft={clearDraft === 'movement' || clearDraft === 'inventory' ? clearDraft : null}
+              options={data.formOptions}
+            />
             <div className="tableWrap">
               <table>
                 <thead>
@@ -153,10 +216,10 @@ export default async function Page({ searchParams }: PageProps) {
                         <td>
                           <a href={href}>#{entry.ledgerNo}</a>
                         </td>
-                        <td>{entry.processingDate}</td>
-                        <td>{codeName(entry.branchCode, entry.branchName)}</td>
-                        <td>{codeName(entry.entryTypeCode, entry.entryTypeName ?? entryTypeName(entry.entryTypeCode))}</td>
-                        <td>{codeName(entry.responsibleEmployeeNo, entry.responsibleEmployeeName)}</td>
+                        <td>{dateOnly(entry.processingDate)}</td>
+                        <td>{nameOnly(entry.branchName)}</td>
+                        <td>{entry.entryTypeName ?? entryTypeName(entry.entryTypeCode)}</td>
+                        <td>{nameOnly(entry.responsibleEmployeeName)}</td>
                         <td className="description">{entry.description}</td>
                         <td className="number">{yen(entry.otherAmountYen)}</td>
                       </tr>
@@ -165,6 +228,16 @@ export default async function Page({ searchParams }: PageProps) {
                 </tbody>
               </table>
             </div>
+            <PaginationControls
+              previousHref={previousHref}
+              nextHref={nextHref}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageNumbers={pageNumbers}
+              pageSize={pageSize}
+              totalCount={data.entries.totalCount}
+              params={params}
+            />
           </section>
 
           <aside className="panel detailPanel" aria-label="Selected entry detail">
@@ -180,11 +253,11 @@ export default async function Page({ searchParams }: PageProps) {
                     ['出納No', selected.ledgerNo],
                     ['摘要', selected.description],
                     ['備考', selected.remarks],
-                    ['処理日', selected.processingDate],
-                    ['申請処理日', selected.applicationDate],
+                    ['処理日', dateOnly(selected.processingDate)],
+                    ['申請処理日', dateOnly(selected.applicationDate)],
                     ['年/月', periodText(selected.periodYear, selected.periodMonth)],
                     ['連番', selected.dailySequence],
-                    ['登録済', selected.postedAt],
+                    ['登録済', dateTime(selected.postedAt)],
                   ]}
                 />
                 <DetailSection
@@ -237,24 +310,24 @@ export default async function Page({ searchParams }: PageProps) {
                 <DetailSection
                   title="監査"
                   rows={[
-                    ['登録日時', selected.registeredAt],
+                    ['登録日時', dateTime(selected.registeredAt)],
                     ['登録担当', codeName(selected.registeredByEmployeeNo, selected.registeredByEmployeeName)],
-                    ['更新日時', selected.updatedAt],
+                    ['更新日時', dateTime(selected.updatedAt)],
                     ['更新担当', codeName(selected.updatedByEmployeeNo, selected.updatedByEmployeeName)],
-                    ['作成日時', selected.createdAt],
+                    ['作成日時', dateTime(selected.createdAt)],
                   ]}
                 />
                 <DetailSection
                   title="FileMaker"
                   rows={[
-                    ['作成情報タイムスタンプ', selected.filemakerCreatedAt],
+                    ['ログイン社員', codeName(selected.filemakerLoginEmployeeNo, selected.filemakerLoginEmployeeName)],
+                    ['作成情報タイムスタンプ', dateTime(selected.filemakerCreatedAt)],
                     ['作成者', selected.filemakerCreatedBy],
-                    ['修正情報タイムスタンプ', selected.filemakerModifiedAt],
+                    ['修正情報タイムスタンプ', dateTime(selected.filemakerModifiedAt)],
                     ['修正者', selected.filemakerModifiedBy],
                     ['ID', selected.id],
                   ]}
                 />
-                <RawRecordSection rawRecord={selected.legacyRawRecord} />
               </>
             ) : (
               <p className="emptyState">条件に一致する出納がありません。</p>
@@ -290,6 +363,55 @@ function Metric({ label, value }: Readonly<{ label: string; value: string }>) {
   );
 }
 
+function PaginationControls({
+  previousHref,
+  nextHref,
+  currentPage,
+  totalPages,
+  pageNumbers,
+  pageSize,
+  totalCount,
+  params,
+}: Readonly<{
+  previousHref: string | null;
+  nextHref: string | null;
+  currentPage: number;
+  totalPages: number;
+  pageNumbers: readonly (number | 'ellipsis')[];
+  pageSize: number;
+  totalCount: number;
+  params: Record<string, string | string[] | undefined>;
+}>) {
+  return (
+    <nav className="paginationBar" aria-label="Ledger pagination">
+      <span>
+        {totalCount}件 / {totalPages}ページ / {pageSize}件
+      </span>
+      <div className="paginationActions">
+        {previousHref ? (
+          <a className="pagerButton" href={previousHref}>前へ</a>
+        ) : (
+          <span className="pagerButton pagerButtonDisabled" aria-disabled="true">前へ</span>
+        )}
+        <div className="pageNumberList">
+          {pageNumbers.map((pageNumber, index) => pageNumber === 'ellipsis' ? (
+            <span key={`ellipsis-${index}`} className="pagerEllipsis">...</span>
+          ) : pageNumber === currentPage ? (
+            <span key={pageNumber} className="pagerButton pagerButtonActive" aria-current="page">{pageNumber}</span>
+          ) : (
+            <a key={pageNumber} className="pagerButton" href={pageHref(params, pageNumber)}>{pageNumber}</a>
+          ))}
+        </div>
+        {nextHref ? (
+          <a className="pagerButton" href={nextHref}>次へ</a>
+        ) : (
+          <span className="pagerButton pagerButtonDisabled" aria-disabled="true">次へ</span>
+        )}
+      </div>
+    </nav>
+  );
+}
+
 function DetailSection({
   title,
   rows,
@@ -312,43 +434,50 @@ function DetailSection({
   );
 }
 
-function RawRecordSection({ rawRecord }: Readonly<{ rawRecord: Record<string, unknown> | null }>) {
-  const rows = rawRecordRows(rawRecord);
-  if (rows.length === 0) return null;
-
-  return (
-    <section className="detailSection">
-      <h3>Legacy raw_record</h3>
-      <div className="rawRecordGrid">
-        {rows.map(([key, value]) => (
-          <div key={key} className="rawRecordField">
-            <span>{key}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function rawRecordRows(rawRecord: Record<string, unknown> | null): [string, string][] {
-  if (!rawRecord) return [];
-  const row = rawRecord.row && typeof rawRecord.row === 'object' && !Array.isArray(rawRecord.row)
-    ? rawRecord.row as Record<string, unknown>
-    : rawRecord;
-
-  return Object.entries(row).map(([key, value]) => [key, rawValueText(value)]);
-}
-
-function rawValueText(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '-';
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value).replace(/\x1d/g, ' / ');
-}
-
 function displayValue(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined || value === '') return '-';
   return String(value);
+}
+
+function dateTime(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}/${byType.month}/${byType.day} ${byType.hour}:${byType.minute}:${byType.second}`;
+}
+
+function dateOnly(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (match) return `${match[1]}/${match[2]}/${match[3]}`;
+  return value.replaceAll('-', '/');
+}
+
+function dateInputText(value: string | null | undefined): string {
+  return dateOnly(value) ?? '';
+}
+
+function todayInTokyo(): string {
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
 }
 
 function codeName(code: number | null | undefined, name: string | null | undefined): string {
@@ -357,20 +486,78 @@ function codeName(code: number | null | undefined, name: string | null | undefin
   return name ? `${code} ${name}` : String(code);
 }
 
+function nameOnly(name: string | null | undefined): string {
+  return name || '-';
+}
+
 function periodText(year: number | null, month: number | null): string {
   if (year == null && month == null) return '-';
   return `${year ?? '-'} / ${month ?? '-'}`;
 }
 
+function pageRangeText(currentPage: number, pageSize: number, itemCount: number, totalCount: number): string {
+  if (totalCount === 0) return '0 entries';
+  const first = (currentPage - 1) * pageSize + 1;
+  const last = first + itemCount - 1;
+  return `${first}-${last} / ${totalCount} entries`;
+}
+
+function paginationItems(currentPage: number, totalPages: number): (number | 'ellipsis')[] {
+  if (totalPages <= 9) return Array.from({ length: totalPages }, (_, index) => index + 1);
+
+  const pages = new Set([1, totalPages]);
+  for (let page = currentPage - 2; page <= currentPage + 2; page += 1) {
+    if (page > 1 && page < totalPages) pages.add(page);
+  }
+
+  const sortedPages = [...pages].sort((a, b) => a - b);
+  const items: (number | 'ellipsis')[] = [];
+  for (const page of sortedPages) {
+    const previous = items.at(-1);
+    if (typeof previous === 'number' && page - previous > 1) items.push('ellipsis');
+    items.push(page);
+  }
+  return items;
+}
+
 function queryHref(params: Record<string, string | string[] | undefined>, ledgerNo: number): string {
   const next = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (key === 'ledgerNo') continue;
+    if (
+      key === 'ledgerNo'
+      || key === 'cursorLedgerNo'
+      || key === 'cursorStack'
+      || key === 'actionMessage'
+      || key === 'clearDraft'
+    ) {
+      continue;
+    }
     const first = firstParam(value);
     if (first) next.set(key, first);
   }
   next.set('ledgerNo', String(ledgerNo));
   return `/?${next.toString()}`;
+}
+
+function pageHref(params: Record<string, string | string[] | undefined>, page: number): string {
+  const next = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (
+      key === 'ledgerNo'
+      || key === 'cursorLedgerNo'
+      || key === 'cursorStack'
+      || key === 'page'
+      || key === 'actionMessage'
+      || key === 'clearDraft'
+    ) {
+      continue;
+    }
+    const first = firstParam(value);
+    if (first) next.set(key, first);
+  }
+  if (page > 1) next.set('page', String(page));
+  const query = next.toString();
+  return query ? `/?${query}` : '/';
 }
 
 function redVoucherText(code: 0 | 1 | 2 | 3): string {

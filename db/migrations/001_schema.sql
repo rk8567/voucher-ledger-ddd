@@ -183,6 +183,8 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
   filemaker_created_by text,
   filemaker_modified_at timestamptz,
   filemaker_modified_by text,
+  filemaker_login_employee_no integer,
+  filemaker_login_employee_name text,
 
   created_at timestamptz NOT NULL DEFAULT now(),
 

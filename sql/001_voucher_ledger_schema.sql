@@ -183,6 +183,8 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
   filemaker_created_by text,
   filemaker_modified_at timestamptz,
   filemaker_modified_by text,
+  filemaker_login_employee_no integer,
+  filemaker_login_employee_name text,
 
   created_at timestamptz NOT NULL DEFAULT now(),
 
@@ -742,6 +744,8 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
   source_file text NOT NULL DEFAULT 'DB金券管理台帳_fmp12.xml',
   raw_record jsonb,
 
+  filemaker_login_employee_no integer,
+  filemaker_login_employee_name text,
   legacy_uuid text,
   ledger_no bigint,
   department_code integer,

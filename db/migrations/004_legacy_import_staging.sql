@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
   source_file text NOT NULL DEFAULT 'DB金券管理台帳_fmp12.xml',
   raw_record jsonb,
 
+  filemaker_login_employee_no integer,
+  filemaker_login_employee_name text,
   legacy_uuid text,
   ledger_no bigint,
   department_code integer,
@@ -61,6 +63,10 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
   quantity_rep_15 integer,
   quantity_rep_16 integer
 );
+
+ALTER TABLE legacy_filemaker_voucher_ledger_staging
+  ADD COLUMN IF NOT EXISTS filemaker_login_employee_no integer,
+  ADD COLUMN IF NOT EXISTS filemaker_login_employee_name text;
 
 COMMENT ON TABLE legacy_filemaker_voucher_ledger_staging IS 'Raw import staging for legacy T切手出納台帳. Not used by the application layer.';
 

@@ -9,6 +9,8 @@ const STAGING_INSERT = `
 INSERT INTO legacy_filemaker_voucher_ledger_staging (
   source_file,
   raw_record,
+  filemaker_login_employee_no,
+  filemaker_login_employee_name,
   legacy_uuid,
   ledger_no,
   department_code,
@@ -58,11 +60,13 @@ INSERT INTO legacy_filemaker_voucher_ledger_staging (
   quantity_rep_15,
   quantity_rep_16
 ) VALUES (
-  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50
+  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52
 )
 ON CONFLICT (ledger_no) DO UPDATE SET
   source_file = EXCLUDED.source_file,
   raw_record = EXCLUDED.raw_record,
+  filemaker_login_employee_no = EXCLUDED.filemaker_login_employee_no,
+  filemaker_login_employee_name = EXCLUDED.filemaker_login_employee_name,
   legacy_uuid = COALESCE(EXCLUDED.legacy_uuid, legacy_filemaker_voucher_ledger_staging.legacy_uuid),
   department_code = EXCLUDED.department_code,
   branch_code = EXCLUDED.branch_code,
@@ -209,6 +213,8 @@ async function importRawLedgerRows(
     const result = await client.query(STAGING_INSERT, [
       filePath,
       JSON.stringify({ rowNumber: index + 1, row }),
+      asNullableInt(row['gログイン社員番号']),
+      row['ログイン社員NM'] || null,
       null,
       ledgerNo,
       asNullableInt(row.部門CD),

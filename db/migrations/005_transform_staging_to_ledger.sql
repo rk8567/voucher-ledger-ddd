@@ -5,6 +5,14 @@ BEGIN;
 
 SET LOCAL voucher_ledger.legacy_import = 'on';
 
+ALTER TABLE legacy_filemaker_voucher_ledger_staging
+  ADD COLUMN IF NOT EXISTS filemaker_login_employee_no integer,
+  ADD COLUMN IF NOT EXISTS filemaker_login_employee_name text;
+
+ALTER TABLE voucher_ledger_entries
+  ADD COLUMN IF NOT EXISTS filemaker_login_employee_no integer,
+  ADD COLUMN IF NOT EXISTS filemaker_login_employee_name text;
+
 -- Stub missing FK targets so legacy rows can load before full master cleanup.
 INSERT INTO branches (branch_code, branch_name, active)
 SELECT DISTINCT s.branch_code, 'Legacy branch ' || s.branch_code, false
@@ -53,7 +61,9 @@ SET responsible_employee_no = s.responsible_employee_no,
     registered_by_employee_no = s.registered_by_employee_no,
     updated_by_employee_no = s.updated_by_employee_no,
     registered_at = COALESCE(s.registered_at, e.registered_at),
-    updated_at = COALESCE(s.updated_at, e.updated_at)
+    updated_at = COALESCE(s.updated_at, e.updated_at),
+    filemaker_login_employee_no = s.filemaker_login_employee_no,
+    filemaker_login_employee_name = s.filemaker_login_employee_name
 FROM legacy_filemaker_voucher_ledger_staging s
 WHERE s.ledger_no = e.ledger_no
   AND (
@@ -62,6 +72,8 @@ WHERE s.ledger_no = e.ledger_no
     OR e.updated_by_employee_no IS DISTINCT FROM s.updated_by_employee_no
     OR (s.registered_at IS NOT NULL AND e.registered_at IS DISTINCT FROM s.registered_at)
     OR (s.updated_at IS NOT NULL AND e.updated_at IS DISTINCT FROM s.updated_at)
+    OR e.filemaker_login_employee_no IS DISTINCT FROM s.filemaker_login_employee_no
+    OR e.filemaker_login_employee_name IS DISTINCT FROM s.filemaker_login_employee_name
   );
 
 INSERT INTO voucher_ledger_entries (
@@ -97,7 +109,9 @@ INSERT INTO voucher_ledger_entries (
   filemaker_created_at,
   filemaker_created_by,
   filemaker_modified_at,
-  filemaker_modified_by
+  filemaker_modified_by,
+  filemaker_login_employee_no,
+  filemaker_login_employee_name
 )
 SELECT
   s.legacy_uuid,
@@ -136,7 +150,9 @@ SELECT
   s.filemaker_created_at,
   s.filemaker_created_by,
   s.filemaker_modified_at,
-  s.filemaker_modified_by
+  s.filemaker_modified_by,
+  s.filemaker_login_employee_no,
+  s.filemaker_login_employee_name
 FROM legacy_filemaker_voucher_ledger_staging s
 WHERE s.ledger_no IS NOT NULL
   AND s.branch_code IS NOT NULL

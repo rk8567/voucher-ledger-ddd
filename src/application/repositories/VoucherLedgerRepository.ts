@@ -53,8 +53,9 @@ export type LedgerEntryRecord = Readonly<{
   filemakerCreatedBy: string | null;
   filemakerModifiedAt: string | null;
   filemakerModifiedBy: string | null;
+  filemakerLoginEmployeeNo: number | null;
+  filemakerLoginEmployeeName: string | null;
   createdAt: string | null;
-  legacyRawRecord: Record<string, unknown> | null;
 }>;
 
 export type PostedLedgerEntryWithAmounts = LedgerEntryRecord &
@@ -95,11 +96,13 @@ export type LedgerEntryListFilter = Readonly<{
   entryTypeCode?: EntryTypeCode | null;
   includeDeleted?: boolean;
   limit?: number | null;
+  offset?: number | null;
   cursorLedgerNo?: number | null;
 }>;
 
 export type LedgerEntryListRecord = Readonly<{
   items: readonly LedgerEntryRecord[];
+  totalCount: number;
   nextCursorLedgerNo: number | null;
 }>;
 

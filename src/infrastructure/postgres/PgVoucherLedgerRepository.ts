@@ -43,11 +43,6 @@ function nullableDateOnlyOf(value: unknown): string | null {
   return String(value).slice(0, 10);
 }
 
-function nullableRecordOf(value: unknown): Record<string, unknown> | null {
-  if (value === null || value === undefined || typeof value !== 'object' || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
-}
-
 function mapBranch(row: Record<string, unknown>): BranchRecord {
   return {
     branchCode: numberOf(row.branch_code),
@@ -104,14 +99,14 @@ function mapEntry(row: Record<string, unknown>): LedgerEntryRecord {
     filemakerCreatedBy: nullableStringOf(row.filemaker_created_by),
     filemakerModifiedAt: nullableStringOf(row.filemaker_modified_at),
     filemakerModifiedBy: nullableStringOf(row.filemaker_modified_by),
+    filemakerLoginEmployeeNo: nullableNumberOf(row.filemaker_login_employee_no),
+    filemakerLoginEmployeeName: nullableStringOf(row.filemaker_login_employee_name),
     createdAt: nullableStringOf(row.created_at),
-    legacyRawRecord: nullableRecordOf(row.legacy_raw_record),
   };
 }
 
 const LEDGER_ENTRY_SELECT = `
   SELECT e.*,
-         NULL::jsonb AS legacy_raw_record,
          b.branch_name AS branch_name,
          d.department_name AS department_name,
          et.name_japanese AS entry_type_name,
@@ -134,15 +129,6 @@ const LEDGER_ENTRY_SELECT = `
     LEFT JOIN employees registered_by ON registered_by.employee_no = e.registered_by_employee_no
     LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no
 `;
-
-const LEDGER_ENTRY_DETAIL_SELECT = LEDGER_ENTRY_SELECT.replace(
-  'NULL::jsonb AS legacy_raw_record,',
-  's.raw_record AS legacy_raw_record,',
-).replace(
-  'LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no',
-  `LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no
-    LEFT JOIN legacy_filemaker_voucher_ledger_staging s ON s.ledger_no = e.ledger_no`,
-);
 
 export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
   constructor(private readonly db: DbClient) {}
@@ -387,7 +373,8 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
   }
 
   async listLedgerEntries(filter: LedgerEntryListFilter): Promise<LedgerEntryListRecord> {
-    const limit = Math.min(Math.max(filter.limit ?? 100, 1), 500);
+    const limit = Math.min(Math.max(filter.limit ?? 100, 1), 200);
+    const offset = Math.max(filter.offset ?? 0, 0);
     const values: unknown[] = [];
     const where: string[] = [];
 
@@ -406,11 +393,18 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     if (!filter.includeDeleted) where.push('e.is_deleted = false');
 
     const whereSql = where.length === 0 ? '' : `WHERE ${where.join(' AND ')}`;
+    const countResult = await this.db.query(
+      `SELECT COUNT(*) AS total_count
+         FROM voucher_ledger_entries e
+        ${whereSql}`,
+      values,
+    );
     const result = await this.db.query(
       `${LEDGER_ENTRY_SELECT}
         ${whereSql}
         ORDER BY e.ledger_no ASC
-        LIMIT ${add(limit + 1)}`,
+        LIMIT ${add(limit + 1)}
+        OFFSET ${add(offset)}`,
       values,
     );
 
@@ -418,13 +412,14 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     const items = rows.slice(0, limit);
     return {
       items,
+      totalCount: numberOf(countResult.rows[0]?.total_count),
       nextCursorLedgerNo: rows.length > limit ? items.at(-1)?.ledgerNo ?? null : null,
     };
   }
 
   async getLedgerEntryByLedgerNo(ledgerNo: number): Promise<PostedLedgerEntryWithAmounts | null> {
     const entryResult = await this.db.query(
-      `${LEDGER_ENTRY_DETAIL_SELECT}
+      `${LEDGER_ENTRY_SELECT}
         WHERE e.ledger_no = $1
           AND e.posted_at IS NOT NULL`,
       [ledgerNo],

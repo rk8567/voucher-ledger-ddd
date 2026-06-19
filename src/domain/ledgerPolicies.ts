@@ -32,6 +32,6 @@ export function assertCanPost(input: PostingPolicyInput): void {
   }
 
   if (input.counterpartyBranchCode && input.counterpartyBranchCode === input.branchCode) {
-    throw new DomainError('COUNTERPARTY_BRANCH_MUST_DIFFER', '入出拠点CD must differ from 拠点CD');
+    throw new DomainError('COUNTERPARTY_BRANCH_MUST_DIFFER', '入出拠点は拠点と別の拠点を選択してください');
   }
 }
