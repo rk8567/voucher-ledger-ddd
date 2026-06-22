@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { unstable_cache } from 'next/cache';
 import { GetBranchCurrentBalanceQuery } from '@/application/queries/GetBranchCurrentBalance';
 import { GetLedgerEntryQuery } from '@/application/queries/GetLedgerEntry';
 import { ListLedgerEntriesQuery } from '@/application/queries/ListLedgerEntries';
@@ -8,10 +9,15 @@ import type {
   CurrentBalanceRecord,
   LedgerEntryListFilter,
   LedgerEntryListRecord,
+  LedgerEntrySortKey,
   PostedLedgerEntryWithAmounts,
+  SortDirection,
 } from '@/application/repositories/VoucherLedgerRepository';
 import { EntryTypeCode } from '@/domain/entryTypes';
 import { pgPool } from '@/infrastructure/postgres/singletons';
+
+export const LEDGER_DATA_CACHE_TAG = 'ledger-data';
+export const LEDGER_REFERENCE_CACHE_TAG = 'ledger-reference-data';
 
 export type LedgerSearchInput = Readonly<{
   branchCode?: number | null;
@@ -24,6 +30,8 @@ export type LedgerSearchInput = Readonly<{
   limit?: number | null;
   page?: number | null;
   cursorLedgerNo?: number | null;
+  sortKey?: LedgerEntrySortKey | null;
+  sortDirection?: SortDirection | null;
 }>;
 
 export type LedgerDashboardData = Readonly<{
@@ -64,7 +72,6 @@ function createQueries(unitOfWork: UnitOfWork) {
 }
 
 export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<LedgerDashboardData> {
-  const { listLedgerEntriesQuery, getLedgerEntryQuery, getBranchCurrentBalanceQuery } = await getQueries();
   const limit = input.limit ?? 100;
   const page = Math.max(input.page ?? 1, 1);
   const filter: LedgerEntryListFilter = {
@@ -78,14 +85,18 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
     limit,
     offset: (page - 1) * limit,
     cursorLedgerNo: input.cursorLedgerNo,
+    sortKey: input.sortKey,
+    sortDirection: input.sortDirection,
   };
 
-  const entries = await listLedgerEntriesQuery.execute(filter);
+  const entries = await getCachedLedgerEntries(filter);
   const selectedLedgerNo = input.ledgerNo ?? entries.items[0]?.ledgerNo ?? null;
-  const selectedEntry = selectedLedgerNo == null ? null : await getLedgerEntryQuery.execute(selectedLedgerNo);
+  const selectedEntry = selectedLedgerNo == null ? null : await getCachedLedgerEntry(selectedLedgerNo);
   const balanceBranchCode = input.branchCode ?? selectedEntry?.branchCode ?? entries.items[0]?.branchCode ?? null;
-  const currentBalance = balanceBranchCode == null ? null : await getBranchCurrentBalanceQuery.execute(balanceBranchCode);
-  const formOptions = await getLedgerFormOptions();
+  const [currentBalance, formOptions] = await Promise.all([
+    balanceBranchCode == null ? null : getCachedBranchCurrentBalance(balanceBranchCode),
+    getCachedLedgerFormOptions(),
+  ]);
 
   return {
     entries,
@@ -94,6 +105,39 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
     formOptions,
   };
 }
+
+const getCachedLedgerEntries = unstable_cache(
+  async (filter: LedgerEntryListFilter): Promise<LedgerEntryListRecord> => {
+    const { listLedgerEntriesQuery } = await getQueries();
+    return listLedgerEntriesQuery.execute(filter);
+  },
+  ['ledger-entries'],
+  { revalidate: 30, tags: [LEDGER_DATA_CACHE_TAG] },
+);
+
+const getCachedLedgerEntry = unstable_cache(
+  async (ledgerNo: number): Promise<PostedLedgerEntryWithAmounts | null> => {
+    const { getLedgerEntryQuery } = await getQueries();
+    return getLedgerEntryQuery.execute(ledgerNo);
+  },
+  ['ledger-entry'],
+  { revalidate: 30, tags: [LEDGER_DATA_CACHE_TAG] },
+);
+
+const getCachedBranchCurrentBalance = unstable_cache(
+  async (branchCode: number): Promise<CurrentBalanceRecord | null> => {
+    const { getBranchCurrentBalanceQuery } = await getQueries();
+    return getBranchCurrentBalanceQuery.execute(branchCode);
+  },
+  ['branch-current-balance'],
+  { revalidate: 30, tags: [LEDGER_DATA_CACHE_TAG] },
+);
+
+const getCachedLedgerFormOptions = unstable_cache(
+  async (): Promise<LedgerFormOptions> => getLedgerFormOptions(),
+  ['ledger-form-options'],
+  { revalidate: 3600, tags: [LEDGER_REFERENCE_CACHE_TAG] },
+);
 
 async function getLedgerFormOptions(): Promise<LedgerFormOptions> {
   const [

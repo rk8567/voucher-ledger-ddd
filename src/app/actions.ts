@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { updateTag } from 'next/cache';
 
 import { RegisterInventoryCheckUseCase } from '@/application/usecases/RegisterInventoryCheck';
 import { RegisterVoucherMovementUseCase } from '@/application/usecases/RegisterVoucherMovement';
@@ -8,6 +9,7 @@ import { DENOMINATIONS, type QuantityInput } from '@/domain/denominations';
 import { DomainError } from '@/domain/errors';
 import { EntryTypeCode } from '@/domain/entryTypes';
 import { unitOfWork } from '@/infrastructure/postgres/singletons';
+import { LEDGER_DATA_CACHE_TAG } from '@/server/ledger';
 import type { EntryActionState } from './entryActionState';
 
 const movementEntryTypes = new Set<number>([
@@ -96,6 +98,7 @@ export async function registerInventoryCheckAction(
 }
 
 function redirectWithMessage(clearDraft: WorkflowDraft, ledgerNo: number, message: string): never {
+  updateTag(LEDGER_DATA_CACHE_TAG);
   redirect(`/?ledgerNo=${ledgerNo}&actionMessage=${encodeURIComponent(message)}&clearDraft=${clearDraft}`);
 }
 

@@ -477,6 +477,28 @@ th {
   font-weight: 700;
 }
 
+.sortLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: inherit;
+  font-weight: 700;
+}
+
+.sortLink:hover {
+  color: var(--accent-dark);
+  text-decoration: none;
+}
+
+.activeSort {
+  color: var(--accent-dark);
+}
+
+.number .sortLink {
+  justify-content: flex-end;
+}
+
 td {
   font-size: 13px;
   overflow: hidden;

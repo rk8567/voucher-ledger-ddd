@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { DENOMINATIONS, quantityOf, stampQuantityCount } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
 import { getLedgerDashboardData, type LedgerSearchInput } from '@/server/ledger';
@@ -22,6 +23,18 @@ const ENTRY_TYPE_LABELS: Record<number, string> = {
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 const DEFAULT_PAGE_SIZE = 100;
+const SORT_KEYS = [
+  'ledgerNo',
+  'processingDate',
+  'branchName',
+  'entryTypeName',
+  'responsibleEmployeeName',
+  'description',
+  'otherAmountYen',
+] as const;
+
+type TableSortKey = NonNullable<LedgerSearchInput['sortKey']>;
+type SortDirection = NonNullable<LedgerSearchInput['sortDirection']>;
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -42,6 +55,16 @@ function positiveNumberParam(value: string | string[] | undefined): number | nul
 function pageSizeParam(value: string | string[] | undefined): number | null {
   const parsed = numberParam(value);
   return PAGE_SIZE_OPTIONS.some((option) => option === parsed) ? parsed : null;
+}
+
+function sortKeyParam(value: string | string[] | undefined): TableSortKey | null {
+  const raw = firstParam(value);
+  return SORT_KEYS.some((sortKey) => sortKey === raw) ? raw as TableSortKey : null;
+}
+
+function sortDirectionParam(value: string | string[] | undefined): SortDirection | null {
+  const raw = firstParam(value);
+  return raw === 'asc' || raw === 'desc' ? raw : null;
 }
 
 function dateParam(value: string | string[] | undefined): string | null {
@@ -75,6 +98,8 @@ function parseSearchParams(params: Record<string, string | string[] | undefined>
     ledgerNo: positiveNumberParam(params.ledgerNo),
     limit: pageSizeParam(params.limit),
     page: positiveNumberParam(params.page),
+    sortKey: sortKeyParam(params.sort),
+    sortDirection: sortDirectionParam(params.dir),
   };
 }
 
@@ -95,6 +120,8 @@ export default async function Page({ searchParams }: PageProps) {
     const clearDraft = firstParam(params.clearDraft);
     const pageSize = input.limit ?? DEFAULT_PAGE_SIZE;
     const currentPage = input.page ?? 1;
+    const currentSortKey = input.sortKey ?? 'ledgerNo';
+    const currentSortDirection = input.sortDirection ?? 'asc';
     const totalPages = Math.max(Math.ceil(data.entries.totalCount / pageSize), 1);
     const previousHref = currentPage > 1 ? pageHref(params, currentPage - 1) : null;
     const nextHref = currentPage < totalPages ? pageHref(params, currentPage + 1) : null;
@@ -112,62 +139,6 @@ export default async function Page({ searchParams }: PageProps) {
             <span>{data.currentBalance ? `Branch ${data.currentBalance.branchCode}` : 'No balance'}</span>
           </div>
         </header>
-
-        <section className="toolbar" aria-label="Ledger filters">
-          <form className="filterGrid">
-            <label>
-              <span>拠点CD</span>
-              <input name="branchCode" inputMode="numeric" defaultValue={firstParam(params.branchCode) ?? ''} />
-            </label>
-            <label>
-              <span>年</span>
-              <input name="periodYear" inputMode="numeric" defaultValue={firstParam(params.periodYear) ?? ''} />
-            </label>
-            <label>
-              <span>月</span>
-              <input name="periodMonth" inputMode="numeric" defaultValue={firstParam(params.periodMonth) ?? ''} />
-            </label>
-            <label>
-              <span>入出区分</span>
-              <select name="entryTypeCode" defaultValue={firstParam(params.entryTypeCode) ?? ''}>
-                <option value="">すべて</option>
-                {Object.entries(ENTRY_TYPE_LABELS).map(([code, label]) => (
-                  <option key={code} value={code}>
-                    {code} {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>処理日 From</span>
-              <input
-                name="processingDateFrom"
-                pattern="\d{4}/\d{2}/\d{2}"
-                placeholder="yyyy/mm/dd"
-                defaultValue={dateInputText(firstParam(params.processingDateFrom))}
-              />
-            </label>
-            <label>
-              <span>処理日 To</span>
-              <input
-                name="processingDateTo"
-                pattern="\d{4}/\d{2}/\d{2}"
-                placeholder="yyyy/mm/dd"
-                defaultValue={dateInputText(firstParam(params.processingDateTo))}
-              />
-            </label>
-            <label>
-              <span>表示件数</span>
-              <select name="limit" defaultValue={String(pageSize)}>
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-                <option value="200">200</option>
-              </select>
-            </label>
-            <button type="submit">検索</button>
-          </form>
-        </section>
 
         <section className="summaryBand" aria-label="Current balance">
           <Metric label="残高合計" value={data.currentBalance ? yen(data.currentBalance.runningTotalAmountYen) : '-'} />
@@ -198,13 +169,13 @@ export default async function Page({ searchParams }: PageProps) {
               <table>
                 <thead>
                   <tr>
-                    <th>出納No</th>
-                    <th>処理日</th>
-                    <th>拠点</th>
-                    <th>区分</th>
-                    <th>担当</th>
-                    <th>摘要</th>
-                    <th className="number">その他</th>
+                    <SortHeader label="出納No" sortKey="ledgerNo" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
+                    <SortHeader label="処理日" sortKey="processingDate" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
+                    <SortHeader label="拠点" sortKey="branchName" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
+                    <SortHeader label="区分" sortKey="entryTypeName" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
+                    <SortHeader label="担当" sortKey="responsibleEmployeeName" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
+                    <SortHeader label="摘要" sortKey="description" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
+                    <SortHeader label="その他" sortKey="otherAmountYen" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} className="number" />
                   </tr>
                 </thead>
                 <tbody>
@@ -214,7 +185,7 @@ export default async function Page({ searchParams }: PageProps) {
                     return (
                       <tr key={entry.id} className={isSelected ? 'selectedRow' : undefined}>
                         <td>
-                          <a href={href}>#{entry.ledgerNo}</a>
+                          <Link href={href}>#{entry.ledgerNo}</Link>
                         </td>
                         <td>{dateOnly(entry.processingDate)}</td>
                         <td>{nameOnly(entry.branchName)}</td>
@@ -363,6 +334,33 @@ function Metric({ label, value }: Readonly<{ label: string; value: string }>) {
   );
 }
 
+function SortHeader({
+  label,
+  sortKey,
+  currentSortKey,
+  currentSortDirection,
+  params,
+  className,
+}: Readonly<{
+  label: string;
+  sortKey: TableSortKey;
+  currentSortKey: TableSortKey;
+  currentSortDirection: SortDirection;
+  params: Record<string, string | string[] | undefined>;
+  className?: string;
+}>) {
+  const isActive = sortKey === currentSortKey;
+  const nextDirection: SortDirection = isActive && currentSortDirection === 'asc' ? 'desc' : 'asc';
+  return (
+    <th className={className}>
+      <Link className={isActive ? 'sortLink activeSort' : 'sortLink'} href={sortHref(params, sortKey, nextDirection)}>
+        <span>{label}</span>
+        <span aria-hidden="true">{isActive ? (currentSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+      </Link>
+    </th>
+  );
+}
+
 function PaginationControls({
   previousHref,
   nextHref,
@@ -389,7 +387,7 @@ function PaginationControls({
       </span>
       <div className="paginationActions">
         {previousHref ? (
-          <a className="pagerButton" href={previousHref}>前へ</a>
+          <Link className="pagerButton" href={previousHref}>前へ</Link>
         ) : (
           <span className="pagerButton pagerButtonDisabled" aria-disabled="true">前へ</span>
         )}
@@ -399,11 +397,11 @@ function PaginationControls({
           ) : pageNumber === currentPage ? (
             <span key={pageNumber} className="pagerButton pagerButtonActive" aria-current="page">{pageNumber}</span>
           ) : (
-            <a key={pageNumber} className="pagerButton" href={pageHref(params, pageNumber)}>{pageNumber}</a>
+            <Link key={pageNumber} className="pagerButton" href={pageHref(params, pageNumber)}>{pageNumber}</Link>
           ))}
         </div>
         {nextHref ? (
-          <a className="pagerButton" href={nextHref}>次へ</a>
+          <Link className="pagerButton" href={nextHref}>次へ</Link>
         ) : (
           <span className="pagerButton pagerButtonDisabled" aria-disabled="true">次へ</span>
         )}
@@ -463,10 +461,6 @@ function dateOnly(value: string | null | undefined): string | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
   if (match) return `${match[1]}/${match[2]}/${match[3]}`;
   return value.replaceAll('-', '/');
-}
-
-function dateInputText(value: string | null | undefined): string {
-  return dateOnly(value) ?? '';
 }
 
 function todayInTokyo(): string {
@@ -556,6 +550,36 @@ function pageHref(params: Record<string, string | string[] | undefined>, page: n
     if (first) next.set(key, first);
   }
   if (page > 1) next.set('page', String(page));
+  const query = next.toString();
+  return query ? `/?${query}` : '/';
+}
+
+function sortHref(
+  params: Record<string, string | string[] | undefined>,
+  sortKey: TableSortKey,
+  direction: SortDirection,
+): string {
+  const next = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (
+      key === 'ledgerNo'
+      || key === 'cursorLedgerNo'
+      || key === 'cursorStack'
+      || key === 'page'
+      || key === 'sort'
+      || key === 'dir'
+      || key === 'actionMessage'
+      || key === 'clearDraft'
+    ) {
+      continue;
+    }
+    const first = firstParam(value);
+    if (first) next.set(key, first);
+  }
+  if (sortKey !== 'ledgerNo' || direction !== 'asc') {
+    next.set('sort', sortKey);
+    next.set('dir', direction);
+  }
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }

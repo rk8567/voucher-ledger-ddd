@@ -107,6 +107,7 @@ function mapEntry(row: Record<string, unknown>): LedgerEntryRecord {
 
 const LEDGER_ENTRY_SELECT = `
   SELECT e.*,
+         COUNT(*) OVER() AS total_count,
          b.branch_name AS branch_name,
          d.department_name AS department_name,
          et.name_japanese AS entry_type_name,
@@ -129,6 +130,24 @@ const LEDGER_ENTRY_SELECT = `
     LEFT JOIN employees registered_by ON registered_by.employee_no = e.registered_by_employee_no
     LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no
 `;
+
+const LEDGER_SORT_EXPRESSIONS: Record<NonNullable<LedgerEntryListFilter['sortKey']>, string> = {
+  ledgerNo: 'e.ledger_no',
+  processingDate: 'e.processing_date',
+  branchName: 'b.branch_name',
+  entryTypeName: 'et.name_japanese',
+  responsibleEmployeeName: 'responsible.employee_name',
+  description: 'e.description',
+  otherAmountYen: 'e.other_amount',
+};
+
+function ledgerOrderBy(filter: LedgerEntryListFilter): string {
+  const sortKey = filter.sortKey ?? 'ledgerNo';
+  const expression = LEDGER_SORT_EXPRESSIONS[sortKey] ?? LEDGER_SORT_EXPRESSIONS.ledgerNo;
+  const direction = filter.sortDirection === 'desc' ? 'DESC' : 'ASC';
+  const tieBreakerDirection = sortKey === 'ledgerNo' ? direction : 'ASC';
+  return `${expression} ${direction} NULLS LAST, e.ledger_no ${tieBreakerDirection}`;
+}
 
 export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
   constructor(private readonly db: DbClient) {}
@@ -393,28 +412,36 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     if (!filter.includeDeleted) where.push('e.is_deleted = false');
 
     const whereSql = where.length === 0 ? '' : `WHERE ${where.join(' AND ')}`;
-    const countResult = await this.db.query(
-      `SELECT COUNT(*) AS total_count
-         FROM voucher_ledger_entries e
-        ${whereSql}`,
-      values,
-    );
     const result = await this.db.query(
       `${LEDGER_ENTRY_SELECT}
         ${whereSql}
-        ORDER BY e.ledger_no ASC
+        ORDER BY ${ledgerOrderBy(filter)}
         LIMIT ${add(limit + 1)}
         OFFSET ${add(offset)}`,
       values,
     );
 
-    const rows = (result.rows as Record<string, unknown>[]).map(mapEntry);
+    const rawRows = result.rows as Record<string, unknown>[];
+    const rows = rawRows.map(mapEntry);
     const items = rows.slice(0, limit);
+    const totalCount = rawRows.length > 0
+      ? numberOf(rawRows[0]?.total_count)
+      : await this.countLedgerEntries(whereSql, values);
     return {
       items,
-      totalCount: numberOf(countResult.rows[0]?.total_count),
+      totalCount,
       nextCursorLedgerNo: rows.length > limit ? items.at(-1)?.ledgerNo ?? null : null,
     };
+  }
+
+  private async countLedgerEntries(whereSql: string, values: readonly unknown[]): Promise<number> {
+    const result = await this.db.query(
+      `SELECT COUNT(*) AS total_count
+         FROM voucher_ledger_entries e
+        ${whereSql}`,
+      [...values],
+    );
+    return numberOf(result.rows[0]?.total_count);
   }
 
   async getLedgerEntryByLedgerNo(ledgerNo: number): Promise<PostedLedgerEntryWithAmounts | null> {

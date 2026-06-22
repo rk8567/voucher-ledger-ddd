@@ -98,7 +98,20 @@ export type LedgerEntryListFilter = Readonly<{
   limit?: number | null;
   offset?: number | null;
   cursorLedgerNo?: number | null;
+  sortKey?: LedgerEntrySortKey | null;
+  sortDirection?: SortDirection | null;
 }>;
+
+export type LedgerEntrySortKey =
+  | 'ledgerNo'
+  | 'processingDate'
+  | 'branchName'
+  | 'entryTypeName'
+  | 'responsibleEmployeeName'
+  | 'description'
+  | 'otherAmountYen';
+
+export type SortDirection = 'asc' | 'desc';
 
 export type LedgerEntryListRecord = Readonly<{
   items: readonly LedgerEntryRecord[];
