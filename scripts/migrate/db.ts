@@ -16,12 +16,19 @@ export function createPool(): Pool {
     ...parsed,
     database: parsed.database ?? undefined,
     host: parsed.host ?? undefined,
-    password: process.env.DATABASE_PASSWORD ?? parsed.password ?? undefined,
+    password: databasePassword() ?? parsed.password ?? undefined,
     port: parsed.port ? Number(parsed.port) : undefined,
     ssl: parsed.ssl === true ? true : undefined,
     user: process.env.DATABASE_USER ?? parsed.user ?? undefined,
   };
   return new Pool(dbConfig);
+}
+
+function databasePassword(): string | undefined {
+  if (process.env.DATABASE_PASSWORD_FILE) {
+    return readFileSync(process.env.DATABASE_PASSWORD_FILE, 'utf8').trimEnd();
+  }
+  return process.env.DATABASE_PASSWORD;
 }
 
 export async function withTransaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {

@@ -4,6 +4,7 @@ import { unstable_cache } from 'next/cache';
 import { GetBranchCurrentBalanceQuery } from '@/application/queries/GetBranchCurrentBalance';
 import { GetLedgerEntryQuery } from '@/application/queries/GetLedgerEntry';
 import { ListLedgerEntriesQuery } from '@/application/queries/ListLedgerEntries';
+import type { DbClient } from '@/application/db/postgres';
 import type { UnitOfWork } from '@/application/db/UnitOfWork';
 import type {
   CurrentBalanceRecord,
@@ -14,7 +15,6 @@ import type {
   SortDirection,
 } from '@/application/repositories/VoucherLedgerRepository';
 import { EntryTypeCode } from '@/domain/entryTypes';
-import { pgPool } from '@/infrastructure/postgres/singletons';
 
 export const LEDGER_DATA_CACHE_TAG = 'ledger-data';
 export const LEDGER_REFERENCE_CACHE_TAG = 'ledger-reference-data';
@@ -61,6 +61,11 @@ async function getQueries(): Promise<{
 }> {
   const { unitOfWork } = await import('@/infrastructure/postgres/singletons');
   return createQueries(unitOfWork);
+}
+
+async function getPgPool(): Promise<DbClient> {
+  const { pgPool } = await import('@/infrastructure/postgres/singletons');
+  return pgPool;
 }
 
 function createQueries(unitOfWork: UnitOfWork) {
@@ -140,6 +145,7 @@ const getCachedLedgerFormOptions = unstable_cache(
 );
 
 async function getLedgerFormOptions(): Promise<LedgerFormOptions> {
+  const pgPool = await getPgPool();
   const [
     branches,
     employees,

@@ -1,4 +1,5 @@
 import { Pool, type PoolClient } from 'pg';
+import { readFileSync } from 'node:fs';
 import pkg from 'pg-connection-string';
 
 export type DbClient = Pick<PoolClient, 'query'>;
@@ -11,11 +12,18 @@ export function createPgPool(connectionString = process.env.DATABASE_URL): Pool 
     ...parsed,
     database: parsed.database ?? undefined,
     host: parsed.host ?? undefined,
-    password: process.env.DATABASE_PASSWORD ?? parsed.password ?? undefined,
+    password: databasePassword() ?? parsed.password ?? undefined,
     port: parsed.port ? Number(parsed.port) : undefined,
     ssl: parsed.ssl === true ? true : undefined,
     user: process.env.DATABASE_USER ?? parsed.user ?? undefined,
   });
+}
+
+function databasePassword(): string | undefined {
+  if (process.env.DATABASE_PASSWORD_FILE) {
+    return readFileSync(process.env.DATABASE_PASSWORD_FILE, 'utf8').trimEnd();
+  }
+  return process.env.DATABASE_PASSWORD;
 }
 
 export async function withTransaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {

@@ -206,6 +206,50 @@ npm run typecheck
 
 The included TypeScript was type-checked after installing the declared dependencies.
 
+## Docker Deployment
+
+The repository includes a production Next.js container, a PostgreSQL container, and a one-shot migration/import container.
+
+Create a local Docker env file if you want to override defaults:
+
+```bash
+cp deploy/.env.docker.example deploy/.env.docker
+mkdir -p deploy/.secrets
+printf '%s' 'replace-with-a-strong-password' > deploy/.secrets/postgres_password
+```
+
+Start PostgreSQL and the application:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml up -d --build db app
+```
+
+Apply schema migrations:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate schema
+```
+
+If FileMaker HTML exports are available under `filemaker/exports`, import and transform them:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate all \
+  --branches filemaker/exports/M拠点L.htm \
+  --entry-types filemaker/exports/M入出区分.htm \
+  --transaction-categories filemaker/exports/M出納区分.htm \
+  --red-voucher-statuses filemaker/exports/M_赤伝票.htm \
+  --employees filemaker/exports/L_M社員.htm \
+  --ledger filemaker/exports/L_T金券管理台帳.htm
+```
+
+Check database counts:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate status
+```
+
+The app is exposed on `http://localhost:${APP_PORT:-3000}`. The Dockerfile intentionally contains no database credentials. PostgreSQL, the app, and the migration container receive the database password through a Docker secret file mounted at runtime.
+
 ## Master data
 
 The seed migration includes fallback names for `M入出区分`, `M出納区分`, and `M赤伝票`. Replace those names with exact FileMaker master data exports when available. Load branch, employee, entry-type, transaction-category, and red-voucher master data from the FileMaker exports before application use. Company and department data can be imported when source exports are available; otherwise the transform creates compatibility placeholders only where required.
