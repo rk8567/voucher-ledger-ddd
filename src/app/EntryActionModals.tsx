@@ -10,6 +10,7 @@ import {
   registerVoucherMovementAction,
 } from './actions';
 import { initialEntryActionState, type EntryActionState } from './entryActionState';
+import { openEntryWorkflowEvent } from './LedgerToolbar';
 
 type EntryActionModalsProps = Readonly<{
   defaultBranchCode: number | null;
@@ -38,11 +39,18 @@ export function EntryActionModals(props: EntryActionModalsProps) {
     if (props.clearDraft === 'inventory') window.localStorage.removeItem(inventoryDraftKey);
   }, [props.clearDraft]);
 
-  return (
-    <div className="entryActions">
-      <button type="button" onClick={() => setOpenWorkflow('movement')}>新規レコード</button>
-      <button type="button" onClick={() => setOpenWorkflow('inventory')}>現在高チェック</button>
+  useEffect(() => {
+    function onOpenWorkflow(event: Event) {
+      const workflow = (event as CustomEvent<Workflow>).detail;
+      if (workflow === 'movement' || workflow === 'inventory') setOpenWorkflow(workflow);
+    }
 
+    window.addEventListener(openEntryWorkflowEvent, onOpenWorkflow);
+    return () => window.removeEventListener(openEntryWorkflowEvent, onOpenWorkflow);
+  }, []);
+
+  return (
+    <>
       {openWorkflow === 'movement' ? (
         <EntryModal title="新規レコード" onClose={() => setOpenWorkflow(null)}>
           <PersistedEntryForm
@@ -76,7 +84,7 @@ export function EntryActionModals(props: EntryActionModalsProps) {
           </PersistedEntryForm>
         </EntryModal>
       ) : null}
-    </div>
+    </>
   );
 }
 

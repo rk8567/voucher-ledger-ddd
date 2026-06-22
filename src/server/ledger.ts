@@ -26,6 +26,14 @@ export type LedgerSearchInput = Readonly<{
   processingDateFrom?: string | null;
   processingDateTo?: string | null;
   entryTypeCode?: EntryTypeCode | null;
+  searchText?: string | null;
+  ledgerNoFilter?: string | null;
+  processingDateFilter?: string | null;
+  branchFilter?: string | null;
+  entryTypeFilter?: string | null;
+  responsibleEmployeeFilter?: string | null;
+  descriptionFilter?: string | null;
+  otherAmountFilter?: string | null;
   ledgerNo?: number | null;
   limit?: number | null;
   page?: number | null;
@@ -80,18 +88,10 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
   const limit = input.limit ?? 100;
   const page = Math.max(input.page ?? 1, 1);
   const filter: LedgerEntryListFilter = {
-    branchCode: input.branchCode,
-    periodYear: input.periodYear,
-    periodMonth: input.periodMonth,
-    processingDateFrom: input.processingDateFrom,
-    processingDateTo: input.processingDateTo,
-    entryTypeCode: input.entryTypeCode,
+    ...ledgerFilterFromInput(input),
     includeDeleted: false,
     limit,
     offset: (page - 1) * limit,
-    cursorLedgerNo: input.cursorLedgerNo,
-    sortKey: input.sortKey,
-    sortDirection: input.sortDirection,
   };
 
   const entries = await getCachedLedgerEntries(filter);
@@ -108,6 +108,49 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
     selectedEntry,
     currentBalance,
     formOptions,
+  };
+}
+
+export async function getLedgerExportEntries(input: LedgerSearchInput): Promise<readonly LedgerEntryListRecord['items'][number][]> {
+  const { listLedgerEntriesQuery } = await getQueries();
+  const pageSize = 200;
+  const maxRows = 50_000;
+  const items: LedgerEntryListRecord['items'][number][] = [];
+
+  for (let offset = 0; offset < maxRows; offset += pageSize) {
+    const result = await listLedgerEntriesQuery.execute({
+      ...ledgerFilterFromInput(input),
+      includeDeleted: false,
+      limit: pageSize,
+      offset,
+    });
+
+    items.push(...result.items);
+    if (items.length >= result.totalCount || result.items.length === 0) break;
+  }
+
+  return items;
+}
+
+function ledgerFilterFromInput(input: LedgerSearchInput): LedgerEntryListFilter {
+  return {
+    branchCode: input.branchCode,
+    periodYear: input.periodYear,
+    periodMonth: input.periodMonth,
+    processingDateFrom: input.processingDateFrom,
+    processingDateTo: input.processingDateTo,
+    entryTypeCode: input.entryTypeCode,
+    searchText: input.searchText,
+    ledgerNoFilter: input.ledgerNoFilter,
+    processingDateFilter: input.processingDateFilter,
+    branchFilter: input.branchFilter,
+    entryTypeFilter: input.entryTypeFilter,
+    responsibleEmployeeFilter: input.responsibleEmployeeFilter,
+    descriptionFilter: input.descriptionFilter,
+    otherAmountFilter: input.otherAmountFilter,
+    cursorLedgerNo: input.cursorLedgerNo,
+    sortKey: input.sortKey,
+    sortDirection: input.sortDirection,
   };
 }
 

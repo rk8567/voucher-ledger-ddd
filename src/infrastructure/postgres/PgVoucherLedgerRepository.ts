@@ -149,6 +149,14 @@ function ledgerOrderBy(filter: LedgerEntryListFilter): string {
   return `${expression} ${direction} NULLS LAST, e.ledger_no ${tieBreakerDirection}`;
 }
 
+function likePattern(value: string): string {
+  return `%${value.trim()}%`;
+}
+
+function normalizeDateFilter(value: string): string {
+  return value.trim().replaceAll('/', '-');
+}
+
 export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -409,9 +417,35 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     if (filter.processingDateTo != null) where.push(`e.processing_date <= ${add(filter.processingDateTo)}`);
     if (filter.entryTypeCode != null) where.push(`e.entry_type_code = ${add(filter.entryTypeCode)}`);
     if (filter.cursorLedgerNo != null) where.push(`e.ledger_no > ${add(filter.cursorLedgerNo)}`);
+    if (filter.searchText) {
+      const pattern = add(likePattern(filter.searchText));
+      where.push(`(
+        e.ledger_no::text ILIKE ${pattern}
+        OR e.processing_date::text ILIKE ${pattern}
+        OR e.description ILIKE ${pattern}
+        OR e.remarks ILIKE ${pattern}
+        OR e.other_amount_note ILIKE ${pattern}
+        OR b.branch_name ILIKE ${pattern}
+        OR et.name_japanese ILIKE ${pattern}
+        OR tc.name_japanese ILIKE ${pattern}
+        OR responsible.employee_name ILIKE ${pattern}
+        OR registered_by.employee_name ILIKE ${pattern}
+        OR updated_by.employee_name ILIKE ${pattern}
+        OR c.company_name ILIKE ${pattern}
+        OR d.department_name ILIKE ${pattern}
+      )`);
+    }
+    if (filter.ledgerNoFilter) where.push(`e.ledger_no::text ILIKE ${add(likePattern(filter.ledgerNoFilter))}`);
+    if (filter.processingDateFilter) where.push(`e.processing_date::text ILIKE ${add(likePattern(normalizeDateFilter(filter.processingDateFilter)))}`);
+    if (filter.branchFilter) where.push(`b.branch_name ILIKE ${add(likePattern(filter.branchFilter))}`);
+    if (filter.entryTypeFilter) where.push(`et.name_japanese ILIKE ${add(likePattern(filter.entryTypeFilter))}`);
+    if (filter.responsibleEmployeeFilter) where.push(`responsible.employee_name ILIKE ${add(likePattern(filter.responsibleEmployeeFilter))}`);
+    if (filter.descriptionFilter) where.push(`e.description ILIKE ${add(likePattern(filter.descriptionFilter))}`);
+    if (filter.otherAmountFilter) where.push(`e.other_amount::text ILIKE ${add(likePattern(filter.otherAmountFilter))}`);
     if (!filter.includeDeleted) where.push('e.is_deleted = false');
 
     const whereSql = where.length === 0 ? '' : `WHERE ${where.join(' AND ')}`;
+    const countValues = [...values];
     const result = await this.db.query(
       `${LEDGER_ENTRY_SELECT}
         ${whereSql}
@@ -426,7 +460,7 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     const items = rows.slice(0, limit);
     const totalCount = rawRows.length > 0
       ? numberOf(rawRows[0]?.total_count)
-      : await this.countLedgerEntries(whereSql, values);
+      : await this.countLedgerEntries(whereSql, countValues);
     return {
       items,
       totalCount,
@@ -438,6 +472,14 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     const result = await this.db.query(
       `SELECT COUNT(*) AS total_count
          FROM voucher_ledger_entries e
+         LEFT JOIN branches b ON b.branch_code = e.branch_code
+         LEFT JOIN departments d ON d.department_code = e.department_code
+         LEFT JOIN entry_types et ON et.code = e.entry_type_code
+         LEFT JOIN transaction_categories tc ON tc.code = e.transaction_category_code
+         LEFT JOIN companies c ON c.company_code = e.company_code
+         LEFT JOIN employees responsible ON responsible.employee_no = e.responsible_employee_no
+         LEFT JOIN employees registered_by ON registered_by.employee_no = e.registered_by_employee_no
+         LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no
         ${whereSql}`,
       [...values],
     );

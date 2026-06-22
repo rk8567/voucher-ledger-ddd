@@ -106,16 +106,96 @@ h3 {
   background: var(--surface);
 }
 
-.toolbar {
-  padding: 14px;
-  margin-bottom: 14px;
-}
-
 .filterGrid {
   display: grid;
   grid-template-columns: repeat(7, minmax(108px, 1fr)) auto;
   gap: 10px;
   align-items: end;
+}
+
+.commandToolbar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  padding: 10px;
+  background: var(--surface);
+}
+
+.toolbarGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-right: 8px;
+  border-right: 1px solid var(--line);
+}
+
+.toolbarGroup:last-of-type {
+  border-right: 0;
+}
+
+.toolbarButton,
+.toolbarIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toolbarButton:hover,
+.toolbarIconButton:hover {
+  background: #f9faf8;
+  color: var(--accent-dark);
+  text-decoration: none;
+}
+
+.toolbarButtonActive {
+  border-color: var(--accent);
+  background: #e7f4f1;
+  color: var(--accent-dark);
+}
+
+.findPopover {
+  position: absolute;
+  z-index: 15;
+  top: calc(100% + 6px);
+  left: 10px;
+  width: min(360px, calc(100vw - 48px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
+  box-shadow: 0 14px 36px rgb(31 37 35 / 18%);
+}
+
+.findPopoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.toolbarIconButton {
+  min-width: 32px;
+  padding: 0;
+}
+
+.findPopover input {
+  min-height: 36px;
 }
 
 label {
@@ -229,17 +309,11 @@ button:disabled {
   border-bottom: 1px solid var(--line);
 }
 
-.entryActions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.panelHeaderActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
-  background: #fbfcfb;
-}
-
-.entryActions button {
-  min-width: 0;
 }
 
 .secondaryButton {
@@ -385,6 +459,56 @@ button:disabled {
   overflow-x: hidden;
 }
 
+.columnFilterInput,
+.pageJumpForm input {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.filterRow th {
+  padding-top: 6px;
+  padding-bottom: 8px;
+  background: #fff;
+}
+
+.columnFilterInput {
+  width: 100%;
+  min-width: 0;
+}
+
+.filterActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.filterButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 7px 12px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.filterButton:hover {
+  text-decoration: none;
+}
+
+.secondaryButton {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
 .paginationBar {
   display: flex;
   align-items: center;
@@ -400,6 +524,8 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
 }
 
 .pageNumberList {
@@ -453,6 +579,27 @@ button:disabled {
   min-width: 24px;
   color: var(--muted);
   font-weight: 700;
+}
+
+.pageJumpForm {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  min-height: 34px;
+}
+
+.pageJumpForm label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pageJumpForm input {
+  width: 82px;
 }
 
 table {
@@ -647,8 +794,7 @@ dd {
 @media (max-width: 1080px) {
   .filterGrid,
   .summaryBand,
-  .contentGrid,
-  .entryActions {
+  .contentGrid {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -668,15 +814,28 @@ dd {
   }
 
   .pageHeader,
-  .headerStats {
+  .headerStats,
+  .toolbarGroup {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .toolbarGroup {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding-right: 0;
+    padding-bottom: 8px;
+  }
+
+  .toolbarGroup:last-of-type {
+    border-bottom: 0;
+    padding-bottom: 0;
   }
 
   .filterGrid,
   .summaryBand,
   .contentGrid,
-  .entryActions,
   .entryForm,
   .quantityInputs,
   .denominationGrid {
@@ -715,5 +874,14 @@ dd {
 
   .pageNumberList {
     flex-wrap: wrap;
+  }
+
+  .pageJumpForm {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pageJumpForm input {
+    width: 100%;
   }
 }

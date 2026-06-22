@@ -94,6 +94,14 @@ export type LedgerEntryListFilter = Readonly<{
   processingDateFrom?: string | null;
   processingDateTo?: string | null;
   entryTypeCode?: EntryTypeCode | null;
+  searchText?: string | null;
+  ledgerNoFilter?: string | null;
+  processingDateFilter?: string | null;
+  branchFilter?: string | null;
+  entryTypeFilter?: string | null;
+  responsibleEmployeeFilter?: string | null;
+  descriptionFilter?: string | null;
+  otherAmountFilter?: string | null;
   includeDeleted?: boolean;
   limit?: number | null;
   offset?: number | null;

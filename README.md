@@ -195,6 +195,8 @@ Recommended server functions:
 - `registerInventoryCheck(input)` → `RegisterInventoryCheckUseCase`
 - `issueRedVoucherCorrection(input)` → `IssueRedVoucherCorrectionUseCase`
 
+The ledger table supports sortable columns, per-column filters, numbered pagination, direct page jumping, and CSV export. CSV export is served from `/export/ledger` and uses the current table filters and sort order, exporting all matching rows rather than only the visible page.
+
 tRPC is a reasonable later adapter for interactive client-heavy screens, but routers should remain thin: validate input, call these server/application functions, and map domain errors for UI display. Keep ledger rules in `src/domain` and `src/application`.
 
 ## Development
