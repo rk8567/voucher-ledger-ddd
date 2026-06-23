@@ -26,14 +26,7 @@ export type LedgerSearchInput = Readonly<{
   processingDateFrom?: string | null;
   processingDateTo?: string | null;
   entryTypeCode?: EntryTypeCode | null;
-  searchText?: string | null;
-  ledgerNoFilter?: string | null;
-  processingDateFilter?: string | null;
-  branchFilter?: string | null;
-  entryTypeFilter?: string | null;
-  responsibleEmployeeFilter?: string | null;
-  descriptionFilter?: string | null;
-  otherAmountFilter?: string | null;
+  columnFilters?: Readonly<Record<string, string | null | undefined>> | null;
   ledgerNo?: number | null;
   limit?: number | null;
   page?: number | null;
@@ -140,14 +133,7 @@ function ledgerFilterFromInput(input: LedgerSearchInput): LedgerEntryListFilter 
     processingDateFrom: input.processingDateFrom,
     processingDateTo: input.processingDateTo,
     entryTypeCode: input.entryTypeCode,
-    searchText: input.searchText,
-    ledgerNoFilter: input.ledgerNoFilter,
-    processingDateFilter: input.processingDateFilter,
-    branchFilter: input.branchFilter,
-    entryTypeFilter: input.entryTypeFilter,
-    responsibleEmployeeFilter: input.responsibleEmployeeFilter,
-    descriptionFilter: input.descriptionFilter,
-    otherAmountFilter: input.otherAmountFilter,
+    columnFilters: input.columnFilters,
     cursorLedgerNo: input.cursorLedgerNo,
     sortKey: input.sortKey,
     sortDirection: input.sortDirection,

@@ -3,7 +3,8 @@ import { DENOMINATIONS, quantityOf, stampQuantityCount } from '@/domain/denomina
 import { EntryTypeCode } from '@/domain/entryTypes';
 import { getLedgerDashboardData, type LedgerSearchInput } from '@/server/ledger';
 import { EntryActionModals } from './EntryActionModals';
-import { LedgerToolbar } from './LedgerToolbar';
+import { LedgerTable } from './LedgerTable';
+import { ReturnTopButton } from './ReturnTopButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,25 +37,6 @@ const SORT_KEYS = [
 
 type TableSortKey = NonNullable<LedgerSearchInput['sortKey']>;
 type SortDirection = NonNullable<LedgerSearchInput['sortDirection']>;
-type TableColumnFilterKey =
-  | 'filterLedgerNo'
-  | 'filterProcessingDate'
-  | 'filterBranch'
-  | 'filterEntryType'
-  | 'filterResponsible'
-  | 'filterDescription'
-  | 'filterOtherAmount';
-
-const TABLE_COLUMN_FILTER_KEYS: readonly TableColumnFilterKey[] = [
-  'filterLedgerNo',
-  'filterProcessingDate',
-  'filterBranch',
-  'filterEntryType',
-  'filterResponsible',
-  'filterDescription',
-  'filterOtherAmount',
-];
-
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -119,20 +101,31 @@ function parseSearchParams(params: Record<string, string | string[] | undefined>
     processingDateFrom: dateParam(params.processingDateFrom),
     processingDateTo: dateParam(params.processingDateTo),
     entryTypeCode: entryType == null ? null : (entryType as EntryTypeCode),
-    searchText: textParam(params.q),
-    ledgerNoFilter: textParam(params.filterLedgerNo),
-    processingDateFilter: textParam(params.filterProcessingDate),
-    branchFilter: textParam(params.filterBranch),
-    entryTypeFilter: textParam(params.filterEntryType),
-    responsibleEmployeeFilter: textParam(params.filterResponsible),
-    descriptionFilter: textParam(params.filterDescription),
-    otherAmountFilter: textParam(params.filterOtherAmount),
+    columnFilters: columnFiltersParam(params),
     ledgerNo: positiveNumberParam(params.ledgerNo),
     limit: pageSizeParam(params.limit),
     page: positiveNumberParam(params.page),
     sortKey: sortKeyParam(params.sort),
     sortDirection: sortDirectionParam(params.dir),
   };
+}
+
+function columnFiltersParam(params: Record<string, string | string[] | undefined>): Record<string, string> {
+  const filters: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (!key.startsWith('filter_')) continue;
+    const filterValue = textParam(value);
+    if (filterValue) filters[key.slice('filter_'.length)] = filterValue;
+  }
+  return filters;
+}
+
+function plainParams(params: Record<string, string | string[] | undefined>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(params)
+      .map(([key, value]) => [key, firstParam(value) ?? ''] as const)
+      .filter(([, value]) => value !== ''),
+  );
 }
 
 export default async function Page({ searchParams }: PageProps) {
@@ -152,7 +145,7 @@ export default async function Page({ searchParams }: PageProps) {
     const clearDraft = firstParam(params.clearDraft);
     const pageSize = input.limit ?? DEFAULT_PAGE_SIZE;
     const currentPage = input.page ?? 1;
-    const currentSortKey = input.sortKey ?? 'ledgerNo';
+    const currentSortKey = input.sortKey ?? '';
     const currentSortDirection = input.sortDirection ?? 'asc';
     const totalPages = Math.max(Math.ceil(data.entries.totalCount / pageSize), 1);
     const previousHref = currentPage > 1 ? pageHref(params, currentPage - 1) : null;
@@ -160,7 +153,7 @@ export default async function Page({ searchParams }: PageProps) {
     const pageNumbers = paginationItems(currentPage, totalPages);
 
     return (
-      <main className="shell">
+      <main id="top" className="shell">
         <header className="pageHeader">
           <div>
             <p className="eyebrow">Voucher Ledger</p>
@@ -181,14 +174,6 @@ export default async function Page({ searchParams }: PageProps) {
 
         {actionMessage ? <p className="notice successNotice">{actionMessage}</p> : null}
 
-        <LedgerToolbar
-          exportHref={exportCsvHref(params)}
-          showAllHref="/"
-          clearHref={clearFindAndFiltersHref(params)}
-          unsortHref={unsortHref(params)}
-          initialFindText={textParam(params.q) ?? ''}
-        />
-
         <div className="contentGrid">
           <section className="panel ledgerPanel" aria-label="Ledger entries">
             <div className="panelHeader">
@@ -207,66 +192,16 @@ export default async function Page({ searchParams }: PageProps) {
               clearDraft={clearDraft === 'movement' || clearDraft === 'inventory' ? clearDraft : null}
               options={data.formOptions}
             />
-            <form action="/" method="get">
-              <HiddenQueryFields params={params} omit={['page', 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft', ...TABLE_COLUMN_FILTER_KEYS]} />
-              <div className="tableWrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <SortHeader label="出納No" sortKey="ledgerNo" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
-                      <SortHeader label="処理日" sortKey="processingDate" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
-                      <SortHeader label="拠点" sortKey="branchName" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
-                      <SortHeader label="区分" sortKey="entryTypeName" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
-                      <SortHeader label="担当" sortKey="responsibleEmployeeName" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
-                      <SortHeader label="摘要" sortKey="description" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} />
-                      <SortHeader label="その他" sortKey="otherAmountYen" currentSortKey={currentSortKey} currentSortDirection={currentSortDirection} params={params} className="number" />
-                    </tr>
-                    <tr className="filterRow">
-                      <FilterHeader name="filterLedgerNo" value={textParam(params.filterLedgerNo)} placeholder="No" inputMode="numeric" />
-                      <FilterHeader name="filterProcessingDate" value={textParam(params.filterProcessingDate)} placeholder="yyyy/mm/dd" />
-                      <FilterHeader name="filterBranch" value={textParam(params.filterBranch)} placeholder="拠点" />
-                      <FilterHeader name="filterEntryType" value={textParam(params.filterEntryType)} placeholder="区分" />
-                      <FilterHeader name="filterResponsible" value={textParam(params.filterResponsible)} placeholder="担当" />
-                      <FilterHeader name="filterDescription" value={textParam(params.filterDescription)} placeholder="摘要" />
-                      <th className="number">
-                        <div className="filterActions">
-                          <input
-                            className="columnFilterInput"
-                            type="search"
-                            name="filterOtherAmount"
-                            defaultValue={textParam(params.filterOtherAmount) ?? ''}
-                            placeholder="金額"
-                            inputMode="numeric"
-                            maxLength={100}
-                          />
-                          <button className="filterButton" type="submit">絞込</button>
-                          {hasColumnFilters(params) ? <Link className="filterButton secondaryButton" href={clearColumnFiltersHref(params)}>解除</Link> : null}
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.entries.items.map((entry) => {
-                      const href = queryHref(params, entry.ledgerNo);
-                      const isSelected = selected?.ledgerNo === entry.ledgerNo;
-                      return (
-                        <tr key={entry.id} className={isSelected ? 'selectedRow' : undefined}>
-                          <td>
-                            <Link href={href}>#{entry.ledgerNo}</Link>
-                          </td>
-                          <td>{dateOnly(entry.processingDate)}</td>
-                          <td>{nameOnly(entry.branchName)}</td>
-                          <td>{entry.entryTypeName ?? entryTypeName(entry.entryTypeCode)}</td>
-                          <td>{nameOnly(entry.responsibleEmployeeName)}</td>
-                          <td className="description">{entry.description}</td>
-                          <td className="number">{yen(entry.otherAmountYen)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </form>
+            <LedgerTable
+              entries={data.entries.items}
+              selectedLedgerNo={selected?.ledgerNo ?? null}
+              params={plainParams(params)}
+              currentSortKey={currentSortKey}
+              currentSortDirection={currentSortDirection}
+              exportHref={exportCsvHref(params)}
+              showAllHref="/"
+              unsortHref={unsortHref(params)}
+            />
             <PaginationControls
               previousHref={previousHref}
               nextHref={nextHref}
@@ -373,6 +308,7 @@ export default async function Page({ searchParams }: PageProps) {
             )}
           </aside>
         </div>
+        <ReturnTopButton />
       </main>
     );
   } catch (error) {
@@ -399,59 +335,6 @@ function Metric({ label, value }: Readonly<{ label: string; value: string }>) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
-  );
-}
-
-function SortHeader({
-  label,
-  sortKey,
-  currentSortKey,
-  currentSortDirection,
-  params,
-  className,
-}: Readonly<{
-  label: string;
-  sortKey: TableSortKey;
-  currentSortKey: TableSortKey;
-  currentSortDirection: SortDirection;
-  params: Record<string, string | string[] | undefined>;
-  className?: string;
-}>) {
-  const isActive = sortKey === currentSortKey;
-  const nextDirection: SortDirection = isActive && currentSortDirection === 'asc' ? 'desc' : 'asc';
-  return (
-    <th className={className}>
-      <Link className={isActive ? 'sortLink activeSort' : 'sortLink'} href={sortHref(params, sortKey, nextDirection)}>
-        <span>{label}</span>
-        <span aria-hidden="true">{isActive ? (currentSortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
-      </Link>
-    </th>
-  );
-}
-
-function FilterHeader({
-  name,
-  value,
-  placeholder,
-  inputMode,
-}: Readonly<{
-  name: TableColumnFilterKey;
-  value: string | null;
-  placeholder: string;
-  inputMode?: 'numeric' | 'text';
-}>) {
-  return (
-    <th>
-      <input
-        className="columnFilterInput"
-        type="search"
-        name={name}
-        defaultValue={value ?? ''}
-        placeholder={placeholder}
-        inputMode={inputMode}
-        maxLength={100}
-      />
-    </th>
   );
 }
 
@@ -500,7 +383,7 @@ function PaginationControls({
           <span className="pagerButton pagerButtonDisabled" aria-disabled="true">次へ</span>
         )}
         <form className="pageJumpForm" action="/" method="get">
-          <HiddenQueryFields params={params} omit={['page', 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft']} />
+          <HiddenQueryFields params={params} omit={['q', 'page', 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft']} />
           <label>
             <span>ページ</span>
             <input type="number" name="page" min={1} max={totalPages} defaultValue={currentPage} />
@@ -635,30 +518,12 @@ function paginationItems(currentPage: number, totalPages: number): (number | 'el
   return items;
 }
 
-function queryHref(params: Record<string, string | string[] | undefined>, ledgerNo: number): string {
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (
-      key === 'ledgerNo'
-      || key === 'cursorLedgerNo'
-      || key === 'cursorStack'
-      || key === 'actionMessage'
-      || key === 'clearDraft'
-    ) {
-      continue;
-    }
-    const first = firstParam(value);
-    if (first) next.set(key, first);
-  }
-  next.set('ledgerNo', String(ledgerNo));
-  return `/?${next.toString()}`;
-}
-
 function pageHref(params: Record<string, string | string[] | undefined>, page: number): string {
   const next = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (
       key === 'ledgerNo'
+      || key === 'q'
       || key === 'cursorLedgerNo'
       || key === 'cursorStack'
       || key === 'page'
@@ -675,37 +540,12 @@ function pageHref(params: Record<string, string | string[] | undefined>, page: n
   return query ? `/?${query}` : '/';
 }
 
-function hasColumnFilters(params: Record<string, string | string[] | undefined>): boolean {
-  return TABLE_COLUMN_FILTER_KEYS.some((key) => Boolean(textParam(params[key])));
-}
-
-function clearColumnFiltersHref(params: Record<string, string | string[] | undefined>): string {
+function clearFiltersHref(params: Record<string, string | string[] | undefined>): string {
   const next = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (
-      TABLE_COLUMN_FILTER_KEYS.some((filterKey) => filterKey === key)
-      || key === 'ledgerNo'
-      || key === 'cursorLedgerNo'
-      || key === 'cursorStack'
-      || key === 'page'
-      || key === 'actionMessage'
-      || key === 'clearDraft'
-    ) {
-      continue;
-    }
-    const first = firstParam(value);
-    if (first) next.set(key, first);
-  }
-  const query = next.toString();
-  return query ? `/?${query}` : '/';
-}
-
-function clearFindAndFiltersHref(params: Record<string, string | string[] | undefined>): string {
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (
-      key === 'q'
-      || TABLE_COLUMN_FILTER_KEYS.some((filterKey) => filterKey === key)
+      key.startsWith('filter_')
+      || key === 'q'
       || key === 'ledgerNo'
       || key === 'cursorLedgerNo'
       || key === 'cursorStack'
@@ -727,6 +567,7 @@ function exportCsvHref(params: Record<string, string | string[] | undefined>): s
   for (const [key, value] of Object.entries(params)) {
     if (
       key === 'ledgerNo'
+      || key === 'q'
       || key === 'cursorLedgerNo'
       || key === 'cursorStack'
       || key === 'page'
@@ -747,6 +588,7 @@ function unsortHref(params: Record<string, string | string[] | undefined>): stri
   for (const [key, value] of Object.entries(params)) {
     if (
       key === 'ledgerNo'
+      || key === 'q'
       || key === 'cursorLedgerNo'
       || key === 'cursorStack'
       || key === 'page'
@@ -759,36 +601,6 @@ function unsortHref(params: Record<string, string | string[] | undefined>): stri
     }
     const first = firstParam(value);
     if (first) next.set(key, first);
-  }
-  const query = next.toString();
-  return query ? `/?${query}` : '/';
-}
-
-function sortHref(
-  params: Record<string, string | string[] | undefined>,
-  sortKey: TableSortKey,
-  direction: SortDirection,
-): string {
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (
-      key === 'ledgerNo'
-      || key === 'cursorLedgerNo'
-      || key === 'cursorStack'
-      || key === 'page'
-      || key === 'sort'
-      || key === 'dir'
-      || key === 'actionMessage'
-      || key === 'clearDraft'
-    ) {
-      continue;
-    }
-    const first = firstParam(value);
-    if (first) next.set(key, first);
-  }
-  if (sortKey !== 'ledgerNo' || direction !== 'asc') {
-    next.set('sort', sortKey);
-    next.set('dir', direction);
   }
   const query = next.toString();
   return query ? `/?${query}` : '/';

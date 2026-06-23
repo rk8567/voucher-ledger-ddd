@@ -141,6 +141,51 @@ const LEDGER_SORT_EXPRESSIONS: Record<NonNullable<LedgerEntryListFilter['sortKey
   otherAmountYen: 'e.other_amount',
 };
 
+const LEDGER_COLUMN_FILTER_EXPRESSIONS: Record<string, string> = {
+  ledgerNo: 'e.ledger_no::text',
+  processingDate: 'e.processing_date::text',
+  applicationDate: 'e.application_date::text',
+  branchCode: 'e.branch_code::text',
+  branchName: 'b.branch_name',
+  departmentCode: 'e.department_code::text',
+  departmentName: 'd.department_name',
+  periodYear: 'e.period_year::text',
+  periodMonth: 'e.period_month::text',
+  entryTypeCode: 'e.entry_type_code::text',
+  entryTypeName: 'et.name_japanese',
+  transactionCategoryCode: 'e.transaction_category_code::text',
+  transactionCategoryName: 'tc.name_japanese',
+  counterpartyBranchCode: 'e.counterparty_branch_code::text',
+  counterpartyBranchName: 'cb.branch_name',
+  companyCode: 'e.company_code::text',
+  companyName: 'c.company_name',
+  responsibleEmployeeNo: 'e.responsible_employee_no::text',
+  responsibleEmployeeName: 'responsible.employee_name',
+  description: 'e.description',
+  remarks: 'e.remarks',
+  otherAmountYen: 'e.other_amount::text',
+  otherAmountNote: 'e.other_amount_note',
+  redVoucherStatusCode: 'e.red_voucher_status_code::text',
+  redVoucherStatusName: 'rvs.name_japanese',
+  originalLedgerNo: 'e.original_ledger_no::text',
+  reversalLedgerNo: 'e.reversal_ledger_no::text',
+  correctionLedgerNo: 'e.correction_ledger_no::text',
+  registeredAt: 'e.registered_at::text',
+  registeredByEmployeeNo: 'e.registered_by_employee_no::text',
+  registeredByEmployeeName: 'registered_by.employee_name',
+  updatedAt: 'e.updated_at::text',
+  updatedByEmployeeNo: 'e.updated_by_employee_no::text',
+  updatedByEmployeeName: 'updated_by.employee_name',
+  postedAt: 'e.posted_at::text',
+  filemakerCreatedAt: 'e.filemaker_created_at::text',
+  filemakerCreatedBy: 'e.filemaker_created_by',
+  filemakerModifiedAt: 'e.filemaker_modified_at::text',
+  filemakerModifiedBy: 'e.filemaker_modified_by',
+  filemakerLoginEmployeeNo: 'e.filemaker_login_employee_no::text',
+  filemakerLoginEmployeeName: 'e.filemaker_login_employee_name',
+  createdAt: 'e.created_at::text',
+};
+
 function ledgerOrderBy(filter: LedgerEntryListFilter): string {
   const sortKey = filter.sortKey ?? 'ledgerNo';
   const expression = LEDGER_SORT_EXPRESSIONS[sortKey] ?? LEDGER_SORT_EXPRESSIONS.ledgerNo;
@@ -417,31 +462,15 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     if (filter.processingDateTo != null) where.push(`e.processing_date <= ${add(filter.processingDateTo)}`);
     if (filter.entryTypeCode != null) where.push(`e.entry_type_code = ${add(filter.entryTypeCode)}`);
     if (filter.cursorLedgerNo != null) where.push(`e.ledger_no > ${add(filter.cursorLedgerNo)}`);
-    if (filter.searchText) {
-      const pattern = add(likePattern(filter.searchText));
-      where.push(`(
-        e.ledger_no::text ILIKE ${pattern}
-        OR e.processing_date::text ILIKE ${pattern}
-        OR e.description ILIKE ${pattern}
-        OR e.remarks ILIKE ${pattern}
-        OR e.other_amount_note ILIKE ${pattern}
-        OR b.branch_name ILIKE ${pattern}
-        OR et.name_japanese ILIKE ${pattern}
-        OR tc.name_japanese ILIKE ${pattern}
-        OR responsible.employee_name ILIKE ${pattern}
-        OR registered_by.employee_name ILIKE ${pattern}
-        OR updated_by.employee_name ILIKE ${pattern}
-        OR c.company_name ILIKE ${pattern}
-        OR d.department_name ILIKE ${pattern}
-      )`);
+    for (const [key, value] of Object.entries(filter.columnFilters ?? {})) {
+      const expression = LEDGER_COLUMN_FILTER_EXPRESSIONS[key];
+      const trimmed = value?.trim();
+      if (!expression || !trimmed) continue;
+      const pattern = key.toLowerCase().includes('date') || key.toLowerCase().endsWith('at')
+        ? likePattern(normalizeDateFilter(trimmed))
+        : likePattern(trimmed);
+      where.push(`${expression} ILIKE ${add(pattern)}`);
     }
-    if (filter.ledgerNoFilter) where.push(`e.ledger_no::text ILIKE ${add(likePattern(filter.ledgerNoFilter))}`);
-    if (filter.processingDateFilter) where.push(`e.processing_date::text ILIKE ${add(likePattern(normalizeDateFilter(filter.processingDateFilter)))}`);
-    if (filter.branchFilter) where.push(`b.branch_name ILIKE ${add(likePattern(filter.branchFilter))}`);
-    if (filter.entryTypeFilter) where.push(`et.name_japanese ILIKE ${add(likePattern(filter.entryTypeFilter))}`);
-    if (filter.responsibleEmployeeFilter) where.push(`responsible.employee_name ILIKE ${add(likePattern(filter.responsibleEmployeeFilter))}`);
-    if (filter.descriptionFilter) where.push(`e.description ILIKE ${add(likePattern(filter.descriptionFilter))}`);
-    if (filter.otherAmountFilter) where.push(`e.other_amount::text ILIKE ${add(likePattern(filter.otherAmountFilter))}`);
     if (!filter.includeDeleted) where.push('e.is_deleted = false');
 
     const whereSql = where.length === 0 ? '' : `WHERE ${where.join(' AND ')}`;
