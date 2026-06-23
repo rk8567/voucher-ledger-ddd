@@ -108,6 +108,8 @@ npm run migrate -- status
 
 ## DDD Perspective
 
+![layering.svg](layering.svg)
+
 ### Bounded Context
 
 The current bounded context is **Voucher Ledger Management**.
