@@ -512,6 +512,10 @@ button:disabled {
   outline-offset: -2px;
 }
 
+.modalOpen .tableScrollFade {
+  display: none;
+}
+
 .returnTopButton {
   position: fixed;
   right: 18px;
@@ -754,7 +758,7 @@ button:disabled {
 .paginationBar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 12px;
   padding: 12px 16px;
   color: var(--muted);
@@ -774,7 +778,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: center;
   min-width: 0;
   width: 100%;
 }
@@ -1133,7 +1137,7 @@ dd {
 
   .paginationActions {
     flex-wrap: wrap;
-    justify-content: flex-start;
+    justify-content: center;
   }
 
   .pageNumberList {
