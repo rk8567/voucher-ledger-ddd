@@ -325,6 +325,89 @@ test('app transaction guard can force legacy import bypass off', async (t) => {
   }
 });
 
+test('red-voucher database rules reject invalid status/link combinations', async (t) => {
+  const { client } = await setupDatabase(t);
+
+  await client.query(`INSERT INTO branches (branch_code, branch_name) VALUES (1, 'Test branch')`);
+  await insertPostedEntry(client, {
+    ledgerNo: 1,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 1,
+    entryTypeCode: 99,
+    description: 'opening',
+    otherAmount: 1000,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 10,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 1,
+    entryTypeCode: 2,
+    description: 'original movement',
+    otherAmount: 100,
+  });
+
+  await assert.rejects(
+    client.query(
+      `INSERT INTO voucher_ledger_entries (
+         ledger_no,
+         branch_code,
+         processing_date,
+         daily_sequence,
+         entry_type_code,
+         description,
+         red_voucher_status_code,
+         original_ledger_no
+       ) VALUES (20, 1, '2026-01-02', 1, 3, 'invalid normal link', 0, 10)`,
+    ),
+    /Normal rows must not have original_ledger_no/,
+  );
+
+  await assert.rejects(
+    client.query(
+      `INSERT INTO voucher_ledger_entries (
+         ledger_no,
+         branch_code,
+         processing_date,
+         daily_sequence,
+         entry_type_code,
+         description,
+         red_voucher_status_code
+       ) VALUES (21, 1, '2026-01-02', 1, 3, 'invalid red without original', 2)`,
+    ),
+    /赤伝票 \/ 訂正伝票 rows must have original_ledger_no/,
+  );
+});
+
+test('red-voucher database links reject orphan ledger numbers at commit', async (t) => {
+  const { client } = await setupDatabase(t);
+
+  await client.query(`INSERT INTO branches (branch_code, branch_name) VALUES (1, 'Test branch')`);
+  await client.query('BEGIN');
+  try {
+    await client.query(
+      `INSERT INTO voucher_ledger_entries (
+         ledger_no,
+         branch_code,
+         processing_date,
+         daily_sequence,
+         entry_type_code,
+         description,
+         red_voucher_status_code,
+         original_ledger_no
+       ) VALUES (20, 1, '2026-01-02', 1, 3, 'orphan red link', 2, 9999)`,
+    );
+
+    await assert.rejects(
+      client.query('COMMIT'),
+      /voucher_ledger_entries_original_ledger_no_fkey/,
+    );
+  } finally {
+    await client.query('ROLLBACK').catch(() => undefined);
+  }
+});
+
 test('inventory checks compare actual count against expected pre-check balance', async (t) => {
   const { client } = await setupDatabase(t);
 

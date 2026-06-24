@@ -203,6 +203,7 @@ Current implementation:
 - Running balance order is deterministic by `processing_date`, `daily_sequence`, then `ledger_no`, not FileMaker found-set/sort state.
 - `tests/domain.test.ts` locks the FileMaker denomination mapping and basic balance arithmetic.
 - `tests/postgres-read-model.test.mjs` includes SQL/domain drift guards for entry total arithmetic and representative running-balance totals.
+- PostgreSQL tests also cover red-voucher status/link integrity and orphan-link rejection.
 
 ### Entry Type Rules
 
@@ -382,7 +383,7 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 
 ## Follow-Up Work
 
-- Extend PostgreSQL-backed tests around migration reconciliation and red-voucher database links.
+- Extend PostgreSQL-backed tests around migration reconciliation edge cases.
 - Run and archive aggregate reconciliation against FileMaker `残高合計` using a real/sanitized export fixture.
 - Extend domain/SQL drift guards as new money-path scenarios are added.
 - Periodically review `legacy_import_audit_log` during migration/parallel-run operations.
