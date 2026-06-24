@@ -182,7 +182,7 @@ export default async function Page({ searchParams }: PageProps) {
         {actionMessage ? <p className="notice successNotice">{actionMessage}</p> : null}
 
         <div className="contentGrid">
-          <section className="panel ledgerPanel" aria-label="Ledger entries">
+          <section id="ledger-entries" className="panel ledgerPanel" aria-label="Ledger entries">
             <div className="panelHeader">
               <h2>出納一覧</h2>
               <div className="panelHeaderActions">
@@ -377,7 +377,7 @@ function PaginationControls({
     <nav className={`paginationBar paginationBar${position === 'top' ? 'Top' : 'Bottom'}`} aria-label={`Ledger pagination ${position}`}>
       <div className="paginationActions">
         {previousHref ? (
-          <Link className="pagerButton" href={previousHref}>前へ</Link>
+          <Link className="pagerButton" href={previousHref} scroll={false}>前へ</Link>
         ) : (
           <span className="pagerButton pagerButtonDisabled" aria-disabled="true">前へ</span>
         )}
@@ -387,15 +387,15 @@ function PaginationControls({
           ) : pageNumber === currentPage ? (
             <span key={pageNumber} className="pagerButton pagerButtonActive" aria-current="page">{pageNumber}</span>
           ) : (
-            <Link key={pageNumber} className="pagerButton" href={pageHref(params, pageNumber)}>{pageNumber}</Link>
+            <Link key={pageNumber} className="pagerButton" href={pageHref(params, pageNumber)} scroll={false}>{pageNumber}</Link>
           ))}
         </div>
         {nextHref ? (
-          <Link className="pagerButton" href={nextHref}>次へ</Link>
+          <Link className="pagerButton" href={nextHref} scroll={false}>次へ</Link>
         ) : (
           <span className="pagerButton pagerButtonDisabled" aria-disabled="true">次へ</span>
         )}
-        <form className="pageJumpForm" action="/" method="get">
+        <form className="pageJumpForm" action="/#ledger-entries" method="get">
           <HiddenQueryFields params={params} omit={['q', 'page', 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft']} />
           <label>
             <span>ページ</span>
