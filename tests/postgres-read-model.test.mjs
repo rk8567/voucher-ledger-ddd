@@ -97,6 +97,37 @@ async function insertPostedEntry(client, input) {
   return entryId;
 }
 
+async function expectDatabaseError(client, sql, expectedPattern) {
+  await client.query(
+    `CREATE OR REPLACE FUNCTION pg_temp.capture_expected_error(statement text)
+     RETURNS text
+     LANGUAGE plpgsql
+     AS $$
+     DECLARE
+       caught_message text;
+     BEGIN
+       BEGIN
+         EXECUTE statement;
+       EXCEPTION WHEN OTHERS THEN
+         caught_message := SQLERRM;
+       END;
+
+       IF caught_message IS NULL THEN
+         RAISE EXCEPTION 'Expected database error, but statement succeeded.';
+       END IF;
+
+       RETURN caught_message;
+     END;
+     $$`,
+  );
+  const result = await client.query(
+    `SELECT pg_temp.capture_expected_error($1) AS message`,
+    [sql],
+  );
+
+  assert.match(result.rows[0].message, expectedPattern);
+}
+
 test('postgres read models use processing date, daily sequence, ledger number order', async (t) => {
   const { client } = await setupDatabase(t);
 
@@ -450,8 +481,9 @@ test('posted financial fields are immutable outside legacy import mode', async (
     otherAmount: 1000,
   });
 
-  await assert.rejects(
-    client.query(`UPDATE voucher_ledger_entries SET other_amount = 999 WHERE id = $1`, [entryId]),
+  await expectDatabaseError(
+    client,
+    `UPDATE voucher_ledger_entries SET other_amount = 999 WHERE id = '${entryId}'`,
     /Posted voucher ledger entries are immutable/,
   );
 });
@@ -471,15 +503,20 @@ test('app transaction guard can force legacy import bypass off', async (t) => {
   });
 
   await client.query(`SET voucher_ledger.legacy_import = 'on'`);
-  await client.query('BEGIN');
-  await client.query(`SET LOCAL voucher_ledger.legacy_import = 'off'`);
+  let transactionOpen = false;
   try {
-    await assert.rejects(
-      client.query(`UPDATE voucher_ledger_entries SET other_amount = 999 WHERE id = $1`, [entryId]),
+    await client.query('BEGIN');
+    transactionOpen = true;
+    await client.query(`SET LOCAL voucher_ledger.legacy_import = 'off'`);
+    await expectDatabaseError(
+      client,
+      `UPDATE voucher_ledger_entries SET other_amount = 999 WHERE id = '${entryId}'`,
       /Posted voucher ledger entries are immutable/,
     );
+    await client.query('COMMIT');
+    transactionOpen = false;
   } finally {
-    await client.query('ROLLBACK');
+    if (transactionOpen) await client.query('ROLLBACK');
     await client.query(`SET voucher_ledger.legacy_import = 'off'`);
   }
 });
@@ -507,9 +544,9 @@ test('red-voucher database rules reject invalid status/link combinations', async
     otherAmount: 100,
   });
 
-  await assert.rejects(
-    client.query(
-      `INSERT INTO voucher_ledger_entries (
+  await expectDatabaseError(
+    client,
+    `INSERT INTO voucher_ledger_entries (
          ledger_no,
          branch_code,
          processing_date,
@@ -519,13 +556,12 @@ test('red-voucher database rules reject invalid status/link combinations', async
          red_voucher_status_code,
          original_ledger_no
        ) VALUES (20, 1, '2026-01-02', 1, 3, 'invalid normal link', 0, 10)`,
-    ),
     /Normal rows must not have original_ledger_no/,
   );
 
-  await assert.rejects(
-    client.query(
-      `INSERT INTO voucher_ledger_entries (
+  await expectDatabaseError(
+    client,
+    `INSERT INTO voucher_ledger_entries (
          ledger_no,
          branch_code,
          processing_date,
@@ -534,7 +570,6 @@ test('red-voucher database rules reject invalid status/link combinations', async
          description,
          red_voucher_status_code
        ) VALUES (21, 1, '2026-01-02', 1, 3, 'invalid red without original', 2)`,
-    ),
     /赤伝票 \/ 訂正伝票 rows must have original_ledger_no/,
   );
 });
@@ -543,9 +578,13 @@ test('red-voucher database links reject orphan ledger numbers at commit', async 
   const { client } = await setupDatabase(t);
 
   await client.query(`INSERT INTO branches (branch_code, branch_name) VALUES (1, 'Test branch')`);
-  await client.query('BEGIN');
+  let transactionOpen = false;
   try {
-    await client.query(
+    await client.query('BEGIN');
+    transactionOpen = true;
+    await client.query(`SET CONSTRAINTS voucher_ledger_entries_original_ledger_no_fkey IMMEDIATE`);
+    await expectDatabaseError(
+      client,
       `INSERT INTO voucher_ledger_entries (
          ledger_no,
          branch_code,
@@ -556,14 +595,10 @@ test('red-voucher database links reject orphan ledger numbers at commit', async 
          red_voucher_status_code,
          original_ledger_no
        ) VALUES (20, 1, '2026-01-02', 1, 3, 'orphan red link', 2, 9999)`,
-    );
-
-    await assert.rejects(
-      client.query('COMMIT'),
       /voucher_ledger_entries_original_ledger_no_fkey/,
     );
   } finally {
-    await client.query('ROLLBACK').catch(() => undefined);
+    if (transactionOpen) await client.query('ROLLBACK');
   }
 });
 
