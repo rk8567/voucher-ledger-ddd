@@ -77,6 +77,32 @@ ALTER TABLE legacy_filemaker_voucher_ledger_staging
 COMMENT ON TABLE legacy_filemaker_voucher_ledger_staging IS 'Raw import staging for legacy T切手出納台帳. Not used by the application layer.';
 
 CREATE OR REPLACE VIEW legacy_filemaker_running_balance_reconciliation AS
+WITH legacy_deltas AS (
+  SELECT
+    e.ledger_no,
+    e.branch_code,
+    e.daily_sequence,
+    CASE et.effect
+      WHEN 'opening_balance' THEN t.total_amount
+      WHEN 'incoming'        THEN t.total_amount
+      WHEN 'outgoing'        THEN -t.total_amount
+      ELSE 0::bigint
+    END AS legacy_delta_amount
+  FROM voucher_ledger_entries e
+  JOIN entry_types et ON et.code = e.entry_type_code
+  JOIN voucher_ledger_entry_totals t ON t.entry_id = e.id
+  WHERE e.posted_at IS NOT NULL
+),
+legacy_running_totals AS (
+  SELECT
+    ledger_no,
+    (SUM(legacy_delta_amount) OVER (
+      PARTITION BY branch_code
+      ORDER BY daily_sequence, ledger_no
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ))::bigint AS running_total_amount
+  FROM legacy_deltas
+)
 SELECT
   s.ledger_no,
   s.branch_code,
@@ -95,11 +121,11 @@ SELECT
      AND r.running_total_amount = s.legacy_running_total_amount
   END AS running_total_matches
 FROM legacy_filemaker_voucher_ledger_staging s
-LEFT JOIN voucher_ledger_running_amounts r
+LEFT JOIN legacy_running_totals r
   ON r.ledger_no = s.ledger_no
 WHERE s.ledger_no IS NOT NULL;
 
-COMMENT ON VIEW legacy_filemaker_running_balance_reconciliation IS 'Golden-master comparison between FileMaker 残高合計 and computed PostgreSQL running totals.';
+COMMENT ON VIEW legacy_filemaker_running_balance_reconciliation IS 'Golden-master comparison between FileMaker 残高合計 and FileMaker-compatible running totals ordered by 連番/出納No, including deleted legacy rows.';
 
 CREATE TABLE IF NOT EXISTS legacy_import_audit_log (
   audit_id bigserial PRIMARY KEY,

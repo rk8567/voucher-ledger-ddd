@@ -147,6 +147,99 @@ test('postgres read models use processing date, daily sequence, ledger number or
   );
 });
 
+test('legacy reconciliation uses FileMaker sequence and includes deleted rows', async (t) => {
+  const { client } = await setupDatabase(t);
+
+  await client.query(`INSERT INTO branches (branch_code, branch_name) VALUES (1, 'Test branch')`);
+
+  await insertPostedEntry(client, {
+    ledgerNo: 1,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 1,
+    entryTypeCode: 99,
+    description: 'opening',
+    otherAmount: 1000,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 2,
+    branchCode: 1,
+    processingDate: '2026-01-02',
+    dailySequence: 2,
+    entryTypeCode: 3,
+    description: 'usage',
+    otherAmount: 100,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 7,
+    branchCode: 1,
+    processingDate: '2025-12-31',
+    dailySequence: 3,
+    entryTypeCode: 99,
+    description: 'late legacy opening balance',
+    otherAmount: 200,
+  });
+  const deletedEntryId = await insertPostedEntry(client, {
+    ledgerNo: 32,
+    branchCode: 1,
+    processingDate: '2026-01-03',
+    dailySequence: 4,
+    entryTypeCode: 3,
+    description: 'deleted legacy usage',
+    otherAmount: 40,
+  });
+  await client.query(`UPDATE voucher_ledger_entries SET is_deleted = true WHERE id = $1`, [deletedEntryId]);
+  await insertPostedEntry(client, {
+    ledgerNo: 33,
+    branchCode: 1,
+    processingDate: '2026-01-04',
+    dailySequence: 5,
+    entryTypeCode: 3,
+    description: 'usage after deleted row',
+    otherAmount: 60,
+  });
+
+  await client.query(
+    `INSERT INTO legacy_filemaker_voucher_ledger_staging (
+       ledger_no,
+       branch_code,
+       processing_date,
+       daily_sequence,
+       entry_type_code,
+       legacy_running_total_amount
+     ) VALUES
+       (1, 1, '2026-01-01', 1, 99, 1000),
+       (2, 1, '2026-01-02', 2, 3, 900),
+       (7, 1, '2025-12-31', 3, 99, 1100),
+       (32, 1, '2026-01-03', 4, 3, 1060),
+       (33, 1, '2026-01-04', 5, 3, 1000)`,
+  );
+
+  const appBalanceForDeletedRow = await client.query(
+    `SELECT ledger_no, running_total_amount::text
+       FROM voucher_ledger_running_amounts
+      WHERE ledger_no IN (32, 33)
+      ORDER BY ledger_no`,
+  );
+  assert.deepEqual(appBalanceForDeletedRow.rows, [{ ledger_no: '33', running_total_amount: '1040' }]);
+
+  const reconciliation = await client.query(
+    `SELECT ledger_no,
+            computed_running_total_amount::text,
+            running_total_matches
+       FROM legacy_filemaker_running_balance_reconciliation
+      ORDER BY daily_sequence, ledger_no`,
+  );
+
+  assert.deepEqual(reconciliation.rows, [
+    { ledger_no: '1', computed_running_total_amount: '1000', running_total_matches: true },
+    { ledger_no: '2', computed_running_total_amount: '900', running_total_matches: true },
+    { ledger_no: '7', computed_running_total_amount: '1100', running_total_matches: true },
+    { ledger_no: '32', computed_running_total_amount: '1060', running_total_matches: true },
+    { ledger_no: '33', computed_running_total_amount: '1000', running_total_matches: true },
+  ]);
+});
+
 test('SQL entry totals match domain balance arithmetic', async (t) => {
   const { client } = await setupDatabase(t);
 

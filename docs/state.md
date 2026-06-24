@@ -19,19 +19,16 @@ The repository is aligned with the issue direction, with several parts already i
 - **Next.js boundary**: `src/server/ledger.ts`, server actions, and app routes call the application/database layer without a separate REST API.
 - **Current UI**: ledger list/detail, sortable/filterable columns, pagination, CSV export, new record, and inventory-check popups are implemented.
 - **Deployment**: Docker app/db/migration services are under `deploy/`, using env placeholders and Docker secrets for credentials.
-- **Remediation status**: initial P0 hardening has been committed: non-negative database constraints, fail-fast ledger import validation, FileMaker total reconciliation during import, domain balance tests, and stable business ordering for running balances.
+- **Remediation status**: initial P0 hardening has been committed: non-negative normal-write database rules, fail-fast ledger import validation, FileMaker total reconciliation during import, domain/SQL balance tests, PostgreSQL trigger/read-model tests, and separate FileMaker-compatible reconciliation.
 
 The main remaining gaps are:
 
-- PostgreSQL-backed tests for views/triggers and migration reconciliation are still needed before production replacement.
-- Inventory-check discrepancy semantics need database tests, especially expected-balance exclusion of the check observation.
-- Red-voucher correction needs invariant tests and UI exposure.
-- Legacy import mode needs operational hardening and a test proving normal app paths cannot leave the bypass enabled.
 - Red-voucher correction exists in the application layer but is not yet exposed as a complete UI workflow.
 - Monthly carry rows (`前葉より繰越`, `次葉へ繰越`) are represented in the data model but no explicit period-close/open workflow exists yet.
 - Master-data maintenance is mostly import/read-oriented; there is no dedicated admin UI.
 - Attachment/container data from FileMaker `画像` is modeled but not imported.
-- Automated tests beyond the initial domain balance suite should be added before replacing production workflows.
+- Production backup/restore and rollback operations are not yet documented.
+- Additional domain/SQL drift guards should be added as new money-path scenarios are implemented.
 
 ## Previous FileMaker System
 
@@ -107,13 +104,14 @@ npm run migrate -- status
 
 Ledger import now fails instead of silently skipping rows when required source fields are missing (`出納No`, `拠点CD`, `処理日`, `入出区分CD`). When the export includes `切手金額合計` or `金額合計`, the importer recomputes totals from `枚数N[1..16]` and `その他金額` and aborts on mismatch. The importer also preserves FileMaker `残高合計` in staging for golden-master comparison against PostgreSQL running totals.
 
-The 2026-06-24 local reconciliation run against `postgresql://voucher:pass@localhost:5432/test` completed import and transform for `filemaker/exports/L_T金券管理台帳.htm` after preserving legacy numeric quirks (`20.`, `￥25`, `1808;`) and skipping summary-only placeholder rows that have no posting fields. Result: `9045` rows compared, `9016` mismatches. This proves the reconciliation harness is active, but FileMaker `残高合計` still diverges from the current PostgreSQL running-balance contract and must not be treated as cutover-ready.
+The 2026-06-24 local reconciliation run against `postgresql://voucher:pass@localhost:5432/test` completed import and transform for `filemaker/exports/L_T金券管理台帳.htm` after preserving legacy numeric quirks (`20.`, `￥25`, `1808;`) and skipping summary-only placeholder rows that have no posting fields. The first run exposed `9016` mismatches out of `9045` rows because the application running-balance view intentionally orders by business date and excludes deleted rows, while FileMaker `残高合計` uses legacy `連番, 出納No` order and includes deleted legacy rows in the historical total. The reconciliation view now uses the FileMaker-compatible order for golden-master comparison only. Result after reapplying schema on 2026-06-24: `9045` rows compared, `0` mismatches.
 
 ### Data Compatibility Decisions
 
 - Opening balance uniqueness is **not enforced**. Legacy data contains multiple `入出区分CD=99` rows for some branch/period combinations. Enforcing uniqueness now would lose or reject legacy-compatible data.
 - Missing master rows may be created as inactive `Legacy ...` compatibility placeholders during transform. Named records imported from FileMaker are active.
 - Blank or inferred red-voucher state is normalized to `red_voucher_status_code = 0` unless links imply correction state.
+- The application running-balance view keeps deterministic business semantics (`処理日`, `連番`, `出納No`, excluding deleted rows). The FileMaker reconciliation view separately mirrors legacy `残高合計` semantics (`連番`, `出納No`, including deleted rows) so migration cutover checks can match the exported source without weakening application behavior.
 
 ## DDD Perspective
 
@@ -385,8 +383,6 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 
 ## Follow-Up Work
 
-- Extend PostgreSQL-backed tests around migration reconciliation edge cases.
-- Resolve the FileMaker `残高合計` reconciliation mismatch from the 2026-06-24 test run (`9016` mismatches out of `9045` rows), focusing on legacy ordering/carry/summary-row semantics.
 - Extend domain/SQL drift guards as new money-path scenarios are added.
 - Periodically review `legacy_import_audit_log` during migration/parallel-run operations.
 - Expose red-voucher correction in the UI.
