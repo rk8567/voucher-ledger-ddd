@@ -91,6 +91,8 @@ npm run test:postgres
 
 The Postgres test command creates and drops an isolated schema inside the configured database. It refuses to run unless the database name contains `test`, unless `ALLOW_NON_TEST_DATABASE=1` is set.
 
+PostgreSQL connections are bound to one database for their lifetime. To test against a different database, set `VOUCHER_LEDGER_TEST_DATABASE_URL` to that database before running `npm run test:postgres`; the test can switch schemas inside the selected database, but it cannot switch databases on an already-open connection.
+
 ## Docker Deployment
 
 Create a Docker env file and password secret:

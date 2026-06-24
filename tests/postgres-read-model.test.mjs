@@ -166,3 +166,76 @@ test('posted financial fields are immutable outside legacy import mode', async (
     /Posted voucher ledger entries are immutable/,
   );
 });
+
+test('inventory checks compare actual count against expected pre-check balance', async (t) => {
+  const { client } = await setupDatabase(t);
+
+  await client.query(`INSERT INTO branches (branch_code, branch_name) VALUES (1, 'Test branch')`);
+  await insertPostedEntry(client, {
+    ledgerNo: 10,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 1,
+    entryTypeCode: 99,
+    description: 'opening',
+    quantities: { 84: 10 },
+    otherAmount: 100,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 20,
+    branchCode: 1,
+    processingDate: '2026-01-02',
+    dailySequence: 1,
+    entryTypeCode: 3,
+    description: 'usage',
+    quantities: { 84: 2 },
+    otherAmount: 20,
+  });
+  const checkEntryId = await insertPostedEntry(client, {
+    ledgerNo: 30,
+    branchCode: 1,
+    processingDate: '2026-01-03',
+    dailySequence: 1,
+    entryTypeCode: 6,
+    description: 'inventory check',
+    quantities: { 84: 7 },
+    otherAmount: 90,
+  });
+
+  const totalResult = await client.query(
+    `SELECT actual_total_amount::text,
+            expected_total_amount::text,
+            discrepancy_amount::text
+       FROM voucher_inventory_check_results
+      WHERE entry_id = $1`,
+    [checkEntryId],
+  );
+  assert.deepEqual(totalResult.rows[0], {
+    actual_total_amount: '678',
+    expected_total_amount: '752',
+    discrepancy_amount: '-74',
+  });
+
+  const denominationResult = await client.query(
+    `SELECT actual_quantity::text,
+            expected_quantity::text,
+            discrepancy_quantity::text
+       FROM voucher_inventory_check_denomination_results
+      WHERE entry_id = $1
+        AND denomination_yen = 84`,
+    [checkEntryId],
+  );
+  assert.deepEqual(denominationResult.rows[0], {
+    actual_quantity: '7',
+    expected_quantity: '8',
+    discrepancy_quantity: '-1',
+  });
+
+  const runningAtCheck = await client.query(
+    `SELECT running_total_amount::text
+       FROM voucher_ledger_running_amounts
+      WHERE entry_id = $1`,
+    [checkEntryId],
+  );
+  assert.equal(runningAtCheck.rows[0].running_total_amount, '752');
+});
