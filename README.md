@@ -85,7 +85,7 @@ It also reports `legacy_import_audit_log`, which should only grow when migration
 
 `npm test` runs the fast TypeScript test gate for denomination mapping, balance arithmetic, and red-voucher correction use-case invariants.
 
-PostgreSQL-backed read-model and trigger checks require an explicit test database URL:
+PostgreSQL-backed read-model, trigger, and SQL/domain drift checks require an explicit test database URL:
 
 ```powershell
 $env:VOUCHER_LEDGER_TEST_DATABASE_URL='postgresql://localhost:5432/voucher_ledger_test'

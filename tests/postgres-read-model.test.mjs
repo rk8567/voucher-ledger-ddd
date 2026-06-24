@@ -187,6 +187,96 @@ test('SQL entry totals match domain balance arithmetic', async (t) => {
   });
 });
 
+test('SQL running totals match independent balance arithmetic', async (t) => {
+  const { client } = await setupDatabase(t);
+
+  await client.query(`INSERT INTO branches (branch_code, branch_name) VALUES (1, 'Test branch')`);
+  const entries = [
+    {
+      ledgerNo: 10,
+      processingDate: '2026-01-01',
+      dailySequence: 1,
+      entryTypeCode: 99,
+      description: 'opening',
+      quantities: { 84: 5, 10: 2 },
+      otherAmount: 100,
+      sign: 1,
+    },
+    {
+      ledgerNo: 30,
+      processingDate: '2026-01-03',
+      dailySequence: 1,
+      entryTypeCode: 2,
+      description: 'incoming',
+      quantities: { 84: 1 },
+      otherAmount: 20,
+      sign: 1,
+    },
+    {
+      ledgerNo: 20,
+      processingDate: '2026-01-02',
+      dailySequence: 1,
+      entryTypeCode: 3,
+      description: 'outgoing',
+      quantities: { 10: 1 },
+      otherAmount: 50,
+      sign: -1,
+    },
+  ];
+
+  for (const entry of entries) {
+    await insertPostedEntry(client, {
+      ledgerNo: entry.ledgerNo,
+      branchCode: 1,
+      processingDate: entry.processingDate,
+      dailySequence: entry.dailySequence,
+      entryTypeCode: entry.entryTypeCode,
+      description: entry.description,
+      quantities: entry.quantities,
+      otherAmount: entry.otherAmount,
+    });
+  }
+
+  let runningStampAmount = 0;
+  let runningOtherAmount = 0;
+  const expectedRows = entries
+    .toSorted((a, b) => a.processingDate.localeCompare(b.processingDate) || a.dailySequence - b.dailySequence || a.ledgerNo - b.ledgerNo)
+    .map((entry) => {
+      const stampAmount = Object.entries(entry.quantities).reduce(
+        (sum, [denomination, quantity]) => sum + Number(denomination) * quantity,
+        0,
+      );
+      runningStampAmount += entry.sign * stampAmount;
+      runningOtherAmount += entry.sign * entry.otherAmount;
+      return [
+        entry.ledgerNo,
+        runningStampAmount,
+        runningOtherAmount,
+        runningStampAmount + runningOtherAmount,
+      ];
+    });
+
+  const sqlRows = await client.query(
+    `SELECT ledger_no,
+            running_stamp_amount::text,
+            running_other_amount::text,
+            running_total_amount::text
+       FROM voucher_ledger_running_amounts
+      WHERE branch_code = 1
+      ORDER BY processing_date, daily_sequence, ledger_no`,
+  );
+
+  assert.deepEqual(
+    sqlRows.rows.map((row) => [
+      Number(row.ledger_no),
+      Number(row.running_stamp_amount),
+      Number(row.running_other_amount),
+      Number(row.running_total_amount),
+    ]),
+    expectedRows,
+  );
+});
+
 test('posted financial fields are immutable outside legacy import mode', async (t) => {
   const { client } = await setupDatabase(t);
 
