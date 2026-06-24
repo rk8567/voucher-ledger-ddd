@@ -189,6 +189,17 @@ export default async function Page({ searchParams }: PageProps) {
                 <span>{pageRangeText(currentPage, pageSize, data.entries.items.length, data.entries.totalCount)}</span>
               </div>
             </div>
+            <PaginationControls
+              previousHref={previousHref}
+              nextHref={nextHref}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageNumbers={pageNumbers}
+              pageSize={pageSize}
+              totalCount={data.entries.totalCount}
+              params={params}
+              position="top"
+            />
             <LedgerTable
               entries={data.entries.items}
               selectedLedgerNo={selected?.ledgerNo ?? null}
@@ -210,6 +221,7 @@ export default async function Page({ searchParams }: PageProps) {
               pageSize={pageSize}
               totalCount={data.entries.totalCount}
               params={params}
+              position="bottom"
             />
           </section>
 
@@ -357,6 +369,7 @@ function PaginationControls({
   pageSize,
   totalCount,
   params,
+  position,
 }: Readonly<{
   previousHref: string | null;
   nextHref: string | null;
@@ -366,9 +379,10 @@ function PaginationControls({
   pageSize: number;
   totalCount: number;
   params: Record<string, string | string[] | undefined>;
+  position: 'top' | 'bottom';
 }>) {
   return (
-    <nav className="paginationBar" aria-label="Ledger pagination">
+    <nav className={`paginationBar paginationBar${position === 'top' ? 'Top' : 'Bottom'}`} aria-label={`Ledger pagination ${position}`}>
       <span>
         {totalCount}件 / {totalPages}ページ / {pageSize}件
       </span>
