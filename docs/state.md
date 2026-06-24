@@ -19,14 +19,19 @@ The repository is aligned with the issue direction, with several parts already i
 - **Next.js boundary**: `src/server/ledger.ts`, server actions, and app routes call the application/database layer without a separate REST API.
 - **Current UI**: ledger list/detail, sortable/filterable columns, pagination, CSV export, new record, and inventory-check popups are implemented.
 - **Deployment**: Docker app/db/migration services are under `deploy/`, using env placeholders and Docker secrets for credentials.
+- **Remediation status**: initial P0 hardening has been committed: non-negative database constraints, fail-fast ledger import validation, FileMaker total reconciliation during import, domain balance tests, and stable business ordering for running balances.
 
 The main remaining gaps are:
 
+- PostgreSQL-backed tests for views/triggers and migration reconciliation are still needed before production replacement.
+- Inventory-check discrepancy semantics need database tests, especially expected-balance exclusion of the check observation.
+- Red-voucher correction needs invariant tests and UI exposure.
+- Legacy import mode needs operational hardening and a test proving normal app paths cannot leave the bypass enabled.
 - Red-voucher correction exists in the application layer but is not yet exposed as a complete UI workflow.
 - Monthly carry rows (`前葉より繰越`, `次葉へ繰越`) are represented in the data model but no explicit period-close/open workflow exists yet.
 - Master-data maintenance is mostly import/read-oriented; there is no dedicated admin UI.
 - Attachment/container data from FileMaker `画像` is modeled but not imported.
-- Automated tests around inventory discrepancy and correction invariants should be added before replacing production workflows.
+- Automated tests beyond the initial domain balance suite should be added before replacing production workflows.
 
 ## Previous FileMaker System
 
@@ -99,6 +104,8 @@ npm run migrate -- schema
 npm run migrate -- all ...
 npm run migrate -- status
 ```
+
+Ledger import now fails instead of silently skipping rows when required source fields are missing (`出納No`, `拠点CD`, `処理日`, `入出区分CD`). When the export includes `切手金額合計` or `金額合計`, the importer recomputes totals from `枚数N[1..16]` and `その他金額` and aborts on mismatch.
 
 ### Data Compatibility Decisions
 
@@ -193,7 +200,8 @@ Current implementation:
 
 - `Balance` and denomination helpers compute entry-level amounts.
 - SQL views in `003_views.sql` compute entry totals, deltas, running denomination balances, running other amount, and running total.
-- Running balance order is deterministic by `ledger_no`, not FileMaker found-set/sort state.
+- Running balance order is deterministic by `processing_date`, `daily_sequence`, then `ledger_no`, not FileMaker found-set/sort state.
+- `tests/domain.test.ts` locks the FileMaker denomination mapping and basic balance arithmetic.
 
 ### Entry Type Rules
 
@@ -286,10 +294,11 @@ Current implementation:
 ### Schema Rules
 
 - Master FK validation is enforced at insert/update.
+- `other_amount` and denomination `quantity` are constrained to non-negative values at the database layer.
 - Posted ledger financial fields are immutable.
 - Denomination rows of posted entries are immutable.
 - Legacy import mode can bypass selected mutation/update rules to preserve source data.
-- Ledger number sequence must be reset after importing legacy `出納No` values.
+- Ledger number sequence is reset automatically by the transform after importing legacy `出納No` values.
 
 ## Application Structure
 
@@ -369,7 +378,10 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 
 ## Follow-Up Work
 
-- Add tests around `Balance`, entry type deltas, inventory checks, and red-voucher correction links.
+- Add PostgreSQL-backed tests around SQL read models, trigger immutability, inventory checks, red-voucher correction links, and migration reconciliation.
+- Add aggregate reconciliation against FileMaker `残高合計` using a real/sanitized export fixture.
+- Add a domain/SQL drift guard so domain balance arithmetic and SQL running totals cannot diverge silently.
+- Harden legacy import mode as a migration-only bypass with operational logging and a test that normal app paths run with it disabled.
 - Expose red-voucher correction in the UI.
 - Decide whether month carry rows must be actively generated or only preserved from legacy data.
 - Decide whether master data is maintained here or imported from another source of truth.
