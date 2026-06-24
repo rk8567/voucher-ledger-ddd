@@ -549,25 +549,27 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
 
   async getCurrentBalance(branchCode: number): Promise<CurrentBalanceRecord> {
     const totalResult = await this.db.query(
-      `SELECT ledger_no,
-              running_stamp_amount,
-              running_other_amount,
-              running_total_amount
-         FROM voucher_ledger_running_amounts
-        WHERE branch_code = $1
-        ORDER BY processing_date DESC, daily_sequence DESC, ledger_no DESC
+      `SELECT r.ledger_no,
+              r.running_stamp_amount,
+              r.running_other_amount,
+              r.running_total_amount
+         FROM voucher_ledger_running_amounts r
+         JOIN voucher_ledger_entries e ON e.ledger_no = r.ledger_no
+        WHERE r.branch_code = $1
+        ORDER BY e.processing_date DESC, e.daily_sequence DESC, e.ledger_no DESC
         LIMIT 1`,
       [branchCode],
     );
 
     const denominationResult = await this.db.query(
-      `SELECT DISTINCT ON (denomination_yen)
-              denomination_yen,
-              running_quantity,
-              running_quantity::bigint * denomination_yen::bigint AS running_amount_yen
-         FROM voucher_ledger_running_denominations
-        WHERE branch_code = $1
-        ORDER BY denomination_yen, processing_date DESC, daily_sequence DESC, ledger_no DESC`,
+      `SELECT DISTINCT ON (r.denomination_yen)
+              r.denomination_yen,
+              r.running_quantity,
+              r.running_quantity::bigint * r.denomination_yen::bigint AS running_amount_yen
+         FROM voucher_ledger_running_denominations r
+         JOIN voucher_ledger_entries e ON e.ledger_no = r.ledger_no
+        WHERE r.branch_code = $1
+        ORDER BY r.denomination_yen, e.processing_date DESC, e.daily_sequence DESC, e.ledger_no DESC`,
       [branchCode],
     );
 

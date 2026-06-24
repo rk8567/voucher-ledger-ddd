@@ -120,6 +120,7 @@ docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --prof
 ```
 
 `migrate schema` is safe to re-run against an existing migration database; it adds missing compatibility columns before recreating views and indexes.
+If PostgreSQL logs `column "processing_date" does not exist` after updating the code, rerun `migrate schema` and rebuild/restart the app container so both the database views and application queries are current.
 
 Import and transform FileMaker HTML exports from `filemaker/exports/`:
 
