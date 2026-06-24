@@ -195,13 +195,19 @@ async function importRawLedgerRows(
   resolveEmployeeNo: (name: string | undefined, branchCode: number) => number | null,
 ): Promise<number> {
   let inserted = 0;
+  const skippedRows: string[] = [];
 
   for (const [index, row] of rows.entries()) {
     const entryTypeCode = asNullableInt(row.入出区分CD);
     const processingDate = asNullableDate(row.処理日);
     const branchCode = asNullableInt(row.拠点CD);
     const ledgerNo = asNullableInt(row.出納No);
-    if (entryTypeCode == null || processingDate == null || branchCode == null || ledgerNo == null) continue;
+    if (entryTypeCode == null || processingDate == null || branchCode == null || ledgerNo == null) {
+      skippedRows.push(
+        `row ${index + 1}: 出納No=${row.出納No || '(blank)'}, 拠点CD=${row.拠点CD || '(blank)'}, 処理日=${row.処理日 || '(blank)'}, 入出区分CD=${row.入出区分CD || '(blank)'}`,
+      );
+      continue;
+    }
 
     const originalLedgerNo = asNullableInt(row.元伝票No);
     const reversalLedgerNo = asNullableInt(row.赤伝票No);
@@ -251,6 +257,10 @@ async function importRawLedgerRows(
     ]);
 
     inserted += result.rowCount ?? 0;
+  }
+
+  if (skippedRows.length > 0) {
+    throw new Error(`Ledger import aborted: ${skippedRows.length} row(s) were missing required fields.\n${skippedRows.join('\n')}`);
   }
 
   return inserted;
