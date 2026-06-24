@@ -167,6 +167,34 @@ test('posted financial fields are immutable outside legacy import mode', async (
   );
 });
 
+test('app transaction guard can force legacy import bypass off', async (t) => {
+  const { client } = await setupDatabase(t);
+
+  await client.query(`INSERT INTO branches (branch_code, branch_name) VALUES (1, 'Test branch')`);
+  const entryId = await insertPostedEntry(client, {
+    ledgerNo: 10,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 1,
+    entryTypeCode: 99,
+    description: 'opening',
+    otherAmount: 1000,
+  });
+
+  await client.query(`SET voucher_ledger.legacy_import = 'on'`);
+  await client.query('BEGIN');
+  await client.query(`SET LOCAL voucher_ledger.legacy_import = 'off'`);
+  try {
+    await assert.rejects(
+      client.query(`UPDATE voucher_ledger_entries SET other_amount = 999 WHERE id = $1`, [entryId]),
+      /Posted voucher ledger entries are immutable/,
+    );
+  } finally {
+    await client.query('ROLLBACK');
+    await client.query(`SET voucher_ledger.legacy_import = 'off'`);
+  }
+});
+
 test('inventory checks compare actual count against expected pre-check balance', async (t) => {
   const { client } = await setupDatabase(t);
 

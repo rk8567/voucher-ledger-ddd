@@ -8,7 +8,7 @@ export function createPgPool(connectionString = process.env.DATABASE_URL): Pool 
   if (!connectionString) throw new Error('DATABASE_URL is required.');
   const { parse } = pkg;
   const parsed = parse(connectionString);
-  return new Pool({
+  const pool = new Pool({
     ...parsed,
     database: parsed.database ?? undefined,
     host: parsed.host ?? undefined,
@@ -17,6 +17,14 @@ export function createPgPool(connectionString = process.env.DATABASE_URL): Pool 
     ssl: parsed.ssl === true ? true : undefined,
     user: process.env.DATABASE_USER ?? parsed.user ?? undefined,
   });
+
+  pool.on('connect', (client) => {
+    client.query("SET voucher_ledger.legacy_import = 'off'").catch((error: unknown) => {
+      console.error('Failed to initialize voucher_ledger.legacy_import for app connection', error);
+    });
+  });
+
+  return pool;
 }
 
 function databasePassword(): string | undefined {
@@ -30,6 +38,7 @@ export async function withTransaction<T>(pool: Pool, work: (client: PoolClient) 
   const client = await pool.connect();
   try {
     await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+    await client.query("SET LOCAL voucher_ledger.legacy_import = 'off'");
     const result = await work(client);
     await client.query('COMMIT');
     return result;

@@ -135,6 +135,8 @@ The Dockerfile contains no credentials. Database credentials are supplied throug
 
 ## Design Notes
 
+Normal application database connections force `voucher_ledger.legacy_import` off when connections are opened and again at transaction start. The legacy-import bypass is reserved for migration SQL that explicitly uses `SET LOCAL voucher_ledger.legacy_import = 'on'`.
+
 The main documentation is [docs/state.md](docs/state.md). It covers:
 
 - Current project assessment against the FileMaker replacement issue.
