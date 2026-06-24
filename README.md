@@ -74,10 +74,22 @@ Open `http://localhost:3000`.
 ## Checks
 
 ```bash
+npm test
 npm run typecheck
 npm run build
 npm run migrate -- status
 ```
+
+`npm test` runs the fast domain test gate for denomination mapping and balance arithmetic.
+
+PostgreSQL-backed read-model and trigger checks require an explicit test database URL:
+
+```powershell
+$env:VOUCHER_LEDGER_TEST_DATABASE_URL='postgresql://localhost:5432/voucher_ledger_test'
+npm run test:postgres
+```
+
+The Postgres test command creates and drops an isolated schema inside the configured database. It refuses to run unless the database name contains `test`, unless `ALLOW_NON_TEST_DATABASE=1` is set.
 
 ## Docker Deployment
 
