@@ -754,7 +754,7 @@ button:disabled {
 .paginationBar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   padding: 12px 16px;
   color: var(--muted);
@@ -773,14 +773,18 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  min-width: 0;
+  width: 100%;
 }
 
 .pageNumberList {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
 }
 
 .pagerButton {
@@ -819,6 +823,12 @@ button:disabled {
 
 .pagerButtonActive:hover {
   background: var(--accent);
+}
+
+.pageNumberList .pagerButton {
+  min-width: 34px;
+  padding-right: 9px;
+  padding-left: 9px;
 }
 
 .pagerEllipsis {

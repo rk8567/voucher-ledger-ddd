@@ -195,8 +195,6 @@ export default async function Page({ searchParams }: PageProps) {
               currentPage={currentPage}
               totalPages={totalPages}
               pageNumbers={pageNumbers}
-              pageSize={pageSize}
-              totalCount={data.entries.totalCount}
               params={params}
               position="top"
             />
@@ -218,8 +216,6 @@ export default async function Page({ searchParams }: PageProps) {
               currentPage={currentPage}
               totalPages={totalPages}
               pageNumbers={pageNumbers}
-              pageSize={pageSize}
-              totalCount={data.entries.totalCount}
               params={params}
               position="bottom"
             />
@@ -366,8 +362,6 @@ function PaginationControls({
   currentPage,
   totalPages,
   pageNumbers,
-  pageSize,
-  totalCount,
   params,
   position,
 }: Readonly<{
@@ -376,16 +370,11 @@ function PaginationControls({
   currentPage: number;
   totalPages: number;
   pageNumbers: readonly (number | 'ellipsis')[];
-  pageSize: number;
-  totalCount: number;
   params: Record<string, string | string[] | undefined>;
   position: 'top' | 'bottom';
 }>) {
   return (
     <nav className={`paginationBar paginationBar${position === 'top' ? 'Top' : 'Bottom'}`} aria-label={`Ledger pagination ${position}`}>
-      <span>
-        {totalCount}件 / {totalPages}ページ / {pageSize}件
-      </span>
       <div className="paginationActions">
         {previousHref ? (
           <Link className="pagerButton" href={previousHref}>前へ</Link>
