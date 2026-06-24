@@ -202,6 +202,7 @@ Current implementation:
 - SQL views in `003_views.sql` compute entry totals, deltas, running denomination balances, running other amount, and running total.
 - Running balance order is deterministic by `processing_date`, `daily_sequence`, then `ledger_no`, not FileMaker found-set/sort state.
 - `tests/domain.test.ts` locks the FileMaker denomination mapping and basic balance arithmetic.
+- `tests/postgres-read-model.test.mjs` includes a SQL/domain drift guard for entry total arithmetic.
 
 ### Entry Type Rules
 
@@ -383,7 +384,7 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 
 - Extend PostgreSQL-backed tests around migration reconciliation and red-voucher database links.
 - Run and archive aggregate reconciliation against FileMaker `残高合計` using a real/sanitized export fixture.
-- Add a domain/SQL drift guard so domain balance arithmetic and SQL running totals cannot diverge silently.
+- Extend domain/SQL drift guards from entry totals to representative running-balance scenarios.
 - Periodically review `legacy_import_audit_log` during migration/parallel-run operations.
 - Expose red-voucher correction in the UI.
 - Decide whether month carry rows must be actively generated or only preserved from legacy data.

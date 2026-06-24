@@ -147,6 +147,46 @@ test('postgres read models use processing date, daily sequence, ledger number or
   );
 });
 
+test('SQL entry totals match domain balance arithmetic', async (t) => {
+  const { client } = await setupDatabase(t);
+
+  await client.query(`INSERT INTO branches (branch_code, branch_name) VALUES (1, 'Test branch')`);
+  const quantities = { 84: 3, 10: 2, 600: 1 };
+  const otherAmountYen = 125;
+  const entryId = await insertPostedEntry(client, {
+    ledgerNo: 10,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 1,
+    entryTypeCode: 99,
+    description: 'opening',
+    quantities,
+    otherAmount: otherAmountYen,
+  });
+  const domainEquivalentStampAmount = Object.entries(quantities).reduce(
+    (sum, [denomination, quantity]) => sum + Number(denomination) * quantity,
+    0,
+  );
+  const domainEquivalentTotalAmount = domainEquivalentStampAmount + otherAmountYen;
+
+  const sqlTotals = await client.query(
+    `SELECT stamp_quantity_total::text,
+            stamp_amount_total::text,
+            other_amount::text,
+            total_amount::text
+       FROM voucher_ledger_entry_totals
+      WHERE entry_id = $1`,
+    [entryId],
+  );
+
+  assert.deepEqual(sqlTotals.rows[0], {
+    stamp_quantity_total: '6',
+    stamp_amount_total: String(domainEquivalentStampAmount),
+    other_amount: String(otherAmountYen),
+    total_amount: String(domainEquivalentTotalAmount),
+  });
+});
+
 test('posted financial fields are immutable outside legacy import mode', async (t) => {
   const { client } = await setupDatabase(t);
 
