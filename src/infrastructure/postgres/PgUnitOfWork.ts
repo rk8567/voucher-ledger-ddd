@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
 import type { Repositories, UnitOfWork } from '@/application/db/UnitOfWork';
-import { withTransaction } from '@/application/db/postgres';
+import { connectAppClient, withTransaction } from '@/application/db/postgres';
 import { PgVoucherLedgerRepository } from '@/infrastructure/postgres/PgVoucherLedgerRepository';
 
 export class PgUnitOfWork implements UnitOfWork {
@@ -13,7 +13,7 @@ export class PgUnitOfWork implements UnitOfWork {
   }
 
   async readOnly<T>(work: (repositories: Repositories) => Promise<T>): Promise<T> {
-    const client = await this.pool.connect();
+    const client = await connectAppClient(this.pool);
     try {
       return await work({ voucherLedger: new PgVoucherLedgerRepository(client) });
     } finally {

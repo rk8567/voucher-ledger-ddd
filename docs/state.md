@@ -303,7 +303,7 @@ Current implementation:
 - `other_amount` and denomination `quantity` are constrained to non-negative values at the database layer.
 - Posted ledger financial fields are immutable.
 - Denomination rows of posted entries are immutable.
-- Legacy import mode can bypass selected mutation/update rules to preserve source data in migration SQL. Transform runs write audit rows to `legacy_import_audit_log`; normal application connections initialize and run transactions with `voucher_ledger.legacy_import = off`.
+- Legacy import mode can bypass selected mutation/update rules to preserve source data in migration SQL. Transform runs write audit rows to `legacy_import_audit_log`; normal unit-of-work connections await `voucher_ledger.legacy_import = off` before use and transactions also set it locally.
 - Ledger number sequence is reset automatically by the transform after importing legacy `出納No` values.
 - `npm run migrate -- status` reports FileMaker `残高合計` reconciliation row counts and mismatch counts.
 

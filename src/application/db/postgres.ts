@@ -18,12 +18,6 @@ export function createPgPool(connectionString = process.env.DATABASE_URL): Pool 
     user: process.env.DATABASE_USER ?? parsed.user ?? undefined,
   });
 
-  pool.on('connect', (client) => {
-    client.query("SET voucher_ledger.legacy_import = 'off'").catch((error: unknown) => {
-      console.error('Failed to initialize voucher_ledger.legacy_import for app connection', error);
-    });
-  });
-
   return pool;
 }
 
@@ -35,7 +29,7 @@ function databasePassword(): string | undefined {
 }
 
 export async function withTransaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
+  const client = await connectAppClient(pool);
   try {
     await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
     await client.query("SET LOCAL voucher_ledger.legacy_import = 'off'");
@@ -47,5 +41,16 @@ export async function withTransaction<T>(pool: Pool, work: (client: PoolClient) 
     throw error;
   } finally {
     client.release();
+  }
+}
+
+export async function connectAppClient(pool: Pool): Promise<PoolClient> {
+  const client = await pool.connect();
+  try {
+    await client.query("SET voucher_ledger.legacy_import = 'off'");
+    return client;
+  } catch (error) {
+    client.release();
+    throw error;
   }
 }
