@@ -17,13 +17,12 @@ The repository is aligned with the issue direction, with several parts already i
 - **Application layer**: `src/application/usecases` contains posting use cases for opening balance, normal voucher movement, inventory check, and red-voucher correction.
 - **Infrastructure boundary**: repository ports live under `src/application/repositories`; PostgreSQL implementations live under `src/infrastructure/postgres`.
 - **Next.js boundary**: `src/server/ledger.ts`, server actions, and app routes call the application/database layer without a separate REST API.
-- **Current UI**: ledger list/detail, sortable/filterable columns, pagination, CSV export, new record, and inventory-check popups are implemented.
+- **Current UI**: ledger list/detail, sortable/filterable columns, pagination, CSV export, new record, inventory-check, and red-voucher correction popups are implemented.
 - **Deployment**: Docker app/db/migration services are under `deploy/`, using env placeholders and Docker secrets for credentials.
 - **Remediation status**: initial P0 hardening has been committed: non-negative normal-write database rules, fail-fast ledger import validation, FileMaker total reconciliation during import, domain/SQL balance tests, PostgreSQL trigger/read-model tests, and separate FileMaker-compatible reconciliation.
 
 The main remaining gaps are:
 
-- Red-voucher correction exists in the application layer but is not yet exposed as a complete UI workflow.
 - Monthly carry rows (`前葉より繰越`, `次葉へ繰越`) are represented in the data model but no explicit period-close/open workflow exists yet.
 - Master-data maintenance is mostly import/read-oriented; there is no dedicated admin UI.
 - Attachment/container data from FileMaker `画像` is modeled but not imported.
@@ -339,12 +338,12 @@ Implemented:
 - CSV export using current filters/sort;
 - new movement registration;
 - inventory-check registration;
+- selected-entry red-voucher correction registration;
 - detail panel showing all selected ledger fields;
 - Docker-ready app startup.
 
 Not yet complete:
 
-- red-voucher correction UI;
 - month carry workflow UI;
 - master-data maintenance screens;
 - attachment import/display.
@@ -386,7 +385,6 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 
 ## Follow-Up Work
 
-- Expose red-voucher correction in the UI.
 - Decide whether month carry rows must be actively generated or only preserved from legacy data.
 - Decide whether master data is maintained here or imported from another source of truth.
 - Add attachment/container migration if FileMaker image data is still required.

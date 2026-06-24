@@ -409,6 +409,21 @@ button:disabled {
   width: auto;
 }
 
+.formContext {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #f9faf8;
+}
+
+.formContext span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .wideField,
 .quantityFieldset {
   grid-column: 1 / -1;
@@ -918,6 +933,17 @@ tr:last-child td {
   top: 16px;
   max-height: calc(100vh - 32px);
   overflow: auto;
+}
+
+.detailActions {
+  display: flex;
+  justify-content: flex-end;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 16px;
+}
+
+.detailActions button {
+  width: auto;
 }
 
 .detailSection {

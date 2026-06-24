@@ -6,6 +6,7 @@ import { DENOMINATIONS } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
 import type { LedgerFormOptions, LedgerSelectOption } from '@/server/ledger';
 import {
+  issueRedVoucherCorrectionAction,
   registerInventoryCheckAction,
   registerVoucherMovementAction,
 } from './actions';
@@ -21,22 +22,52 @@ type EntryActionModalsProps = Readonly<{
   defaultActorEmployeeNo: number | null;
   clearDraft: Workflow | null;
   options: LedgerFormOptions;
+  selectedEntry: CorrectionSelectedEntry | null;
 }>;
 
 type DraftValues = Record<string, string>;
-type Workflow = 'movement' | 'inventory';
+type Workflow = 'movement' | 'inventory' | 'correction';
+
+type CorrectionSelectedEntry = Readonly<{
+  ledgerNo: number;
+  branchCode: number;
+  branchName: string | null;
+  departmentCode: number | null;
+  periodYear: number | null;
+  periodMonth: number | null;
+  applicationDate: string | null;
+  processingDate: string;
+  entryTypeCode: EntryTypeCode;
+  transactionCategoryCode: number | null;
+  counterpartyBranchCode: number | null;
+  statusCode: number | null;
+  companyCode: number | null;
+  responsibleEmployeeNo: number | null;
+  description: string;
+  remarks: string | null;
+  otherAmountYen: number;
+  otherAmountNote: string | null;
+  redVoucherStatusCode: 0 | 1 | 2 | 3;
+  reversalLedgerNo: number | null;
+  isDeleted: boolean;
+  quantities: Readonly<Record<number, number>>;
+}>;
 
 const movementDraftKey = 'voucher-ledger:new-record-draft';
 const inventoryDraftKey = 'voucher-ledger:inventory-check-draft';
+const correctionDraftKey = 'voucher-ledger:red-voucher-correction-draft';
 
 export function EntryActionModals(props: EntryActionModalsProps) {
   const [openWorkflow, setOpenWorkflow] = useState<Workflow | null>(null);
   const movementDefaults = useMemo(() => movementInitialValues(props), [props]);
   const inventoryDefaults = useMemo(() => inventoryInitialValues(props), [props]);
+  const correctionDefaults = useMemo(() => correctionInitialValues(props), [props]);
+  const correctionAvailable = props.selectedEntry ? canCorrect(props.selectedEntry) : false;
 
   useEffect(() => {
     if (props.clearDraft === 'movement') window.localStorage.removeItem(movementDraftKey);
     if (props.clearDraft === 'inventory') window.localStorage.removeItem(inventoryDraftKey);
+    if (props.clearDraft === 'correction') window.localStorage.removeItem(correctionDraftKey);
   }, [props.clearDraft]);
 
   useEffect(() => {
@@ -51,6 +82,19 @@ export function EntryActionModals(props: EntryActionModalsProps) {
 
   return (
     <>
+      {props.selectedEntry ? (
+        <div className="detailActions">
+          <button
+            type="button"
+            className="secondaryButton"
+            disabled={!correctionAvailable}
+            onClick={() => setOpenWorkflow('correction')}
+          >
+            赤伝票で訂正
+          </button>
+        </div>
+      ) : null}
+
       {openWorkflow === 'movement' ? (
         <EntryModal title="新規レコード" onClose={() => setOpenWorkflow(null)}>
           <PersistedEntryForm
@@ -79,6 +123,26 @@ export function EntryActionModals(props: EntryActionModalsProps) {
           >
             <BaseEntryFields includeDescription={false} />
             <InventoryDescriptionField />
+            <AmountAndNotes />
+            <QuantityFields />
+          </PersistedEntryForm>
+        </EntryModal>
+      ) : null}
+
+      {openWorkflow === 'correction' && props.selectedEntry ? (
+        <EntryModal title={`赤伝票/訂正 出納No ${props.selectedEntry.ledgerNo}`} onClose={() => setOpenWorkflow(null)}>
+          <PersistedEntryForm
+            action={issueRedVoucherCorrectionAction}
+            storageKey={correctionDraftKey}
+            defaults={correctionDefaults}
+            submitLabel="赤伝票/訂正を登録"
+            options={props.options}
+          >
+            <input type="hidden" name="originalLedgerNo" value={props.selectedEntry.ledgerNo} />
+            <CorrectionContext original={props.selectedEntry} />
+            <CorrectionReversalFields />
+            <BaseEntryFields includeDescription />
+            <MovementFields />
             <AmountAndNotes />
             <QuantityFields />
           </PersistedEntryForm>
@@ -311,6 +375,53 @@ function InventoryDescriptionField() {
   );
 }
 
+function CorrectionContext({ original }: Readonly<{ original: CorrectionSelectedEntry }>) {
+  return (
+    <div className="formContext wideField">
+      <span>元伝票</span>
+      <strong>
+        {original.ledgerNo} / {original.branchName ?? original.branchCode} / {dateInputText(original.processingDate)}
+      </strong>
+    </div>
+  );
+}
+
+function CorrectionReversalFields() {
+  const values = useContext(DraftValueContext);
+  const errors = useContext(FieldErrorsContext);
+  return (
+    <>
+      <label className={fieldClass(errors, 'reversalProcessingDate')}>
+        <span>赤伝票処理日</span>
+        <input
+          name="reversalProcessingDate"
+          pattern="\d{4}/\d{2}/\d{2}"
+          placeholder="yyyy/mm/dd"
+          defaultValue={fieldValue(values, 'reversalProcessingDate')}
+          required
+        />
+      </label>
+      <label className={fieldClass(errors, 'reversalApplicationDate')}>
+        <span>赤伝票申請処理日</span>
+        <input
+          name="reversalApplicationDate"
+          pattern="\d{4}/\d{2}/\d{2}"
+          placeholder="yyyy/mm/dd"
+          defaultValue={fieldValue(values, 'reversalApplicationDate')}
+        />
+      </label>
+      <label className={`wideField ${fieldClass(errors, 'reversalDescription')}`}>
+        <span>赤伝票摘要</span>
+        <textarea name="reversalDescription" defaultValue={fieldValue(values, 'reversalDescription')} rows={2} />
+      </label>
+      <label className={`wideField ${fieldClass(errors, 'reversalRemarks')}`}>
+        <span>赤伝票備考</span>
+        <textarea name="reversalRemarks" defaultValue={fieldValue(values, 'reversalRemarks')} rows={2} />
+      </label>
+    </>
+  );
+}
+
 function AmountAndNotes() {
   const values = useContext(DraftValueContext);
   const errors = useContext(FieldErrorsContext);
@@ -415,6 +526,36 @@ function inventoryInitialValues(props: EntryActionModalsProps): DraftValues {
   };
 }
 
+function correctionInitialValues(props: EntryActionModalsProps): DraftValues {
+  const selected = props.selectedEntry;
+  if (!selected) return {};
+  return {
+    ...baseInitialValues({
+      ...props,
+      defaultBranchCode: selected.branchCode,
+      defaultProcessingDate: selected.processingDate,
+      defaultPeriodYear: selected.periodYear,
+      defaultPeriodMonth: selected.periodMonth,
+      defaultResponsibleEmployeeNo: selected.responsibleEmployeeNo,
+    }),
+    reversalProcessingDate: dateInputText(selected.processingDate),
+    reversalApplicationDate: dateInputText(selected.applicationDate ?? selected.processingDate),
+    reversalDescription: `No.${selected.ledgerNo} の赤伝票`,
+    reversalRemarks: selected.remarks ?? '',
+    entryTypeCode: String(selected.entryTypeCode),
+    description: selected.description,
+    transactionCategoryCode: selected.transactionCategoryCode == null ? '' : String(selected.transactionCategoryCode),
+    counterpartyBranchCode: selected.counterpartyBranchCode == null ? '' : String(selected.counterpartyBranchCode),
+    companyCode: selected.companyCode == null ? '' : String(selected.companyCode),
+    departmentCode: selected.departmentCode == null ? '' : String(selected.departmentCode),
+    statusCode: selected.statusCode == null ? '' : String(selected.statusCode),
+    otherAmountYen: String(selected.otherAmountYen),
+    otherAmountNote: selected.otherAmountNote ?? '',
+    remarks: selected.remarks ?? '',
+    ...quantityValues(selected.quantities),
+  };
+}
+
 function baseInitialValues(props: EntryActionModalsProps): DraftValues {
   return {
     branchCode: props.defaultBranchCode == null ? '' : String(props.defaultBranchCode),
@@ -427,8 +568,26 @@ function baseInitialValues(props: EntryActionModalsProps): DraftValues {
   };
 }
 
+function canCorrect(entry: CorrectionSelectedEntry): boolean {
+  return !entry.isDeleted
+    && entry.redVoucherStatusCode === 0
+    && entry.reversalLedgerNo === null
+    && [
+      EntryTypeCode.Incoming,
+      EntryTypeCode.Outgoing,
+      EntryTypeCode.IncomingAlt,
+      EntryTypeCode.OutgoingAlt,
+    ].includes(entry.entryTypeCode);
+}
+
 function zeroQuantityValues(): DraftValues {
   return Object.fromEntries(DENOMINATIONS.map((denomination) => [`quantity_${denomination}`, '0']));
+}
+
+function quantityValues(quantities: Readonly<Record<number, number>>): DraftValues {
+  return Object.fromEntries(
+    DENOMINATIONS.map((denomination) => [`quantity_${denomination}`, String(quantities[denomination] ?? 0)]),
+  );
 }
 
 function loadDraft(storageKey: string): DraftValues {

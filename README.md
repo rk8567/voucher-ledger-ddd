@@ -4,6 +4,8 @@ Next.js + PostgreSQL replacement for the FileMaker `金券管理台帳.fmp12` vo
 
 The project migrates FileMaker ledger data and makes the implicit FileMaker business rules explicit in a DDD-oriented TypeScript application layer and PostgreSQL read model.
 
+The web UI supports ledger search/detail, CSV export, new movement registration, inventory checks, and selected-row red-voucher correction.
+
 ## Current Scope
 
 - Next.js owns both frontend and backend execution.

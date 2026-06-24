@@ -189,16 +189,6 @@ export default async function Page({ searchParams }: PageProps) {
                 <span>{pageRangeText(currentPage, pageSize, data.entries.items.length, data.entries.totalCount)}</span>
               </div>
             </div>
-            <EntryActionModals
-              defaultBranchCode={defaultBranchCode}
-              defaultProcessingDate={defaultProcessingDate}
-              defaultPeriodYear={defaultPeriodYear}
-              defaultPeriodMonth={defaultPeriodMonth}
-              defaultResponsibleEmployeeNo={defaultResponsibleEmployeeNo}
-              defaultActorEmployeeNo={defaultActorEmployeeNo}
-              clearDraft={clearDraft === 'movement' || clearDraft === 'inventory' ? clearDraft : null}
-              options={data.formOptions}
-            />
             <LedgerTable
               entries={data.entries.items}
               selectedLedgerNo={selected?.ledgerNo ?? null}
@@ -228,6 +218,17 @@ export default async function Page({ searchParams }: PageProps) {
               <h2>明細</h2>
               <span>{selected ? `出納No ${selected.ledgerNo}` : '未選択'}</span>
             </div>
+            <EntryActionModals
+              defaultBranchCode={defaultBranchCode}
+              defaultProcessingDate={defaultProcessingDate}
+              defaultPeriodYear={defaultPeriodYear}
+              defaultPeriodMonth={defaultPeriodMonth}
+              defaultResponsibleEmployeeNo={defaultResponsibleEmployeeNo}
+              defaultActorEmployeeNo={defaultActorEmployeeNo}
+              clearDraft={clearDraft === 'movement' || clearDraft === 'inventory' || clearDraft === 'correction' ? clearDraft : null}
+              options={data.formOptions}
+              selectedEntry={selected}
+            />
             {selected ? (
               <>
                 <DetailSection

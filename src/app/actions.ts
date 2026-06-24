@@ -5,6 +5,7 @@ import { updateTag } from 'next/cache';
 
 import { RegisterInventoryCheckUseCase } from '@/application/usecases/RegisterInventoryCheck';
 import { RegisterVoucherMovementUseCase } from '@/application/usecases/RegisterVoucherMovement';
+import { IssueRedVoucherCorrectionUseCase } from '@/application/usecases/IssueRedVoucherCorrection';
 import { DENOMINATIONS, type QuantityInput } from '@/domain/denominations';
 import { DomainError } from '@/domain/errors';
 import { EntryTypeCode } from '@/domain/entryTypes';
@@ -97,12 +98,63 @@ export async function registerInventoryCheckAction(
   );
 }
 
+export async function issueRedVoucherCorrectionAction(
+  _previousState: EntryActionState,
+  formData: FormData,
+): Promise<EntryActionState> {
+  let reversalLedgerNo: number;
+  let correctedLedgerNo: number | undefined;
+  try {
+    const quantities = quantityInput(formData);
+    const otherAmountYen = boundedInt(formData, 'otherAmountYen', 'その他金額', 0, 999_999_999) ?? 0;
+    assertAnyEnteredValue(quantities, otherAmountYen);
+
+    const useCase = new IssueRedVoucherCorrectionUseCase(unitOfWork);
+    const result = await useCase.execute({
+      originalLedgerNo: requiredInt(formData, 'originalLedgerNo', '元伝票No'),
+      reversalProcessingDate: requiredDate(formData, 'reversalProcessingDate', '赤伝票処理日'),
+      reversalApplicationDate: optionalDate(formData, 'reversalApplicationDate', '赤伝票申請処理日'),
+      reversalDescription: optionalText(formData, 'reversalDescription'),
+      reversalRemarks: optionalText(formData, 'reversalRemarks'),
+      correctedEntry: {
+        processingDate: requiredDate(formData, 'processingDate', '訂正処理日'),
+        applicationDate: optionalDate(formData, 'applicationDate', '訂正申請処理日'),
+        periodYear: optionalInt(formData, 'periodYear'),
+        periodMonth: optionalInt(formData, 'periodMonth'),
+        entryTypeCode: movementEntryType(requiredInt(formData, 'entryTypeCode', '訂正入出区分')),
+        transactionCategoryCode: optionalInt(formData, 'transactionCategoryCode'),
+        counterpartyBranchCode: optionalInt(formData, 'counterpartyBranchCode'),
+        companyCode: optionalInt(formData, 'companyCode'),
+        departmentCode: optionalInt(formData, 'departmentCode'),
+        responsibleEmployeeNo: optionalInt(formData, 'responsibleEmployeeNo'),
+        statusCode: optionalInt(formData, 'statusCode'),
+        description: requiredText(formData, 'description', '訂正摘要'),
+        remarks: optionalText(formData, 'remarks'),
+        quantities,
+        otherAmountYen,
+        otherAmountNote: optionalText(formData, 'otherAmountNote'),
+      },
+      actor: actorContext(formData),
+    });
+    reversalLedgerNo = result.reversalLedgerNo;
+    correctedLedgerNo = result.correctedLedgerNo;
+  } catch (error) {
+    return errorState(error, formData);
+  }
+
+  redirectWithMessage(
+    'correction',
+    correctedLedgerNo ?? reversalLedgerNo,
+    `赤伝票を登録しました: 赤伝票 #${reversalLedgerNo}${correctedLedgerNo ? ` / 訂正伝票 #${correctedLedgerNo}` : ''}`,
+  );
+}
+
 function redirectWithMessage(clearDraft: WorkflowDraft, ledgerNo: number, message: string): never {
   updateTag(LEDGER_DATA_CACHE_TAG);
   redirect(`/?ledgerNo=${ledgerNo}&actionMessage=${encodeURIComponent(message)}&clearDraft=${clearDraft}`);
 }
 
-type WorkflowDraft = 'movement' | 'inventory';
+type WorkflowDraft = 'movement' | 'inventory' | 'correction';
 
 function errorMessage(error: unknown): string {
   if (error instanceof DomainError && error.code === 'OPENING_BALANCE_REQUIRED') {
