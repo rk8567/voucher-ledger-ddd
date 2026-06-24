@@ -109,6 +109,8 @@ The 2026-06-24 local reconciliation run against `postgresql://voucher:pass@local
 ### Data Compatibility Decisions
 
 - Opening balance uniqueness is **not enforced**. Legacy data contains multiple `入出区分CD=99` rows for some branch/period combinations. Enforcing uniqueness now would lose or reject legacy-compatible data.
+- Multiple opening-balance rows are additive in the application running-balance view. No single row is selected as the seed.
+- Carry rows (`前葉より繰越`, `次葉へ繰越`) are display/history rows with zero running-balance delta. They do not seed or close the period while the application view computes continuously over posted history.
 - Missing master rows may be created as inactive `Legacy ...` compatibility placeholders during transform. Named records imported from FileMaker are active.
 - Blank or inferred red-voucher state is normalized to `red_voucher_status_code = 0` unless links imply correction state.
 - The application running-balance view keeps deterministic business semantics (`処理日`, `連番`, `出納No`, excluding deleted rows). The FileMaker reconciliation view separately mirrors legacy `残高合計` semantics (`連番`, `出納No`, including deleted rows) so migration cutover checks can match the exported source without weakening application behavior.
@@ -383,7 +385,6 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 
 ## Follow-Up Work
 
-- Extend domain/SQL drift guards as new money-path scenarios are added.
 - Periodically review `legacy_import_audit_log` during migration/parallel-run operations.
 - Expose red-voucher correction in the UI.
 - Decide whether month carry rows must be actively generated or only preserved from legacy data.

@@ -370,6 +370,72 @@ test('SQL running totals match independent balance arithmetic', async (t) => {
   );
 });
 
+test('carry rows are display-only and duplicate openings are additive', async (t) => {
+  const { client } = await setupDatabase(t);
+
+  await client.query(`INSERT INTO branches (branch_code, branch_name) VALUES (1, 'Test branch')`);
+  await insertPostedEntry(client, {
+    ledgerNo: 5,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 1,
+    entryTypeCode: 1,
+    description: 'previous page carry display',
+    otherAmount: 999,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 10,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 2,
+    entryTypeCode: 99,
+    description: 'first opening',
+    otherAmount: 1000,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 11,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 3,
+    entryTypeCode: 99,
+    description: 'legacy duplicate opening',
+    otherAmount: 200,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 20,
+    branchCode: 1,
+    processingDate: '2026-01-02',
+    dailySequence: 1,
+    entryTypeCode: 3,
+    description: 'usage',
+    otherAmount: 50,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 30,
+    branchCode: 1,
+    processingDate: '2026-01-31',
+    dailySequence: 1,
+    entryTypeCode: 9,
+    description: 'next page carry display',
+    otherAmount: 888,
+  });
+
+  const balances = await client.query(
+    `SELECT ledger_no, running_total_amount::text
+       FROM voucher_ledger_running_amounts
+      WHERE branch_code = 1
+      ORDER BY processing_date, daily_sequence, ledger_no`,
+  );
+
+  assert.deepEqual(balances.rows, [
+    { ledger_no: '5', running_total_amount: '0' },
+    { ledger_no: '10', running_total_amount: '1000' },
+    { ledger_no: '11', running_total_amount: '1200' },
+    { ledger_no: '20', running_total_amount: '1150' },
+    { ledger_no: '30', running_total_amount: '1150' },
+  ]);
+});
+
 test('posted financial fields are immutable outside legacy import mode', async (t) => {
   const { client } = await setupDatabase(t);
 
