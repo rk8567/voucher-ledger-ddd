@@ -119,6 +119,8 @@ Apply schema:
 docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate schema
 ```
 
+`migrate schema` is safe to re-run against an existing migration database; it adds missing compatibility columns before recreating views and indexes.
+
 Import and transform FileMaker HTML exports from `filemaker/exports/`:
 
 ```bash
