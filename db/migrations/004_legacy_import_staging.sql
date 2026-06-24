@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
   responsible_employee_no integer,
   company_code integer,
   other_amount bigint,
+  legacy_stamp_amount_total bigint,
+  legacy_total_amount bigint,
+  legacy_running_total_amount bigint,
   other_amount_note text,
   remarks text,
   image_present boolean,
@@ -66,9 +69,37 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
 
 ALTER TABLE legacy_filemaker_voucher_ledger_staging
   ADD COLUMN IF NOT EXISTS filemaker_login_employee_no integer,
-  ADD COLUMN IF NOT EXISTS filemaker_login_employee_name text;
+  ADD COLUMN IF NOT EXISTS filemaker_login_employee_name text,
+  ADD COLUMN IF NOT EXISTS legacy_stamp_amount_total bigint,
+  ADD COLUMN IF NOT EXISTS legacy_total_amount bigint,
+  ADD COLUMN IF NOT EXISTS legacy_running_total_amount bigint;
 
 COMMENT ON TABLE legacy_filemaker_voucher_ledger_staging IS 'Raw import staging for legacy T切手出納台帳. Not used by the application layer.';
+
+CREATE OR REPLACE VIEW legacy_filemaker_running_balance_reconciliation AS
+SELECT
+  s.ledger_no,
+  s.branch_code,
+  s.processing_date,
+  s.daily_sequence,
+  s.legacy_running_total_amount,
+  r.running_total_amount AS computed_running_total_amount,
+  CASE
+    WHEN s.legacy_running_total_amount IS NULL THEN NULL
+    WHEN r.running_total_amount IS NULL THEN NULL
+    ELSE (r.running_total_amount - s.legacy_running_total_amount)::bigint
+  END AS running_total_difference,
+  CASE
+    WHEN s.legacy_running_total_amount IS NULL THEN NULL
+    ELSE r.running_total_amount IS NOT NULL
+     AND r.running_total_amount = s.legacy_running_total_amount
+  END AS running_total_matches
+FROM legacy_filemaker_voucher_ledger_staging s
+LEFT JOIN voucher_ledger_running_amounts r
+  ON r.ledger_no = s.ledger_no
+WHERE s.ledger_no IS NOT NULL;
+
+COMMENT ON VIEW legacy_filemaker_running_balance_reconciliation IS 'Golden-master comparison between FileMaker 残高合計 and computed PostgreSQL running totals.';
 
 CREATE INDEX IF NOT EXISTS idx_legacy_voucher_staging_ledger_no
   ON legacy_filemaker_voucher_ledger_staging(ledger_no);

@@ -28,6 +28,9 @@ INSERT INTO legacy_filemaker_voucher_ledger_staging (
   responsible_employee_no,
   company_code,
   other_amount,
+  legacy_stamp_amount_total,
+  legacy_total_amount,
+  legacy_running_total_amount,
   other_amount_note,
   remarks,
   is_deleted,
@@ -60,7 +63,7 @@ INSERT INTO legacy_filemaker_voucher_ledger_staging (
   quantity_rep_15,
   quantity_rep_16
 ) VALUES (
-  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52
+  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,$53,$54,$55
 )
 ON CONFLICT (ledger_no) DO UPDATE SET
   source_file = EXCLUDED.source_file,
@@ -83,6 +86,9 @@ ON CONFLICT (ledger_no) DO UPDATE SET
   responsible_employee_no = EXCLUDED.responsible_employee_no,
   company_code = EXCLUDED.company_code,
   other_amount = EXCLUDED.other_amount,
+  legacy_stamp_amount_total = EXCLUDED.legacy_stamp_amount_total,
+  legacy_total_amount = EXCLUDED.legacy_total_amount,
+  legacy_running_total_amount = EXCLUDED.legacy_running_total_amount,
   other_amount_note = EXCLUDED.other_amount_note,
   remarks = EXCLUDED.remarks,
   is_deleted = EXCLUDED.is_deleted,
@@ -226,6 +232,9 @@ async function importRawLedgerRows(
     const otherAmount = asNullableBigInt(row.その他金額) ?? 0n;
     const quantities = rawQuantitiesFromRow(row);
     validateLegacyRowTotals(row, quantities, otherAmount, index + 1);
+    const legacyStampAmountTotal = asNullableBigInt(row.切手金額合計);
+    const legacyTotalAmount = asNullableBigInt(row.金額合計);
+    const legacyRunningTotalAmount = asNullableBigInt(row.残高合計);
 
     const result = await client.query(STAGING_INSERT, [
       filePath,
@@ -249,6 +258,9 @@ async function importRawLedgerRows(
       responsibleEmployeeNo,
       null,
       otherAmount.toString(),
+      legacyStampAmountTotal?.toString() ?? null,
+      legacyTotalAmount?.toString() ?? null,
+      legacyRunningTotalAmount?.toString() ?? null,
       null,
       row.備考 || null,
       asNullableBoolean(row.Is削除) ?? false,

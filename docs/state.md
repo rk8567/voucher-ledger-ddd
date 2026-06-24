@@ -105,7 +105,7 @@ npm run migrate -- all ...
 npm run migrate -- status
 ```
 
-Ledger import now fails instead of silently skipping rows when required source fields are missing (`出納No`, `拠点CD`, `処理日`, `入出区分CD`). When the export includes `切手金額合計` or `金額合計`, the importer recomputes totals from `枚数N[1..16]` and `その他金額` and aborts on mismatch.
+Ledger import now fails instead of silently skipping rows when required source fields are missing (`出納No`, `拠点CD`, `処理日`, `入出区分CD`). When the export includes `切手金額合計` or `金額合計`, the importer recomputes totals from `枚数N[1..16]` and `その他金額` and aborts on mismatch. The importer also preserves FileMaker `残高合計` in staging for golden-master comparison against PostgreSQL running totals.
 
 ### Data Compatibility Decisions
 
@@ -290,6 +290,7 @@ Current implementation:
 - `voucher_ledger_running_amounts`
 - `voucher_inventory_check_results`
 - `voucher_inventory_check_denomination_results`
+- `legacy_filemaker_running_balance_reconciliation`
 
 ### Schema Rules
 
@@ -299,6 +300,7 @@ Current implementation:
 - Denomination rows of posted entries are immutable.
 - Legacy import mode can bypass selected mutation/update rules to preserve source data.
 - Ledger number sequence is reset automatically by the transform after importing legacy `出納No` values.
+- `npm run migrate -- status` reports FileMaker `残高合計` reconciliation row counts and mismatch counts.
 
 ## Application Structure
 
@@ -378,8 +380,8 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 
 ## Follow-Up Work
 
-- Add PostgreSQL-backed tests around SQL read models, trigger immutability, inventory checks, red-voucher correction links, and migration reconciliation.
-- Add aggregate reconciliation against FileMaker `残高合計` using a real/sanitized export fixture.
+- Extend PostgreSQL-backed tests around migration reconciliation and red-voucher database links.
+- Run and archive aggregate reconciliation against FileMaker `残高合計` using a real/sanitized export fixture.
 - Add a domain/SQL drift guard so domain balance arithmetic and SQL running totals cannot diverge silently.
 - Harden legacy import mode as a migration-only bypass with operational logging and a test that normal app paths run with it disabled.
 - Expose red-voucher correction in the UI.

@@ -155,6 +155,23 @@ async function runStatus(): Promise<void> {
       const count = await queryCount(pool, `SELECT count(*)::text AS count FROM ${table}`);
       console.log(`${table}: ${count}`);
     }
+    const [reconciledRows, reconciliationMismatches] = await Promise.all([
+      queryCount(
+        pool,
+        `SELECT count(*)::text AS count
+           FROM legacy_filemaker_running_balance_reconciliation
+          WHERE legacy_running_total_amount IS NOT NULL`,
+      ),
+      queryCount(
+        pool,
+        `SELECT count(*)::text AS count
+           FROM legacy_filemaker_running_balance_reconciliation
+          WHERE legacy_running_total_amount IS NOT NULL
+            AND running_total_matches IS DISTINCT FROM true`,
+      ),
+    ]);
+    console.log(`legacy_running_balance_reconciliation.rows_compared: ${reconciledRows}`);
+    console.log(`legacy_running_balance_reconciliation.mismatches: ${reconciliationMismatches}`);
   } finally {
     await pool.end();
   }
