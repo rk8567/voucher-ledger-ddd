@@ -333,6 +333,7 @@ Implemented:
 
 - ledger table with sortable columns;
 - per-column filter popups;
+- deleted legacy-row visibility switch;
 - column selection;
 - pagination and page jump;
 - CSV export using current filters/sort;

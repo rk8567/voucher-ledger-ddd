@@ -172,6 +172,12 @@ h3 {
   color: var(--accent-dark);
 }
 
+.activeToggle {
+  border-color: var(--accent);
+  background: #e7f4f1;
+  color: var(--accent-dark);
+}
+
 .toolbarIconButton {
   min-width: 32px;
   padding: 0;
@@ -884,6 +890,15 @@ tr:last-child td {
 
 .selectedRow td {
   background: #e7f4f1;
+}
+
+.deletedRow td {
+  background: #f7f1ef;
+  color: #7b5d57;
+}
+
+.selectedRow.deletedRow td {
+  background: #eadfda;
 }
 
 .description {

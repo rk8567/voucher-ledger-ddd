@@ -33,6 +33,7 @@ export type LedgerSearchInput = Readonly<{
   cursorLedgerNo?: number | null;
   sortKey?: LedgerEntrySortKey | null;
   sortDirection?: SortDirection | null;
+  includeDeleted?: boolean | null;
 }>;
 
 export type LedgerDashboardData = Readonly<{
@@ -82,7 +83,7 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
   const page = Math.max(input.page ?? 1, 1);
   const filter: LedgerEntryListFilter = {
     ...ledgerFilterFromInput(input),
-    includeDeleted: false,
+    includeDeleted: input.includeDeleted === true,
     limit,
     offset: (page - 1) * limit,
   };
@@ -113,7 +114,7 @@ export async function getLedgerExportEntries(input: LedgerSearchInput): Promise<
   for (let offset = 0; offset < maxRows; offset += pageSize) {
     const result = await listLedgerEntriesQuery.execute({
       ...ledgerFilterFromInput(input),
-      includeDeleted: false,
+      includeDeleted: input.includeDeleted === true,
       limit: pageSize,
       offset,
     });
@@ -137,6 +138,7 @@ function ledgerFilterFromInput(input: LedgerSearchInput): LedgerEntryListFilter 
     cursorLedgerNo: input.cursorLedgerNo,
     sortKey: input.sortKey,
     sortDirection: input.sortDirection,
+    includeDeleted: input.includeDeleted === true,
   };
 }
 

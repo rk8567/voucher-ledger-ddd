@@ -80,6 +80,11 @@ function textParam(value: string | string[] | undefined): string | null {
   return raw ? raw.slice(0, 100) : null;
 }
 
+function booleanParam(value: string | string[] | undefined): boolean {
+  const raw = firstParam(value);
+  return raw === '1' || raw === 'true';
+}
+
 function yen(value: number): string {
   return new Intl.NumberFormat('ja-JP', {
     style: 'currency',
@@ -107,6 +112,7 @@ function parseSearchParams(params: Record<string, string | string[] | undefined>
     page: positiveNumberParam(params.page),
     sortKey: sortKeyParam(params.sort),
     sortDirection: sortDirectionParam(params.dir),
+    includeDeleted: booleanParam(params.includeDeleted),
   };
 }
 
@@ -147,6 +153,7 @@ export default async function Page({ searchParams }: PageProps) {
     const currentPage = input.page ?? 1;
     const currentSortKey = input.sortKey ?? '';
     const currentSortDirection = input.sortDirection ?? 'asc';
+    const includeDeleted = input.includeDeleted === true;
     const totalPages = Math.max(Math.ceil(data.entries.totalCount / pageSize), 1);
     const previousHref = currentPage > 1 ? pageHref(params, currentPage - 1) : null;
     const nextHref = currentPage < totalPages ? pageHref(params, currentPage + 1) : null;
@@ -200,6 +207,8 @@ export default async function Page({ searchParams }: PageProps) {
               currentSortDirection={currentSortDirection}
               exportHref={exportCsvHref(params)}
               showAllHref="/"
+              includeDeleted={includeDeleted}
+              deletedToggleHref={deletedToggleHref(params, includeDeleted)}
               unsortHref={unsortHref(params)}
             />
             <PaginationControls
@@ -581,6 +590,29 @@ function exportCsvHref(params: Record<string, string | string[] | undefined>): s
   }
   const query = next.toString();
   return query ? `/export/ledger?${query}` : '/export/ledger';
+}
+
+function deletedToggleHref(params: Record<string, string | string[] | undefined>, includeDeleted: boolean): string {
+  const next = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (
+      key === 'ledgerNo'
+      || key === 'q'
+      || key === 'cursorLedgerNo'
+      || key === 'cursorStack'
+      || key === 'page'
+      || key === 'includeDeleted'
+      || key === 'actionMessage'
+      || key === 'clearDraft'
+    ) {
+      continue;
+    }
+    const first = firstParam(value);
+    if (first) next.set(key, first);
+  }
+  if (!includeDeleted) next.set('includeDeleted', '1');
+  const query = next.toString();
+  return query ? `/?${query}` : '/';
 }
 
 function unsortHref(params: Record<string, string | string[] | undefined>): string {

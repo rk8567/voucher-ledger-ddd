@@ -15,6 +15,8 @@ type LedgerTableProps = Readonly<{
   currentSortDirection: 'asc' | 'desc';
   exportHref: string;
   showAllHref: string;
+  includeDeleted: boolean;
+  deletedToggleHref: string;
   unsortHref: string;
 }>;
 
@@ -69,6 +71,7 @@ const columns: readonly ColumnDefinition[] = [
   { key: 'otherAmountNote', label: 'その他金額備考', kind: 'text' },
   { key: 'redVoucherStatusCode', label: '赤伝票CD', kind: 'integer' },
   { key: 'redVoucherStatusName', label: '赤伝票状態', kind: 'text' },
+  { key: 'isDeleted', label: '削除', kind: 'text' },
   { key: 'originalLedgerNo', label: '元伝票No', kind: 'integer' },
   { key: 'reversalLedgerNo', label: '赤伝票No', kind: 'integer' },
   { key: 'correctionLedgerNo', label: '訂正伝票No', kind: 'integer' },
@@ -98,6 +101,8 @@ export function LedgerTable({
   currentSortDirection,
   exportHref,
   showAllHref,
+  includeDeleted,
+  deletedToggleHref,
   unsortHref,
 }: LedgerTableProps) {
   const [openColumnKey, setOpenColumnKey] = useState<string | null>(null);
@@ -196,6 +201,9 @@ export function LedgerTable({
         <div className="tableCommandTools" aria-label="FileMaker commands">
           <a className="toolbarButton" href={exportHref}>CSV出力</a>
           <a className="toolbarButton" href={showAllHref}>全件表示</a>
+          <a className={includeDeleted ? 'toolbarButton activeToggle' : 'toolbarButton'} href={deletedToggleHref}>
+            {includeDeleted ? '削除も表示' : '削除を表示'}
+          </a>
           <button type="button" className="toolbarButton" onClick={() => openWorkflow('movement')}>新規レコード</button>
           <button type="button" className="toolbarButton" onClick={() => openWorkflow('inventory')}>現在高チェック</button>
           <a className="toolbarButton" href={unsortHref}>標準ソート</a>
@@ -276,8 +284,11 @@ export function LedgerTable({
               {entries.map((entry) => {
                 const href = queryHref(params, entry.ledgerNo);
                 const isSelected = selectedLedgerNo === entry.ledgerNo;
+                const rowClassName = [isSelected ? 'selectedRow' : '', entry.isDeleted ? 'deletedRow' : '']
+                  .filter(Boolean)
+                  .join(' ') || undefined;
                 return (
-                  <tr key={entry.id} className={isSelected ? 'selectedRow' : undefined}>
+                  <tr key={entry.id} className={rowClassName}>
                     {visibleColumns.map((column) => (
                       <td key={`${entry.id}-${column.key}`} className={cellClassName(column)}>
                         {column.key === 'ledgerNo' ? <Link href={href}>#{entry.ledgerNo}</Link> : displayCell(entry, column)}

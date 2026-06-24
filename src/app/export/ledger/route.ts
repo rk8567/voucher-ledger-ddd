@@ -37,6 +37,11 @@ function textParam(params: URLSearchParams, key: string): string | null {
   return firstParam(params, key)?.slice(0, 100) ?? null;
 }
 
+function booleanParam(params: URLSearchParams, key: string): boolean {
+  const raw = firstParam(params, key);
+  return raw === '1' || raw === 'true';
+}
+
 function sortKeyParam(params: URLSearchParams): TableSortKey | null {
   const raw = firstParam(params, 'sort');
   return SORT_KEYS.some((sortKey) => sortKey === raw) ? raw as TableSortKey : null;
@@ -59,6 +64,7 @@ function parseExportParams(params: URLSearchParams): LedgerSearchInput {
     columnFilters: columnFiltersParam(params),
     sortKey: sortKeyParam(params),
     sortDirection: sortDirectionParam(params),
+    includeDeleted: booleanParam(params, 'includeDeleted'),
   };
 }
 
