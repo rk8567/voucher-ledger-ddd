@@ -80,7 +80,7 @@ npm run build
 npm run migrate -- status
 ```
 
-`npm test` runs the fast domain test gate for denomination mapping and balance arithmetic.
+`npm test` runs the fast TypeScript test gate for denomination mapping, balance arithmetic, and red-voucher correction use-case invariants.
 
 PostgreSQL-backed read-model and trigger checks require an explicit test database URL:
 
