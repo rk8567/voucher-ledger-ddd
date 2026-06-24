@@ -156,7 +156,8 @@ function asNullableBigInt(value: string | undefined): bigint | null {
 }
 
 function normalizeIntegerText(value: string): string {
-  return value.replace(/[,\s円]/g, '').trim();
+  const normalized = value.replace(/[,\s円￥¥;；]/g, '').trim();
+  return normalized.replace(/\.0*$/, '');
 }
 
 function asNullableBoolean(value: string | undefined): boolean | null {
@@ -217,6 +218,8 @@ async function importRawLedgerRows(
     const branchCode = asNullableInt(row.拠点CD);
     const ledgerNo = asNullableInt(row.出納No);
     if (entryTypeCode == null || processingDate == null || branchCode == null || ledgerNo == null) {
+      if (isLegacySummaryOnlyRow(row)) continue;
+
       skippedRows.push(
         `row ${index + 1}: 出納No=${row.出納No || '(blank)'}, 拠点CD=${row.拠点CD || '(blank)'}, 処理日=${row.処理日 || '(blank)'}, 入出区分CD=${row.入出区分CD || '(blank)'}`,
       );
@@ -365,6 +368,21 @@ function rawQuantitiesFromRow(row: Record<string, string>): number[] {
     const key = index === 0 ? '枚数N' : `枚数N[${index + 1}]`;
     return asNullableInt(row[key]) ?? 0;
   });
+}
+
+function isLegacySummaryOnlyRow(row: Record<string, string>): boolean {
+  const hasTransactionIdentity = Boolean(
+    row.処理日
+      || row.申請処理日
+      || row.登録日時
+      || row.更新日時
+      || row.摘要
+      || row.その他金額
+      || row.切手金額合計
+      || row.金額合計
+      || row.枚数合計
+  );
+  return !hasTransactionIdentity && rawQuantitiesFromRow(row).every((quantity) => quantity === 0);
 }
 
 function stampAmountFromRepetitions(quantities: readonly number[]): bigint {

@@ -107,6 +107,8 @@ npm run migrate -- status
 
 Ledger import now fails instead of silently skipping rows when required source fields are missing (`出納No`, `拠点CD`, `処理日`, `入出区分CD`). When the export includes `切手金額合計` or `金額合計`, the importer recomputes totals from `枚数N[1..16]` and `その他金額` and aborts on mismatch. The importer also preserves FileMaker `残高合計` in staging for golden-master comparison against PostgreSQL running totals.
 
+The 2026-06-24 local reconciliation run against `postgresql://voucher:pass@localhost:5432/test` completed import and transform for `filemaker/exports/L_T金券管理台帳.htm` after preserving legacy numeric quirks (`20.`, `￥25`, `1808;`) and skipping summary-only placeholder rows that have no posting fields. Result: `9045` rows compared, `9016` mismatches. This proves the reconciliation harness is active, but FileMaker `残高合計` still diverges from the current PostgreSQL running-balance contract and must not be treated as cutover-ready.
+
 ### Data Compatibility Decisions
 
 - Opening balance uniqueness is **not enforced**. Legacy data contains multiple `入出区分CD=99` rows for some branch/period combinations. Enforcing uniqueness now would lose or reject legacy-compatible data.
@@ -384,7 +386,7 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 ## Follow-Up Work
 
 - Extend PostgreSQL-backed tests around migration reconciliation edge cases.
-- Run and archive aggregate reconciliation against FileMaker `残高合計` using a real/sanitized export fixture.
+- Resolve the FileMaker `残高合計` reconciliation mismatch from the 2026-06-24 test run (`9016` mismatches out of `9045` rows), focusing on legacy ordering/carry/summary-row semantics.
 - Extend domain/SQL drift guards as new money-path scenarios are added.
 - Periodically review `legacy_import_audit_log` during migration/parallel-run operations.
 - Expose red-voucher correction in the UI.

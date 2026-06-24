@@ -195,10 +195,6 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
 ALTER TABLE voucher_ledger_entries
   DROP CONSTRAINT IF EXISTS voucher_ledger_entries_other_amount_check;
 
-ALTER TABLE voucher_ledger_entries
-  ADD CONSTRAINT voucher_ledger_entries_other_amount_check
-  CHECK (other_amount >= 0);
-
 COMMENT ON TABLE voucher_ledger_entries IS 'Source-of-truth ledger rows migrated from T切手出納台帳 / T金券管理台帳.';
 COMMENT ON COLUMN voucher_ledger_entries.ledger_no IS 'Legacy 出納No. Use voucher_ledger_no_seq for new rows; reset sequence after importing legacy rows.';
 COMMENT ON COLUMN voucher_ledger_entries.daily_sequence IS 'Legacy 連番. Not unique: 赤伝票/correction rows may duplicate the original legacy sequence.';
@@ -231,10 +227,6 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entry_denominations (
 
 ALTER TABLE voucher_ledger_entry_denominations
   DROP CONSTRAINT IF EXISTS voucher_ledger_entry_denominations_quantity_check;
-
-ALTER TABLE voucher_ledger_entry_denominations
-  ADD CONSTRAINT voucher_ledger_entry_denominations_quantity_check
-  CHECK (quantity >= 0);
 
 COMMENT ON TABLE voucher_ledger_entry_denominations IS 'Normalized replacement for FileMaker repeating field 枚数N[1..16].';
 
@@ -340,6 +332,26 @@ CREATE TRIGGER trg_voucher_entries_validate_master_rules
 BEFORE INSERT OR UPDATE ON voucher_ledger_entries
 FOR EACH ROW EXECUTE FUNCTION voucher_ledger_validate_entry_master_rules();
 
+CREATE OR REPLACE FUNCTION voucher_ledger_validate_entry_amount()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.other_amount >= 0
+     OR NEW.entry_type_code = 6
+     OR current_setting('voucher_ledger.legacy_import', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+
+  RAISE EXCEPTION 'other_amount must be non-negative except for inventory-check observations and legacy import.';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_voucher_entries_validate_amount ON voucher_ledger_entries;
+CREATE TRIGGER trg_voucher_entries_validate_amount
+BEFORE INSERT OR UPDATE ON voucher_ledger_entries
+FOR EACH ROW EXECUTE FUNCTION voucher_ledger_validate_entry_amount();
+
 CREATE OR REPLACE FUNCTION voucher_ledger_prevent_posted_entry_financial_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -428,6 +440,36 @@ DROP TRIGGER IF EXISTS trg_voucher_denominations_prevent_posted_mutation ON vouc
 CREATE TRIGGER trg_voucher_denominations_prevent_posted_mutation
 BEFORE INSERT OR UPDATE OR DELETE ON voucher_ledger_entry_denominations
 FOR EACH ROW EXECUTE FUNCTION voucher_ledger_prevent_posted_denomination_mutation();
+
+CREATE OR REPLACE FUNCTION voucher_ledger_validate_denomination_quantity()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  parent_entry_type_code integer;
+BEGIN
+  IF NEW.quantity >= 0
+     OR current_setting('voucher_ledger.legacy_import', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT entry_type_code
+    INTO parent_entry_type_code
+    FROM voucher_ledger_entries
+   WHERE id = NEW.entry_id;
+
+  IF parent_entry_type_code IS DISTINCT FROM 6 THEN
+    RAISE EXCEPTION 'Denomination quantity must be non-negative except for inventory-check observations.';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_voucher_denominations_validate_quantity ON voucher_ledger_entry_denominations;
+CREATE TRIGGER trg_voucher_denominations_validate_quantity
+BEFORE INSERT OR UPDATE ON voucher_ledger_entry_denominations
+FOR EACH ROW EXECUTE FUNCTION voucher_ledger_validate_denomination_quantity();
 
 CREATE OR REPLACE FUNCTION voucher_ledger_validate_before_posting()
 RETURNS trigger
