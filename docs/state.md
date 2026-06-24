@@ -305,7 +305,7 @@ Current implementation:
 - Denomination rows of posted entries are immutable.
 - Legacy import mode can bypass selected mutation/update rules to preserve source data in migration SQL. Transform runs write audit rows to `legacy_import_audit_log`; normal unit-of-work connections await `voucher_ledger.legacy_import = off` before use and transactions also set it locally.
 - Ledger number sequence is reset automatically by the transform after importing legacy `出納No` values.
-- `npm run migrate -- status` reports FileMaker `残高合計` reconciliation row counts and mismatch counts.
+- `npm run migrate -- status` reports FileMaker `残高合計` reconciliation row counts, mismatch counts, and the latest `legacy_import_audit_log` events for migration bypass review.
 
 ## Application Structure
 
@@ -386,7 +386,6 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 
 ## Follow-Up Work
 
-- Periodically review `legacy_import_audit_log` during migration/parallel-run operations.
 - Expose red-voucher correction in the UI.
 - Decide whether month carry rows must be actively generated or only preserved from legacy data.
 - Decide whether master data is maintained here or imported from another source of truth.

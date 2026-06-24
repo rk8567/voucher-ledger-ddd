@@ -177,6 +177,31 @@ async function runStatus(): Promise<void> {
       'SELECT count(*)::text AS count FROM legacy_import_audit_log',
     );
     console.log(`legacy_import_audit_log: ${legacyImportAuditEvents}`);
+    const auditResult = await pool.query<{
+      audit_id: string;
+      event_at: Date;
+      operation: string;
+      legacy_import_enabled: boolean;
+      database_user_name: string;
+      application_name: string | null;
+      detail: unknown;
+    }>(
+      `SELECT audit_id::text,
+              event_at,
+              operation,
+              legacy_import_enabled,
+              database_user_name,
+              application_name,
+              detail
+         FROM legacy_import_audit_log
+        ORDER BY audit_id DESC
+        LIMIT 5`,
+    );
+    for (const row of auditResult.rows.reverse()) {
+      console.log(
+        `legacy_import_audit_log.latest: #${row.audit_id} ${row.event_at.toISOString()} ${row.operation} legacy_import_enabled=${row.legacy_import_enabled} user=${row.database_user_name} app=${row.application_name || '-'} detail=${JSON.stringify(row.detail)}`,
+      );
+    }
   } finally {
     await pool.end();
   }
