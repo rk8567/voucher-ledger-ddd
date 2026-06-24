@@ -4,6 +4,7 @@ import test from 'node:test';
 import { calculateDifference, Balance } from '../src/domain/balance';
 import { DomainError } from '../src/domain/errors';
 import { DENOMINATIONS, normalizeQuantities, stampAmountYen } from '../src/domain/denominations';
+import { EntryTypeCode, assertPostableEntryType, signOfEntryType } from '../src/domain/entryTypes';
 
 test('locks the FileMaker quantity repetition to denomination mapping', () => {
   assert.deepEqual(DENOMINATIONS, [
@@ -64,4 +65,18 @@ test('calculates actual minus expected balance differences', () => {
 
 test('stampAmountYen sums normalized quantities', () => {
   assert.equal(stampAmountYen(normalizeQuantities({ 1: 5, 270: 2 })), 545);
+});
+
+test('legacy carry rows are display-only and not postable', () => {
+  assert.equal(signOfEntryType(EntryTypeCode.CarryIn), 0);
+  assert.equal(signOfEntryType(EntryTypeCode.CarryOut), 0);
+
+  assert.throws(
+    () => assertPostableEntryType(EntryTypeCode.CarryIn),
+    (error) => error instanceof DomainError && error.code === 'INVALID_ENTRY_TYPE',
+  );
+  assert.throws(
+    () => assertPostableEntryType(EntryTypeCode.CarryOut),
+    (error) => error instanceof DomainError && error.code === 'INVALID_ENTRY_TYPE',
+  );
 });

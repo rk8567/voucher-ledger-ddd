@@ -14,6 +14,7 @@ The web UI supports ledger search/detail, CSV export, new movement registration,
 - FileMaker HTML exports under `filemaker/exports/` are the supported migration input.
 - CSV import support has been removed; CSV is only an application export format.
 - A separate REST API is intentionally not part of the current architecture.
+- Legacy carry rows (`前葉より繰越`, `次葉へ繰越`) are preserved as history/display rows only; the new app does not actively generate period-close/open carry records.
 
 ## Structure
 
