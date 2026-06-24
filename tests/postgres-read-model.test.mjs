@@ -53,7 +53,7 @@ async function setupDatabase(t) {
     }
   });
 
-  for (const fileName of ['001_schema.sql', '002_seed_legacy_codes.sql', '003_views.sql']) {
+  for (const fileName of ['001_schema.sql', '002_seed_legacy_codes.sql', '003_views.sql', '004_legacy_import_staging.sql']) {
     await applyMigration(client, quotedSchema, fileName);
   }
 
@@ -266,4 +266,21 @@ test('inventory checks compare actual count against expected pre-check balance',
     [checkEntryId],
   );
   assert.equal(runningAtCheck.rows[0].running_total_amount, '752');
+});
+
+test('legacy transform records legacy import audit events', async (t) => {
+  const { client, schemaName } = await setupDatabase(t);
+
+  await applyMigration(client, schemaName, '005_transform_staging_to_ledger.sql');
+
+  const result = await client.query(
+    `SELECT operation, legacy_import_enabled
+       FROM legacy_import_audit_log
+      ORDER BY audit_id`,
+  );
+
+  assert.deepEqual(result.rows, [
+    { operation: 'transform_started', legacy_import_enabled: true },
+    { operation: 'transform_completed', legacy_import_enabled: true },
+  ]);
 });

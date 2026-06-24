@@ -81,6 +81,7 @@ npm run migrate -- status
 ```
 
 `npm run migrate -- status` reports imported row counts and FileMaker running-balance reconciliation counts. After importing an export that includes `残高合計`, `legacy_running_balance_reconciliation.mismatches` should be `0` before cutover.
+It also reports `legacy_import_audit_log`, which should only grow when migration SQL uses the legacy-import bypass.
 
 `npm test` runs the fast TypeScript test gate for denomination mapping, balance arithmetic, and red-voucher correction use-case invariants.
 

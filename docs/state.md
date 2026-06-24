@@ -291,6 +291,7 @@ Current implementation:
 - `voucher_inventory_check_results`
 - `voucher_inventory_check_denomination_results`
 - `legacy_filemaker_running_balance_reconciliation`
+- `legacy_import_audit_log`
 
 ### Schema Rules
 
@@ -298,7 +299,7 @@ Current implementation:
 - `other_amount` and denomination `quantity` are constrained to non-negative values at the database layer.
 - Posted ledger financial fields are immutable.
 - Denomination rows of posted entries are immutable.
-- Legacy import mode can bypass selected mutation/update rules to preserve source data in migration SQL; normal application connections initialize and run transactions with `voucher_ledger.legacy_import = off`.
+- Legacy import mode can bypass selected mutation/update rules to preserve source data in migration SQL. Transform runs write audit rows to `legacy_import_audit_log`; normal application connections initialize and run transactions with `voucher_ledger.legacy_import = off`.
 - Ledger number sequence is reset automatically by the transform after importing legacy `出納No` values.
 - `npm run migrate -- status` reports FileMaker `残高合計` reconciliation row counts and mismatch counts.
 
@@ -383,7 +384,7 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 - Extend PostgreSQL-backed tests around migration reconciliation and red-voucher database links.
 - Run and archive aggregate reconciliation against FileMaker `残高合計` using a real/sanitized export fixture.
 - Add a domain/SQL drift guard so domain balance arithmetic and SQL running totals cannot diverge silently.
-- Add operational logging/auditing for legacy import mode use during migration.
+- Periodically review `legacy_import_audit_log` during migration/parallel-run operations.
 - Expose red-voucher correction in the UI.
 - Decide whether month carry rows must be actively generated or only preserved from legacy data.
 - Decide whether master data is maintained here or imported from another source of truth.

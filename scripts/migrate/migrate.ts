@@ -172,6 +172,11 @@ async function runStatus(): Promise<void> {
     ]);
     console.log(`legacy_running_balance_reconciliation.rows_compared: ${reconciledRows}`);
     console.log(`legacy_running_balance_reconciliation.mismatches: ${reconciliationMismatches}`);
+    const legacyImportAuditEvents = await queryCount(
+      pool,
+      'SELECT count(*)::text AS count FROM legacy_import_audit_log',
+    );
+    console.log(`legacy_import_audit_log: ${legacyImportAuditEvents}`);
   } finally {
     await pool.end();
   }

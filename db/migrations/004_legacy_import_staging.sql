@@ -101,8 +101,23 @@ WHERE s.ledger_no IS NOT NULL;
 
 COMMENT ON VIEW legacy_filemaker_running_balance_reconciliation IS 'Golden-master comparison between FileMaker 残高合計 and computed PostgreSQL running totals.';
 
+CREATE TABLE IF NOT EXISTS legacy_import_audit_log (
+  audit_id bigserial PRIMARY KEY,
+  event_at timestamptz NOT NULL DEFAULT now(),
+  operation text NOT NULL CHECK (length(btrim(operation)) > 0),
+  legacy_import_enabled boolean NOT NULL,
+  database_user_name text NOT NULL DEFAULT current_user,
+  application_name text,
+  detail jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+
+COMMENT ON TABLE legacy_import_audit_log IS 'Operational audit log for migration SQL that enables voucher_ledger.legacy_import.';
+
 CREATE INDEX IF NOT EXISTS idx_legacy_voucher_staging_ledger_no
   ON legacy_filemaker_voucher_ledger_staging(ledger_no);
+
+CREATE INDEX IF NOT EXISTS idx_legacy_import_audit_event_at
+  ON legacy_import_audit_log(event_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_legacy_voucher_staging_branch
   ON legacy_filemaker_voucher_ledger_staging(branch_code, processing_date, ledger_no);

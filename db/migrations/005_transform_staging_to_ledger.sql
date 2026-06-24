@@ -5,6 +5,21 @@ BEGIN;
 
 SET LOCAL voucher_ledger.legacy_import = 'on';
 
+INSERT INTO legacy_import_audit_log (
+  operation,
+  legacy_import_enabled,
+  application_name,
+  detail
+)
+SELECT
+  'transform_started',
+  current_setting('voucher_ledger.legacy_import', true) = 'on',
+  current_setting('application_name', true),
+  jsonb_build_object(
+    'staging_rows', (SELECT count(*) FROM legacy_filemaker_voucher_ledger_staging),
+    'existing_ledger_entries', (SELECT count(*) FROM voucher_ledger_entries)
+  );
+
 ALTER TABLE legacy_filemaker_voucher_ledger_staging
   ADD COLUMN IF NOT EXISTS filemaker_login_employee_no integer,
   ADD COLUMN IF NOT EXISTS filemaker_login_employee_name text;
@@ -202,5 +217,22 @@ SELECT setval(
   COALESCE((SELECT max(ledger_no) FROM voucher_ledger_entries), 0) + 1,
   false
 );
+
+INSERT INTO legacy_import_audit_log (
+  operation,
+  legacy_import_enabled,
+  application_name,
+  detail
+)
+SELECT
+  'transform_completed',
+  current_setting('voucher_ledger.legacy_import', true) = 'on',
+  current_setting('application_name', true),
+  jsonb_build_object(
+    'staging_rows', (SELECT count(*) FROM legacy_filemaker_voucher_ledger_staging),
+    'ledger_entries', (SELECT count(*) FROM voucher_ledger_entries),
+    'denomination_rows', (SELECT count(*) FROM voucher_ledger_entry_denominations),
+    'next_ledger_no', COALESCE((SELECT max(ledger_no) FROM voucher_ledger_entries), 0) + 1
+  );
 
 COMMIT;
