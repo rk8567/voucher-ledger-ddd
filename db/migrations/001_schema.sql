@@ -195,6 +195,10 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
 ALTER TABLE voucher_ledger_entries
   DROP CONSTRAINT IF EXISTS voucher_ledger_entries_other_amount_check;
 
+ALTER TABLE voucher_ledger_entries
+  ADD CONSTRAINT voucher_ledger_entries_other_amount_check
+  CHECK (other_amount >= 0);
+
 COMMENT ON TABLE voucher_ledger_entries IS 'Source-of-truth ledger rows migrated from T切手出納台帳 / T金券管理台帳.';
 COMMENT ON COLUMN voucher_ledger_entries.ledger_no IS 'Legacy 出納No. Use voucher_ledger_no_seq for new rows; reset sequence after importing legacy rows.';
 COMMENT ON COLUMN voucher_ledger_entries.daily_sequence IS 'Legacy 連番. Not unique: 赤伝票/correction rows may duplicate the original legacy sequence.';
@@ -227,6 +231,10 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entry_denominations (
 
 ALTER TABLE voucher_ledger_entry_denominations
   DROP CONSTRAINT IF EXISTS voucher_ledger_entry_denominations_quantity_check;
+
+ALTER TABLE voucher_ledger_entry_denominations
+  ADD CONSTRAINT voucher_ledger_entry_denominations_quantity_check
+  CHECK (quantity >= 0);
 
 COMMENT ON TABLE voucher_ledger_entry_denominations IS 'Normalized replacement for FileMaker repeating field 枚数N[1..16].';
 
