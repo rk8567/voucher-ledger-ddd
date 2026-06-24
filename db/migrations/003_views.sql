@@ -80,12 +80,12 @@ SELECT
   d.delta_quantity,
   SUM(d.delta_quantity) OVER (
     PARTITION BY d.branch_code, d.denomination_yen
-    ORDER BY d.ledger_no
+    ORDER BY d.processing_date, d.daily_sequence, d.ledger_no
     ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
   ) AS running_quantity
 FROM voucher_ledger_entry_denomination_deltas d;
 
-COMMENT ON VIEW voucher_ledger_running_denominations IS 'Deterministic replacement for FileMaker 推定残* summary fields, ordered by 出納No.';
+COMMENT ON VIEW voucher_ledger_running_denominations IS 'Deterministic replacement for FileMaker 推定残* summary fields, ordered by 処理日, 連番, 出納No.';
 
 CREATE OR REPLACE VIEW voucher_ledger_running_other_amounts AS
 SELECT
@@ -98,7 +98,7 @@ SELECT
   o.delta_other_amount,
   SUM(o.delta_other_amount) OVER (
     PARTITION BY o.branch_code
-    ORDER BY o.ledger_no
+    ORDER BY o.processing_date, o.daily_sequence, o.ledger_no
     ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
   ) AS running_other_amount
 FROM voucher_ledger_entry_other_amount_deltas o;
@@ -111,15 +111,19 @@ WITH stamp_balance AS (
     entry_id,
     ledger_no,
     branch_code,
+    processing_date,
+    daily_sequence,
     SUM(running_quantity * denomination_yen)::bigint AS running_stamp_amount,
     SUM(running_quantity)::bigint AS running_stamp_quantity
   FROM voucher_ledger_running_denominations
-  GROUP BY entry_id, ledger_no, branch_code
+  GROUP BY entry_id, ledger_no, branch_code, processing_date, daily_sequence
 )
 SELECT
   s.entry_id,
   s.ledger_no,
   s.branch_code,
+  s.processing_date,
+  s.daily_sequence,
   s.running_stamp_quantity,  -- 推定残枚数合計
   s.running_stamp_amount,    -- 推定残切手金額合計
   o.running_other_amount,    -- 推定残その他金額

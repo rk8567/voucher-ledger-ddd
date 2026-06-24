@@ -240,7 +240,7 @@ async function importRawLedgerRows(
       asNullableInt(row.月),
       asNullableDate(row.申請処理日),
       processingDate,
-      index + 1,
+      asNullableInt(row.連番) ?? index + 1,
       entryTypeCode,
       null,
       null,

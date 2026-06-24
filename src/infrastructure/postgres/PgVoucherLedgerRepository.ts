@@ -555,7 +555,7 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
               running_total_amount
          FROM voucher_ledger_running_amounts
         WHERE branch_code = $1
-        ORDER BY ledger_no DESC
+        ORDER BY processing_date DESC, daily_sequence DESC, ledger_no DESC
         LIMIT 1`,
       [branchCode],
     );
@@ -567,7 +567,7 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
               running_quantity::bigint * denomination_yen::bigint AS running_amount_yen
          FROM voucher_ledger_running_denominations
         WHERE branch_code = $1
-        ORDER BY denomination_yen, ledger_no DESC`,
+        ORDER BY denomination_yen, processing_date DESC, daily_sequence DESC, ledger_no DESC`,
       [branchCode],
     );
 
