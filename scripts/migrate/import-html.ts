@@ -116,6 +116,10 @@ ON CONFLICT (ledger_no) DO UPDATE SET
   quantity_rep_16 = EXCLUDED.quantity_rep_16
 `;
 
+const LEGACY_DENOMINATIONS_BY_REPETITION = [
+  1, 2, 10, 50, 84, 94, 120, 140, 210, 5, 20, 52, 110, 270, 430, 600,
+] as const;
+
 function mapRow(row: HtmlTableRow, columnMap: Record<string, string>): Record<string, string> {
   const mapped: Record<string, string> = {};
   for (const [source, target] of Object.entries(columnMap)) {
@@ -126,7 +130,7 @@ function mapRow(row: HtmlTableRow, columnMap: Record<string, string>): Record<st
 
 function asNullableInt(value: string | undefined): number | null {
   if (value == null || value === '') return null;
-  const parsed = Number(value);
+  const parsed = Number(normalizeIntegerText(value));
   return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
 }
 
@@ -139,10 +143,14 @@ function asRequiredInt(value: string | undefined, field: string): number {
 function asNullableBigInt(value: string | undefined): bigint | null {
   if (value == null || value === '') return null;
   try {
-    return BigInt(value);
+    return BigInt(normalizeIntegerText(value));
   } catch {
     return null;
   }
+}
+
+function normalizeIntegerText(value: string): string {
+  return value.replace(/[,\s円]/g, '').trim();
 }
 
 function asNullableBoolean(value: string | undefined): boolean | null {
@@ -215,6 +223,9 @@ async function importRawLedgerRows(
     const responsibleEmployeeNo = asNullableInt(row.担当者CD) ?? resolveEmployeeNo(row.氏名, branchCode);
     const registeredByEmployeeNo = asNullableInt(row.登録担当CD) ?? resolveEmployeeNo(row['氏名[2]'], branchCode);
     const updatedByEmployeeNo = asNullableInt(row.更新担当CD) ?? resolveEmployeeNo(row['氏名[3]'], branchCode);
+    const otherAmount = asNullableBigInt(row.その他金額) ?? 0n;
+    const quantities = rawQuantitiesFromRow(row);
+    validateLegacyRowTotals(row, quantities, otherAmount, index + 1);
 
     const result = await client.query(STAGING_INSERT, [
       filePath,
@@ -237,7 +248,7 @@ async function importRawLedgerRows(
       row.摘要 || row.内容 || '(raw legacy import)',
       responsibleEmployeeNo,
       null,
-      asNullableBigInt(row.その他金額)?.toString() ?? '0',
+      otherAmount.toString(),
       null,
       row.備考 || null,
       asNullableBoolean(row.Is削除) ?? false,
@@ -253,7 +264,7 @@ async function importRawLedgerRows(
       null,
       null,
       null,
-      ...rawQuantitiesFromRow(row),
+      ...quantities,
     ]);
 
     inserted += result.rowCount ?? 0;
@@ -342,6 +353,37 @@ function rawQuantitiesFromRow(row: Record<string, string>): number[] {
     const key = index === 0 ? '枚数N' : `枚数N[${index + 1}]`;
     return asNullableInt(row[key]) ?? 0;
   });
+}
+
+function stampAmountFromRepetitions(quantities: readonly number[]): bigint {
+  return quantities.reduce((sum, quantity, index) => {
+    const denomination = LEGACY_DENOMINATIONS_BY_REPETITION[index];
+    return denomination == null ? sum : sum + BigInt(denomination) * BigInt(quantity);
+  }, 0n);
+}
+
+function validateLegacyRowTotals(
+  row: Record<string, string>,
+  quantities: readonly number[],
+  otherAmount: bigint,
+  rowNumber: number,
+): void {
+  const stampAmount = stampAmountFromRepetitions(quantities);
+  const totalAmount = stampAmount + otherAmount;
+  const expectedStampAmount = asNullableBigInt(row.切手金額合計);
+  const expectedTotalAmount = asNullableBigInt(row.金額合計);
+
+  if (expectedStampAmount != null && expectedStampAmount !== stampAmount) {
+    throw new Error(
+      `Ledger import aborted: row ${rowNumber} 切手金額合計 mismatch. expected=${expectedStampAmount} computed=${stampAmount}`,
+    );
+  }
+
+  if (expectedTotalAmount != null && expectedTotalAmount !== totalAmount) {
+    throw new Error(
+      `Ledger import aborted: row ${rowNumber} 金額合計 mismatch. expected=${expectedTotalAmount} computed=${totalAmount}`,
+    );
+  }
 }
 
 async function upsertBranches(client: PoolClient, mapped: Record<string, string>): Promise<void> {
