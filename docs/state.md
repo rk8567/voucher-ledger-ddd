@@ -17,7 +17,7 @@ The repository is aligned with the issue direction, with several parts already i
 - **Application layer**: `src/application/usecases` contains posting use cases for opening balance, normal voucher movement, inventory check, and red-voucher correction.
 - **Infrastructure boundary**: repository ports live under `src/application/repositories`; PostgreSQL implementations live under `src/infrastructure/postgres`.
 - **Next.js boundary**: `src/server/ledger.ts`, server actions, and app routes call the application/database layer without a separate REST API.
-- **Current UI**: ledger list/detail, sortable/filterable columns, pagination, CSV export, new record, inventory-check, and red-voucher correction popups are implemented.
+- **Current UI**: ledger list/detail, sortable/filterable columns, pagination, selectable CSV/TSV/HTML export, new record, inventory-check, and red-voucher correction popups are implemented.
 - **Deployment**: Docker app/db/migration services are under `deploy/`, using env placeholders and Docker secrets for credentials.
 - **Remediation status**: initial P0 hardening has been committed: non-negative normal-write database rules, fail-fast ledger import validation, FileMaker total reconciliation during import, domain/SQL balance tests, PostgreSQL trigger/read-model tests, and separate FileMaker-compatible reconciliation.
 
@@ -313,15 +313,18 @@ The project intentionally avoids a separate REST API. Next.js calls the applicat
 - server components;
 - server actions;
 - server-only modules;
-- app route for CSV export.
+- app route for table export.
 
 Important files:
 
 - `src/server/ledger.ts`: dashboard queries, cached reads, form option reads, export query.
 - `src/app/actions.ts`: form submissions for movement and inventory check.
-- `src/app/export/ledger/route.ts`: CSV export.
+- `src/app/export/ledger/route.ts`: CSV/TSV/HTML table export.
 - `src/app/page.tsx`: main ledger page.
-- `src/app/LedgerTable.tsx`: table UI, columns, filters, sorting, command toolbar.
+- `src/app/LedgerTable.tsx`: table UI, filters, sorting, command toolbar, and export window.
+- `src/app/ledgerColumns.ts`: shared table/export column metadata.
+- `src/app/ledgerSearchParams.ts`: shared ledger search/export query parsing.
+- `src/app/ledgerExportFormat.ts`: shared CSV/HTML export formatting helpers.
 - `src/app/EntryActionModals.tsx`: new record and inventory-check popups.
 
 ### Current UI Behavior
@@ -333,7 +336,7 @@ Implemented:
 - deleted legacy-row visibility switch;
 - column selection;
 - pagination and page jump;
-- CSV export using current filters/sort;
+- selectable CSV/TSV/HTML export using current filters/sort and chosen columns;
 - new movement registration;
 - inventory-check registration;
 - selected-entry red-voucher correction registration;

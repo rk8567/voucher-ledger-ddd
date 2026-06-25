@@ -789,6 +789,10 @@ button:disabled {
   gap: 8px;
 }
 
+.numberFilterFieldCompact {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .numberFilterField input {
   min-height: 34px;
 }

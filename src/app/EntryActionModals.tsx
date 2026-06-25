@@ -11,8 +11,8 @@ import {
   registerInventoryCheckAction,
   registerVoucherMovementAction,
 } from './actions';
+import { openEntryWorkflowEvent } from './entryWorkflowEvents';
 import { initialEntryActionState, type EntryActionState } from './entryActionState';
-import { openEntryWorkflowEvent } from './LedgerToolbar';
 
 type EntryActionModalsProps = Readonly<{
   defaultBranchCode: number | null;

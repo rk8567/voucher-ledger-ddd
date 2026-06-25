@@ -2,9 +2,10 @@ import Link from 'next/link';
 import { DENOMINATIONS, quantityOf, stampQuantityCount } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
 import { RedVoucherStatus, type RedVoucherStatusCode } from '@/domain/redVoucherStatuses';
-import { getLedgerDashboardData, type LedgerSearchInput } from '@/server/ledger';
+import { getLedgerDashboardData } from '@/server/ledger';
 import { EntryActionModals } from './EntryActionModals';
 import { LedgerTable } from './LedgerTable';
+import { firstParam, parseLedgerSearchParams } from './ledgerSearchParams';
 import { ReturnTopButton } from './ReturnTopButton';
 
 export const dynamic = 'force-dynamic';
@@ -26,65 +27,6 @@ const ENTRY_TYPE_LABELS: Record<number, string> = {
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 const DEFAULT_PAGE_SIZE = 100;
-const SORT_KEYS = [
-  'ledgerNo',
-  'processingDate',
-  'branchName',
-  'entryTypeName',
-  'responsibleEmployeeName',
-  'description',
-  'otherAmountYen',
-] as const;
-
-type TableSortKey = NonNullable<LedgerSearchInput['sortKey']>;
-type SortDirection = NonNullable<LedgerSearchInput['sortDirection']>;
-function firstParam(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function numberParam(value: string | string[] | undefined): number | null {
-  const raw = firstParam(value);
-  if (!raw) return null;
-  const parsed = Number(raw);
-  return Number.isInteger(parsed) ? parsed : null;
-}
-
-function positiveNumberParam(value: string | string[] | undefined): number | null {
-  const parsed = numberParam(value);
-  return parsed != null && parsed > 0 ? parsed : null;
-}
-
-function pageSizeParam(value: string | string[] | undefined): number | null {
-  const parsed = numberParam(value);
-  return PAGE_SIZE_OPTIONS.some((option) => option === parsed) ? parsed : null;
-}
-
-function sortKeyParam(value: string | string[] | undefined): TableSortKey | null {
-  const raw = firstParam(value);
-  return SORT_KEYS.some((sortKey) => sortKey === raw) ? raw as TableSortKey : null;
-}
-
-function sortDirectionParam(value: string | string[] | undefined): SortDirection | null {
-  const raw = firstParam(value);
-  return raw === 'asc' || raw === 'desc' ? raw : null;
-}
-
-function dateParam(value: string | string[] | undefined): string | null {
-  const raw = firstParam(value);
-  if (!raw) return null;
-  const normalized = raw.replaceAll('/', '-');
-  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
-}
-
-function textParam(value: string | string[] | undefined): string | null {
-  const raw = firstParam(value)?.trim();
-  return raw ? raw.slice(0, 100) : null;
-}
-
-function booleanParam(value: string | string[] | undefined): boolean {
-  const raw = firstParam(value);
-  return raw === '1' || raw === 'true';
-}
 
 function yen(value: number): string {
   return new Intl.NumberFormat('ja-JP', {
@@ -98,35 +40,6 @@ function entryTypeName(code: number): string {
   return ENTRY_TYPE_LABELS[code] ?? `入出区分 ${code}`;
 }
 
-function parseSearchParams(params: Record<string, string | string[] | undefined>): LedgerSearchInput {
-  const entryType = numberParam(params.entryTypeCode);
-  return {
-    branchCode: numberParam(params.branchCode),
-    periodYear: numberParam(params.periodYear),
-    periodMonth: numberParam(params.periodMonth),
-    processingDateFrom: dateParam(params.processingDateFrom),
-    processingDateTo: dateParam(params.processingDateTo),
-    entryTypeCode: entryType == null ? null : (entryType as EntryTypeCode),
-    columnFilters: columnFiltersParam(params),
-    ledgerNo: positiveNumberParam(params.ledgerNo),
-    limit: pageSizeParam(params.limit),
-    page: positiveNumberParam(params.page),
-    sortKey: sortKeyParam(params.sort),
-    sortDirection: sortDirectionParam(params.dir),
-    includeDeleted: booleanParam(params.includeDeleted),
-  };
-}
-
-function columnFiltersParam(params: Record<string, string | string[] | undefined>): Record<string, string> {
-  const filters: Record<string, string> = {};
-  for (const [key, value] of Object.entries(params)) {
-    if (!key.startsWith('filter_')) continue;
-    const filterValue = textParam(value);
-    if (filterValue) filters[key.slice('filter_'.length)] = filterValue;
-  }
-  return filters;
-}
-
 function plainParams(params: Record<string, string | string[] | undefined>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(params)
@@ -137,7 +50,7 @@ function plainParams(params: Record<string, string | string[] | undefined>): Rec
 
 export default async function Page({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
-  const input = parseSearchParams(params);
+  const input = parseLedgerSearchParams(params, { pageSizeOptions: PAGE_SIZE_OPTIONS });
 
   try {
     const data = await getLedgerDashboardData(input);
@@ -384,11 +297,6 @@ function PaginationControls({
           ) : (
             <span className="pagerButton pagerButtonDisabled" aria-disabled="true">前へ</span>
           )}
-          {nextHref ? (
-            <Link className="pagerButton" href={nextHref} scroll={false}>次へ</Link>
-          ) : (
-            <span className="pagerButton pagerButtonDisabled" aria-disabled="true">次へ</span>
-          )}
         </div>
         <div className="pageNumberList">
           {pageNumbers.map((pageNumber, index) => pageNumber === 'ellipsis' ? (
@@ -398,13 +306,17 @@ function PaginationControls({
           ) : (
             <Link key={pageNumber} className="pagerButton" href={pageHref(params, pageNumber)} scroll={false}>{pageNumber}</Link>
           ))}
+          {nextHref ? (
+            <Link className="pagerButton" href={nextHref} scroll={false}>次へ</Link>
+          ) : (
+            <span className="pagerButton pagerButtonDisabled" aria-disabled="true">次へ</span>
+          )}
         </div>
         <div className="paginationSide paginationSideRight">
           <form className="pageJumpForm" action="/#ledger-entries" method="get">
             <HiddenQueryFields params={params} omit={['q', 'page', 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft']} />
             <label>
-              <span>ページ</span>
-              <input type="number" name="page" min={1} max={totalPages} defaultValue={currentPage} />
+              <input type="number" name="page" min={1} max={totalPages} defaultValue={currentPage} aria-label="ページ番号" />
             </label>
             <button className="pagerButton" type="submit">移動</button>
           </form>

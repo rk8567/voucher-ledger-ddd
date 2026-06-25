@@ -6,7 +6,9 @@ import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 
 import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
 import type { LedgerFormOptions } from '@/server/ledger';
-import { openEntryWorkflowEvent } from './LedgerToolbar';
+import { openEntryWorkflowEvent } from './entryWorkflowEvents';
+import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from './ledgerColumns';
+import { delimitedText, htmlTable, tokyoTimestampForFileName } from './ledgerExportFormat';
 
 type LedgerTableProps = Readonly<{
   entries: LedgerEntryListRecord['items'];
@@ -22,14 +24,7 @@ type LedgerTableProps = Readonly<{
   filterOptions: LedgerFormOptions;
 }>;
 
-type ColumnDefinition = Readonly<{
-  key: keyof LedgerEntryRecord | 'otherAmountYen';
-  label: string;
-  kind: 'text' | 'integer' | 'money' | 'date' | 'year' | 'month' | 'datetime';
-  optionsKey?: keyof LedgerFormOptions | 'deleted';
-  defaultVisible?: boolean;
-  sortable?: boolean;
-}>;
+type ColumnDefinition = LedgerColumnDefinition;
 
 type DateParts = Readonly<{
   year: number;
@@ -74,53 +69,8 @@ const exportColumnStorageKey = 'voucher-ledger:export-columns';
 const filterPrefix = 'filter_';
 const minYear = 1990;
 const maxYear = 2035;
-const columns: readonly ColumnDefinition[] = [
-  { key: 'ledgerNo', label: '出納No', kind: 'integer', defaultVisible: true, sortable: true },
-  { key: 'processingDate', label: '処理日', kind: 'date', defaultVisible: true, sortable: true },
-  { key: 'branchName', label: '拠点', kind: 'text', optionsKey: 'branches', defaultVisible: true, sortable: true },
-  { key: 'entryTypeName', label: '区分', kind: 'text', optionsKey: 'entryTypes', defaultVisible: true, sortable: true },
-  { key: 'responsibleEmployeeName', label: '担当', kind: 'text', optionsKey: 'employees', defaultVisible: true, sortable: true },
-  { key: 'description', label: '摘要', kind: 'text', defaultVisible: true, sortable: true },
-  { key: 'otherAmountYen', label: 'その他', kind: 'money', defaultVisible: true, sortable: true },
-  { key: 'applicationDate', label: '申請処理日', kind: 'date' },
-  { key: 'branchCode', label: '拠点CD', kind: 'integer' },
-  { key: 'departmentCode', label: '部門CD', kind: 'integer' },
-  { key: 'departmentName', label: '部門', kind: 'text', optionsKey: 'departments' },
-  { key: 'periodYear', label: '年', kind: 'year' },
-  { key: 'periodMonth', label: '月', kind: 'month' },
-  { key: 'entryTypeCode', label: '入出区分CD', kind: 'integer' },
-  { key: 'transactionCategoryCode', label: '出納区分CD', kind: 'integer' },
-  { key: 'transactionCategoryName', label: '出納区分', kind: 'text', optionsKey: 'transactionCategories' },
-  { key: 'counterpartyBranchCode', label: '入出拠点CD', kind: 'integer' },
-  { key: 'counterpartyBranchName', label: '入出拠点', kind: 'text', optionsKey: 'branches' },
-  { key: 'companyCode', label: '会社CD', kind: 'integer' },
-  { key: 'companyName', label: '会社', kind: 'text', optionsKey: 'companies' },
-  { key: 'responsibleEmployeeNo', label: '担当者CD', kind: 'integer' },
-  { key: 'remarks', label: '備考', kind: 'text' },
-  { key: 'otherAmountNote', label: 'その他金額備考', kind: 'text' },
-  { key: 'redVoucherStatusCode', label: '赤伝票CD', kind: 'integer' },
-  { key: 'redVoucherStatusName', label: '赤伝票状態', kind: 'text', optionsKey: 'redVoucherStatuses' },
-  { key: 'isDeleted', label: '削除', kind: 'text', optionsKey: 'deleted' },
-  { key: 'originalLedgerNo', label: '元伝票No', kind: 'integer' },
-  { key: 'reversalLedgerNo', label: '赤伝票No', kind: 'integer' },
-  { key: 'correctionLedgerNo', label: '訂正伝票No', kind: 'integer' },
-  { key: 'registeredAt', label: '登録日時', kind: 'datetime' },
-  { key: 'registeredByEmployeeNo', label: '登録者CD', kind: 'integer' },
-  { key: 'registeredByEmployeeName', label: '登録者', kind: 'text', optionsKey: 'employees' },
-  { key: 'updatedAt', label: '更新日時', kind: 'datetime' },
-  { key: 'updatedByEmployeeNo', label: '更新者CD', kind: 'integer' },
-  { key: 'updatedByEmployeeName', label: '更新者', kind: 'text', optionsKey: 'employees' },
-  { key: 'postedAt', label: '登録済', kind: 'datetime' },
-  { key: 'filemakerCreatedAt', label: 'FM作成日時', kind: 'datetime' },
-  { key: 'filemakerCreatedBy', label: 'FM作成者', kind: 'text' },
-  { key: 'filemakerModifiedAt', label: 'FM修正日時', kind: 'datetime' },
-  { key: 'filemakerModifiedBy', label: 'FM修正者', kind: 'text' },
-  { key: 'filemakerLoginEmployeeNo', label: 'ログイン社員番号', kind: 'integer' },
-  { key: 'filemakerLoginEmployeeName', label: 'ログイン社員名', kind: 'text' },
-  { key: 'createdAt', label: '作成日時', kind: 'datetime' },
-];
-
-const defaultColumnKeys = columns.filter((column) => column.defaultVisible).map((column) => column.key);
+const columns = ledgerColumns;
+const defaultColumnKeys = defaultLedgerColumnKeys;
 
 export function LedgerTable({
   entries,
@@ -481,17 +431,17 @@ function saveCurrentTable(entries: LedgerEntryListRecord['items'], visibleColumn
   const header = visibleColumns.map((column) => column.label);
   const rows = entries.map((entry) => visibleColumns.map((column) => displayCell(entry, column)));
   const content = format === 'html'
-    ? currentTableHtml(header, rows)
+    ? htmlTable(header, rows)
     : `\uFEFF${delimitedText(header, rows, format === 'csv-tab' ? '\t' : ',')}\r\n`;
   const blob = new Blob([content], { type: mimeTypeForFormat(format) });
-  void saveBlob(blob, `voucher-ledger-table-${timestampForFileName()}.${extensionForFormat(format)}`, format);
+  void saveBlob(blob, `voucher-ledger-table-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`, format);
 }
 
 async function saveSearchResults(exportHref: string, selectedColumnKeys: readonly string[], format: SaveFormat) {
   const response = await fetch(exportFormatHref(exportHref, format, selectedColumnKeys), { cache: 'no-store' });
   if (!response.ok) throw new Error('Export failed');
   const blob = await response.blob();
-  await saveBlob(blob, `voucher-ledger-${timestampForFileName()}.${extensionForFormat(format)}`, format);
+  await saveBlob(blob, `voucher-ledger-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`, format);
 }
 
 async function saveBlob(blob: Blob, suggestedName: string, format: SaveFormat) {
@@ -543,67 +493,6 @@ function filePickerTypeForFormat(format: SaveFormat): FilePickerAcceptType {
     return { description: 'Tab-separated values', accept: { 'text/tab-separated-values': ['.tsv'] } };
   }
   return { description: 'CSV', accept: { 'text/csv': ['.csv'] } };
-}
-
-function currentTableHtml(header: readonly string[], rows: readonly (readonly string[])[]): string {
-  const head = header.map((column) => `<th>${htmlCell(column)}</th>`).join('');
-  const body = rows.map((row) => `<tr>${row.map((cell) => `<td>${htmlCell(cell)}</td>`).join('')}</tr>`).join('');
-  const html = `<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <title>金券管理台帳</title>
-  <style>
-    body { font-family: Arial, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif; }
-    table { border-collapse: collapse; }
-    th, td { border: 1px solid #999; padding: 4px 8px; text-align: left; white-space: nowrap; }
-    th { background: #f0f0f0; }
-  </style>
-</head>
-<body>
-  <table>
-    <thead><tr>${head}</tr></thead>
-    <tbody>${body}</tbody>
-  </table>
-</body>
-</html>`;
-  return html;
-}
-
-function delimitedText(header: readonly string[], rows: readonly (readonly string[])[], delimiter: ',' | '\t'): string {
-  return [
-    header.map(csvCell).join(delimiter),
-    ...rows.map((row) => row.map(csvCell).join(delimiter)),
-  ].join('\r\n');
-}
-
-function csvCell(value: string): string {
-  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
-  return `"${safe.replaceAll('"', '""')}"`;
-}
-
-function htmlCell(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-function timestampForFileName(): string {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(now);
-  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${byType.year}${byType.month}${byType.day}-${byType.hour}${byType.minute}`;
 }
 
 function ColumnFilterPopover({
@@ -713,13 +602,13 @@ function FilterControl({
 
   if (column.kind === 'year') {
     return (
-      <NumberField label="年" min={minYear} max={maxYear} value={numericValue(value, new Date().getFullYear())} onChange={(next) => onValueChange(String(next))} />
+      <NumberField label="年" min={minYear} max={maxYear} value={numericValue(value, new Date().getFullYear())} onChange={(next) => onValueChange(String(next))} showLabel={false} />
     );
   }
 
   if (column.kind === 'month') {
     return (
-      <NumberField label="月" min={1} max={12} value={numericValue(value, 1)} onChange={(next) => onValueChange(String(next))} />
+      <NumberField label="月" min={1} max={12} value={numericValue(value, 1)} onChange={(next) => onValueChange(String(next))} showLabel={false} />
     );
   }
 
@@ -752,15 +641,18 @@ function NumberField({
   max,
   value,
   onChange,
+  showLabel = true,
 }: Readonly<{
   label: string;
   min: number;
   max: number;
   value: number;
   onChange: (value: number) => void;
+  showLabel?: boolean;
 }>) {
   return (
-    <label className="numberFilterField">
+    <label className={showLabel ? 'numberFilterField' : 'numberFilterField numberFilterFieldCompact'}>
+      {showLabel ? <span>{label}</span> : null}
       <input
         type="number"
         inputMode="numeric"
@@ -769,6 +661,8 @@ function NumberField({
         step="1"
         value={value}
         aria-label={label}
+        title={label}
+        placeholder={label}
         onChange={(event) => onChange(clampNumber(Number(event.target.value), min, max))}
       />
     </label>
@@ -968,7 +862,8 @@ function cellClassName(column: ColumnDefinition): string | undefined {
 }
 
 function datePartsFromFilter(value: string): DateParts {
-  const match = /^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?/.exec(value);
+  const normalized = value.replaceAll('/', '-');
+  const match = /^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?/.exec(normalized);
   const now = new Date();
   return {
     year: clampNumber(match?.[1] ? Number(match[1]) : now.getFullYear(), minYear, maxYear),

@@ -4,7 +4,7 @@ Next.js + PostgreSQL replacement for the FileMaker `金券管理台帳.fmp12` vo
 
 The project migrates FileMaker ledger data and makes the implicit FileMaker business rules explicit in a DDD-oriented TypeScript application layer and PostgreSQL read model.
 
-The web UI supports ledger search/detail, CSV export, new movement registration, inventory checks, and selected-row red-voucher correction.
+The web UI supports ledger search/detail, selectable table export, new movement registration, inventory checks, and selected-row red-voucher correction.
 
 ## Current Scope
 
@@ -12,7 +12,7 @@ The web UI supports ledger search/detail, CSV export, new movement registration,
 - PostgreSQL stores source-of-truth ledger data, imported master snapshots, and deterministic balance views.
 - FileMaker DDR XML files document legacy schema/scripts.
 - FileMaker HTML exports under `filemaker/exports/` are the supported migration input.
-- CSV import support has been removed; CSV is only an application export format.
+- CSV import support has been removed; CSV/TSV/HTML are application export formats only.
 - A separate REST API is intentionally not part of the current architecture.
 - Legacy carry rows (`前葉より繰越`, `次葉へ繰越`) are preserved as history/display rows only; the new app does not actively generate period-close/open carry records.
 - Master data is imported from upstream/FileMaker exports for ledger selection and validation; the app does not maintain branches, employees, companies, departments, or code tables directly.
@@ -26,7 +26,7 @@ src/application/queries/             Ledger/balance query use cases
 src/application/repositories/        Repository ports
 src/infrastructure/postgres/         PostgreSQL repository/unit-of-work adapter
 src/server/ledger.ts                 Thin Next.js server boundary and caching
-src/app/                             Next.js UI, server actions, CSV export route
+src/app/                             Next.js UI, server actions, table export route
 db/migrations/                       PostgreSQL schema, views, staging, transforms
 scripts/migrate/                     HTML import and migration CLI
 filemaker/                           FileMaker DDR XML and HTML exports
