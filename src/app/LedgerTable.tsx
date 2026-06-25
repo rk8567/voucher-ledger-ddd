@@ -8,6 +8,7 @@ import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/rep
 import type { LedgerFormOptions } from '@/server/ledger';
 import { openEntryWorkflowEvent } from './entryWorkflowEvents';
 import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from './ledgerColumns';
+import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
 import { delimitedText, htmlTable, tokyoTimestampForFileName } from './ledgerExportFormat';
 
 type LedgerTableProps = Readonly<{
@@ -900,32 +901,13 @@ function sortIcon(columnKey: string, currentSortKey: string, currentSortDirectio
 function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string {
   const value = entry[column.key as keyof LedgerEntryRecord];
   if (column.key === 'processingDate' || column.key === 'applicationDate' || column.key.toLowerCase().endsWith('at')) {
-    return dateText(value);
+    return typeof value === 'string' ? dateOnly(value) ?? '-' : '-';
   }
   if (column.key === 'otherAmountYen') return yen(Number(value ?? 0));
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (value == null || value === '') return '-';
   const text = String(value);
   return column.kind === 'text' ? limitText(text, 10) : text;
-}
-
-function limitText(value: string, maxLength: number): string {
-  return Array.from(value).slice(0, maxLength).join('');
-}
-
-function dateText(value: unknown): string {
-  if (typeof value !== 'string' || !value) return '-';
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  if (match) return `${match[1]}/${match[2]}/${match[3]}`;
-  return value.replaceAll('-', '/');
-}
-
-function yen(value: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function queryHref(params: Record<string, string>, ledgerNo: number): string {
