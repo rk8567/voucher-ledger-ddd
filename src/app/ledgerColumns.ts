@@ -1,14 +1,21 @@
-import type { LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
+import type { LedgerEntryRecord, LedgerEntrySortKey } from '@/application/repositories/VoucherLedgerRepository';
 import type { LedgerFormOptions } from '@/server/ledger';
 
-export type LedgerColumnDefinition = Readonly<{
-  key: keyof LedgerEntryRecord | 'otherAmountYen';
+type LedgerColumnKey = keyof LedgerEntryRecord | 'otherAmountYen';
+type LedgerColumnBase = Readonly<{
+  key: LedgerColumnKey;
   label: string;
   kind: 'text' | 'integer' | 'money' | 'date' | 'year' | 'month' | 'datetime';
   optionsKey?: keyof LedgerFormOptions | 'deleted';
   defaultVisible?: boolean;
-  sortable?: boolean;
 }>;
+
+export type LedgerColumnDefinition = LedgerColumnBase & (
+  | Readonly<{ key: LedgerEntrySortKey; sortable: true }>
+  | Readonly<{ key: LedgerColumnKey; sortable?: false }>
+);
+
+type SortableLedgerColumn = Extract<LedgerColumnDefinition, Readonly<{ sortable: true }>>;
 
 export const ledgerColumns: readonly LedgerColumnDefinition[] = [
   { key: 'ledgerNo', label: '出納No', kind: 'integer', defaultVisible: true, sortable: true },
@@ -60,3 +67,6 @@ export const defaultLedgerColumnKeys = ledgerColumns
   .filter((column) => column.defaultVisible)
   .map((column) => column.key);
 
+export const ledgerSortableKeys = ledgerColumns
+  .filter((column): column is SortableLedgerColumn => column.sortable === true)
+  .map((column) => column.key);

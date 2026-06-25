@@ -1,15 +1,6 @@
 import { EntryTypeCode } from '@/domain/entryTypes';
 import type { LedgerSearchInput } from '@/server/ledger';
-
-const SORT_KEYS = [
-  'ledgerNo',
-  'processingDate',
-  'branchName',
-  'entryTypeName',
-  'responsibleEmployeeName',
-  'description',
-  'otherAmountYen',
-] as const;
+import { ledgerSortableKeys } from './ledgerColumns';
 
 type SearchParamValue = string | string[] | undefined;
 export type TableSortKey = NonNullable<LedgerSearchInput['sortKey']>;
@@ -50,7 +41,7 @@ export function booleanParam(value: SearchParamValue): boolean {
 
 export function sortKeyParam(value: SearchParamValue): TableSortKey | null {
   const raw = firstParam(value);
-  return SORT_KEYS.some((sortKey) => sortKey === raw) ? raw as TableSortKey : null;
+  return ledgerSortableKeys.some((sortKey) => sortKey === raw) ? raw as TableSortKey : null;
 }
 
 export function sortDirectionParam(value: SearchParamValue): SortDirection | null {
@@ -121,4 +112,3 @@ export function parseLedgerExportSearchParams(params: URLSearchParams): LedgerSe
     includeDeleted: booleanParam(urlParam(params, 'includeDeleted')),
   };
 }
-
