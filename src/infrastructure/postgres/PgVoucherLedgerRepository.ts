@@ -475,7 +475,6 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     if (filter.processingDateFrom != null) where.push(`e.processing_date >= ${add(filter.processingDateFrom)}`);
     if (filter.processingDateTo != null) where.push(`e.processing_date <= ${add(filter.processingDateTo)}`);
     if (filter.entryTypeCode != null) where.push(`e.entry_type_code = ${add(filter.entryTypeCode)}`);
-    if (filter.cursorLedgerNo != null) where.push(`e.ledger_no > ${add(filter.cursorLedgerNo)}`);
     for (const [key, value] of Object.entries(filter.columnFilters ?? {})) {
       const filterColumn = LEDGER_COLUMN_FILTER_EXPRESSIONS[key];
       const trimmed = value?.trim();
@@ -527,7 +526,6 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     return {
       items,
       totalCount,
-      nextCursorLedgerNo: rows.length > limit ? items.at(-1)?.ledgerNo ?? null : null,
     };
   }
 

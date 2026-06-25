@@ -307,7 +307,7 @@ function PaginationControls({
         </div>
         <div className="paginationSide paginationSideRight">
           <form className="pageJumpForm" action="/#ledger-entries" method="get">
-            <HiddenQueryFields params={params} omit={['q', 'page', 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft']} />
+            <HiddenQueryFields params={params} omit={['page', 'ledgerNo', 'actionMessage', 'clearDraft']} />
             <label>
               <input type="number" name="page" min={1} max={totalPages} defaultValue={currentPage} aria-label="ページ番号" />
             </label>
@@ -417,7 +417,7 @@ function paginationItems(currentPage: number, totalPages: number): (number | 'el
 }
 
 function pageHref(params: Record<string, string | string[] | undefined>, page: number): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'q', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'] });
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
   if (page > 1) next.set('page', String(page));
   const query = next.toString();
   return query ? `/?${query}` : '/';
@@ -425,7 +425,7 @@ function pageHref(params: Record<string, string | string[] | undefined>, page: n
 
 function clearFiltersHref(params: Record<string, string | string[] | undefined>): string {
   const next = paramsWithout(params, {
-    keys: ['q', 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'],
+    keys: ['ledgerNo', 'page', 'actionMessage', 'clearDraft'],
     prefixes: ['filter_'],
   });
   const query = next.toString();
@@ -433,20 +433,20 @@ function clearFiltersHref(params: Record<string, string | string[] | undefined>)
 }
 
 function exportCsvHref(params: Record<string, string | string[] | undefined>): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'q', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'] });
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/export/ledger?${query}` : '/export/ledger';
 }
 
 function deletedToggleHref(params: Record<string, string | string[] | undefined>, includeDeleted: boolean): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'q', 'cursorLedgerNo', 'cursorStack', 'page', 'includeDeleted', 'actionMessage', 'clearDraft'] });
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'includeDeleted', 'actionMessage', 'clearDraft'] });
   if (!includeDeleted) next.set('includeDeleted', '1');
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }
 
 function unsortHref(params: Record<string, string | string[] | undefined>): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'q', 'cursorLedgerNo', 'cursorStack', 'page', 'sort', 'dir', 'actionMessage', 'clearDraft'] });
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'sort', 'dir', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }

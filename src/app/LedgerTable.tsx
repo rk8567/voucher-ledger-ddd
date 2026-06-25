@@ -912,19 +912,19 @@ function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string
 }
 
 function queryHref(params: Record<string, string>, ledgerNo: number): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft'] });
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'actionMessage', 'clearDraft'] });
   next.set('ledgerNo', String(ledgerNo));
   return `/?${next.toString()}`;
 }
 
 function clearFilterHref(params: Record<string, string>, columnKey: string): string {
-  const next = paramsWithout(params, { keys: [filterName(columnKey), 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'] });
+  const next = paramsWithout(params, { keys: [filterName(columnKey), 'ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }
 
 function applyFilterHref(params: Record<string, string>, columnKey: string, value: string): string {
-  const next = paramsWithout(params, { keys: [filterName(columnKey), 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'] });
+  const next = paramsWithout(params, { keys: [filterName(columnKey), 'ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
   if (value.trim()) next.set(filterName(columnKey), value.trim());
   const query = next.toString();
   return query ? `/?${query}` : '/';
@@ -941,7 +941,7 @@ function nextSortHref(
     : currentSortDirection === 'asc'
       ? 'desc'
       : null;
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'sort', 'dir', 'actionMessage', 'clearDraft'] });
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'sort', 'dir', 'actionMessage', 'clearDraft'] });
   if (nextDirection) {
     next.set('sort', sortKey);
     next.set('dir', nextDirection);

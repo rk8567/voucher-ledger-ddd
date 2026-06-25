@@ -158,7 +158,7 @@ class InMemoryVoucherLedgerRepository implements VoucherLedgerRepository {
   }
 
   async listLedgerEntries(_filter: LedgerEntryListFilter): Promise<LedgerEntryListRecord> {
-    return { items: [], totalCount: 0, nextCursorLedgerNo: null };
+    return { items: [], totalCount: 0 };
   }
 
   async getLedgerEntryByLedgerNo(): Promise<PostedLedgerEntryWithAmounts | null> {

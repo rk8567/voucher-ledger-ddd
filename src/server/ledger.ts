@@ -30,7 +30,6 @@ export type LedgerSearchInput = Readonly<{
   ledgerNo?: number | null;
   limit?: number | null;
   page?: number | null;
-  cursorLedgerNo?: number | null;
   sortKey?: LedgerEntrySortKey | null;
   sortDirection?: SortDirection | null;
   includeDeleted?: boolean | null;
@@ -137,7 +136,6 @@ function ledgerFilterFromInput(input: LedgerSearchInput): LedgerEntryListFilter 
     processingDateTo: input.processingDateTo,
     entryTypeCode: input.entryTypeCode,
     columnFilters: input.columnFilters,
-    cursorLedgerNo: input.cursorLedgerNo,
     sortKey: input.sortKey,
     sortDirection: input.sortDirection,
     includeDeleted: input.includeDeleted === true,

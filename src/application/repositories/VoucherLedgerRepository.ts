@@ -99,7 +99,6 @@ export type LedgerEntryListFilter = Readonly<{
   includeDeleted?: boolean;
   limit?: number | null;
   offset?: number | null;
-  cursorLedgerNo?: number | null;
   sortKey?: LedgerEntrySortKey | null;
   sortDirection?: SortDirection | null;
 }>;
@@ -118,7 +117,6 @@ export type SortDirection = 'asc' | 'desc';
 export type LedgerEntryListRecord = Readonly<{
   items: readonly LedgerEntryRecord[];
   totalCount: number;
-  nextCursorLedgerNo: number | null;
 }>;
 
 export interface VoucherLedgerRepository {
