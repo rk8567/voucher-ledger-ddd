@@ -142,6 +142,90 @@ The app is exposed at `http://localhost:${APP_PORT:-3000}`.
 
 The Dockerfile contains no credentials. Database credentials are supplied through `deploy/.env.docker` and a Docker secret file referenced by `POSTGRES_PASSWORD_FILE`.
 
+## Production Backup, Restore, And Rollback
+
+Treat database migrations and FileMaker import/transform runs as forward-only operations. Rollback is restore-from-backup, not a down migration.
+
+Before any production deploy, schema migration, import, or cutover:
+
+1. Confirm the current app is healthy.
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml ps
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate status
+```
+
+2. Create a timestamped PostgreSQL custom-format backup outside the repository.
+
+```bash
+mkdir -p ../voucher-ledger-backups
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml exec -T db \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-acl' \
+  > ../voucher-ledger-backups/voucher_ledger_$(date +%Y%m%d_%H%M%S).dump
+```
+
+3. Verify that the backup can be read before continuing.
+
+```bash
+pg_restore --list ../voucher-ledger-backups/voucher_ledger_YYYYMMDD_HHMMSS.dump > /tmp/voucher_ledger_restore_manifest.txt
+```
+
+Keep backups outside the repo and outside the Docker named volume. Store a copy in the production backup location with restricted access; the dump contains ledger and employee reference data.
+
+Restore procedure for a failed migration/import/deploy:
+
+1. Stop the app so users cannot write while the database is being restored.
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml stop app
+```
+
+2. Take a last-chance dump of the broken state for investigation.
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml exec -T db \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-acl' \
+  > ../voucher-ledger-backups/voucher_ledger_failed_$(date +%Y%m%d_%H%M%S).dump
+```
+
+3. Recreate the application database and restore the known-good dump.
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml exec -T db \
+  sh -c 'dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
+cat ../voucher-ledger-backups/voucher_ledger_YYYYMMDD_HHMMSS.dump | \
+  docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml exec -T db \
+    sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-acl'
+```
+
+4. Start the app and verify the restored database.
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml up -d app
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate status
+```
+
+App rollback procedure:
+
+1. Stop the app container.
+2. Check out or deploy the previously known-good Git commit/image.
+3. Rebuild and start only the app service.
+4. If the failed deploy already changed schema or data, restore the database backup from before that deploy before starting the old app.
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml stop app
+git checkout <known-good-commit>
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml up -d --build app
+```
+
+Cutover checklist:
+
+- backup created and `pg_restore --list` succeeds;
+- `migrate status` reports expected row counts and `legacy_running_balance_reconciliation.mismatches: 0`;
+- latest `legacy_import_audit_log` entries are expected migration operations only;
+- the exact Git commit and backup filename are recorded in the release note;
+- restore procedure has been tested at least once in a non-production environment.
+
 ## Design Notes
 
 Normal application database connections force `voucher_ledger.legacy_import` off when connections are opened and again at transaction start. The legacy-import bypass is reserved for migration SQL that explicitly uses `SET LOCAL voucher_ledger.legacy_import = 'on'`.

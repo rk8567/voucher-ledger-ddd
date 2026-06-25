@@ -23,8 +23,6 @@ The repository is aligned with the issue direction, with several parts already i
 
 The main remaining gaps are:
 
-- Attachment/container data from FileMaker `画像` is modeled but not imported.
-- Production backup/restore and rollback operations are not yet documented.
 - Additional domain/SQL drift guards should be added as new money-path scenarios are implemented.
 
 ## Previous FileMaker System
@@ -344,7 +342,7 @@ Implemented:
 
 Not yet complete:
 
-- attachment import/display.
+- no active P0/P1 remediation item is open in this document.
 
 ## Deployment And Startup
 
@@ -372,6 +370,8 @@ docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --prof
 
 The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets for the database password.
 
+Production backup, restore, and rollback operations are documented in `README.md`. Database migrations and imports are treated as forward-only; rollback is restore-from-backup plus app image/Git commit rollback when needed.
+
 ## Architecture Decisions
 
 - Keep domain and application code independent from Next.js.
@@ -384,5 +384,8 @@ The app listens on `APP_PORT` from `deploy/.env.docker` and uses Docker secrets 
 
 ## Follow-Up Work
 
-- Add attachment/container migration if FileMaker image data is still required.
-- Document production backup/restore and rollback operations.
+- Add new domain/SQL drift guards as new money-path scenarios are implemented.
+
+Skipped for now:
+
+- FileMaker `画像` attachment/container migration. The optional `voucher_ledger_entry_attachments` table remains in the schema, but import/display work is intentionally deferred unless image data becomes a cutover requirement.
