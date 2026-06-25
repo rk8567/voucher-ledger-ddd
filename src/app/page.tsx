@@ -209,6 +209,7 @@ export default async function Page({ searchParams }: PageProps) {
               includeDeleted={includeDeleted}
               deletedToggleHref={deletedToggleHref(params, includeDeleted)}
               unsortHref={unsortHref(params)}
+              filterOptions={data.formOptions}
             />
             <PaginationControls
               previousHref={previousHref}
@@ -376,11 +377,18 @@ function PaginationControls({
   return (
     <nav className={`paginationBar paginationBar${position === 'top' ? 'Top' : 'Bottom'}`} aria-label={`Ledger pagination ${position}`}>
       <div className="paginationActions">
-        {previousHref ? (
-          <Link className="pagerButton" href={previousHref} scroll={false}>前へ</Link>
-        ) : (
-          <span className="pagerButton pagerButtonDisabled" aria-disabled="true">前へ</span>
-        )}
+        <div className="paginationSide paginationSideLeft">
+          {previousHref ? (
+            <Link className="pagerButton" href={previousHref} scroll={false}>前へ</Link>
+          ) : (
+            <span className="pagerButton pagerButtonDisabled" aria-disabled="true">前へ</span>
+          )}
+          {nextHref ? (
+            <Link className="pagerButton" href={nextHref} scroll={false}>次へ</Link>
+          ) : (
+            <span className="pagerButton pagerButtonDisabled" aria-disabled="true">次へ</span>
+          )}
+        </div>
         <div className="pageNumberList">
           {pageNumbers.map((pageNumber, index) => pageNumber === 'ellipsis' ? (
             <span key={`ellipsis-${index}`} className="pagerEllipsis">...</span>
@@ -390,19 +398,16 @@ function PaginationControls({
             <Link key={pageNumber} className="pagerButton" href={pageHref(params, pageNumber)} scroll={false}>{pageNumber}</Link>
           ))}
         </div>
-        {nextHref ? (
-          <Link className="pagerButton" href={nextHref} scroll={false}>次へ</Link>
-        ) : (
-          <span className="pagerButton pagerButtonDisabled" aria-disabled="true">次へ</span>
-        )}
-        <form className="pageJumpForm" action="/#ledger-entries" method="get">
-          <HiddenQueryFields params={params} omit={['q', 'page', 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft']} />
-          <label>
-            <span>ページ</span>
-            <input type="number" name="page" min={1} max={totalPages} defaultValue={currentPage} />
-          </label>
-          <button className="pagerButton" type="submit">移動</button>
-        </form>
+        <div className="paginationSide paginationSideRight">
+          <form className="pageJumpForm" action="/#ledger-entries" method="get">
+            <HiddenQueryFields params={params} omit={['q', 'page', 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft']} />
+            <label>
+              <span>ページ</span>
+              <input type="number" name="page" min={1} max={totalPages} defaultValue={currentPage} />
+            </label>
+            <button className="pagerButton" type="submit">移動</button>
+          </form>
+        </div>
       </div>
     </nav>
   );

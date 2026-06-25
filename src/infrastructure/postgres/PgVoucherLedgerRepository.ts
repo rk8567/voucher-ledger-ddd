@@ -141,49 +141,50 @@ const LEDGER_SORT_EXPRESSIONS: Record<NonNullable<LedgerEntryListFilter['sortKey
   otherAmountYen: 'e.other_amount',
 };
 
-const LEDGER_COLUMN_FILTER_EXPRESSIONS: Record<string, string> = {
-  ledgerNo: 'e.ledger_no::text',
-  processingDate: 'e.processing_date::text',
-  applicationDate: 'e.application_date::text',
-  branchCode: 'e.branch_code::text',
-  branchName: 'b.branch_name',
-  departmentCode: 'e.department_code::text',
-  departmentName: 'd.department_name',
-  periodYear: 'e.period_year::text',
-  periodMonth: 'e.period_month::text',
-  entryTypeCode: 'e.entry_type_code::text',
-  entryTypeName: 'et.name_japanese',
-  transactionCategoryCode: 'e.transaction_category_code::text',
-  transactionCategoryName: 'tc.name_japanese',
-  counterpartyBranchCode: 'e.counterparty_branch_code::text',
-  counterpartyBranchName: 'cb.branch_name',
-  companyCode: 'e.company_code::text',
-  companyName: 'c.company_name',
-  responsibleEmployeeNo: 'e.responsible_employee_no::text',
-  responsibleEmployeeName: 'responsible.employee_name',
-  description: 'e.description',
-  remarks: 'e.remarks',
-  otherAmountYen: 'e.other_amount::text',
-  otherAmountNote: 'e.other_amount_note',
-  redVoucherStatusCode: 'e.red_voucher_status_code::text',
-  redVoucherStatusName: 'rvs.name_japanese',
-  originalLedgerNo: 'e.original_ledger_no::text',
-  reversalLedgerNo: 'e.reversal_ledger_no::text',
-  correctionLedgerNo: 'e.correction_ledger_no::text',
-  registeredAt: 'e.registered_at::text',
-  registeredByEmployeeNo: 'e.registered_by_employee_no::text',
-  registeredByEmployeeName: 'registered_by.employee_name',
-  updatedAt: 'e.updated_at::text',
-  updatedByEmployeeNo: 'e.updated_by_employee_no::text',
-  updatedByEmployeeName: 'updated_by.employee_name',
-  postedAt: 'e.posted_at::text',
-  filemakerCreatedAt: 'e.filemaker_created_at::text',
-  filemakerCreatedBy: 'e.filemaker_created_by',
-  filemakerModifiedAt: 'e.filemaker_modified_at::text',
-  filemakerModifiedBy: 'e.filemaker_modified_by',
-  filemakerLoginEmployeeNo: 'e.filemaker_login_employee_no::text',
-  filemakerLoginEmployeeName: 'e.filemaker_login_employee_name',
-  createdAt: 'e.created_at::text',
+const LEDGER_COLUMN_FILTER_EXPRESSIONS: Record<string, { expression: string; kind: 'text' | 'exactText' | 'number' | 'date' | 'boolean' }> = {
+  ledgerNo: { expression: 'e.ledger_no', kind: 'number' },
+  processingDate: { expression: 'e.processing_date', kind: 'date' },
+  applicationDate: { expression: 'e.application_date', kind: 'date' },
+  branchCode: { expression: 'e.branch_code', kind: 'number' },
+  branchName: { expression: 'b.branch_name', kind: 'exactText' },
+  departmentCode: { expression: 'e.department_code', kind: 'number' },
+  departmentName: { expression: 'd.department_name', kind: 'exactText' },
+  periodYear: { expression: 'e.period_year', kind: 'number' },
+  periodMonth: { expression: 'e.period_month', kind: 'number' },
+  entryTypeCode: { expression: 'e.entry_type_code', kind: 'number' },
+  entryTypeName: { expression: 'et.name_japanese', kind: 'exactText' },
+  transactionCategoryCode: { expression: 'e.transaction_category_code', kind: 'number' },
+  transactionCategoryName: { expression: 'tc.name_japanese', kind: 'exactText' },
+  counterpartyBranchCode: { expression: 'e.counterparty_branch_code', kind: 'number' },
+  counterpartyBranchName: { expression: 'cb.branch_name', kind: 'exactText' },
+  companyCode: { expression: 'e.company_code', kind: 'number' },
+  companyName: { expression: 'c.company_name', kind: 'exactText' },
+  responsibleEmployeeNo: { expression: 'e.responsible_employee_no', kind: 'number' },
+  responsibleEmployeeName: { expression: 'responsible.employee_name', kind: 'exactText' },
+  description: { expression: 'e.description', kind: 'text' },
+  remarks: { expression: 'e.remarks', kind: 'text' },
+  otherAmountYen: { expression: 'e.other_amount', kind: 'number' },
+  otherAmountNote: { expression: 'e.other_amount_note', kind: 'text' },
+  redVoucherStatusCode: { expression: 'e.red_voucher_status_code', kind: 'number' },
+  redVoucherStatusName: { expression: 'rvs.name_japanese', kind: 'exactText' },
+  isDeleted: { expression: 'e.is_deleted', kind: 'boolean' },
+  originalLedgerNo: { expression: 'e.original_ledger_no', kind: 'number' },
+  reversalLedgerNo: { expression: 'e.reversal_ledger_no', kind: 'number' },
+  correctionLedgerNo: { expression: 'e.correction_ledger_no', kind: 'number' },
+  registeredAt: { expression: 'e.registered_at', kind: 'date' },
+  registeredByEmployeeNo: { expression: 'e.registered_by_employee_no', kind: 'number' },
+  registeredByEmployeeName: { expression: 'registered_by.employee_name', kind: 'exactText' },
+  updatedAt: { expression: 'e.updated_at', kind: 'date' },
+  updatedByEmployeeNo: { expression: 'e.updated_by_employee_no', kind: 'number' },
+  updatedByEmployeeName: { expression: 'updated_by.employee_name', kind: 'exactText' },
+  postedAt: { expression: 'e.posted_at', kind: 'date' },
+  filemakerCreatedAt: { expression: 'e.filemaker_created_at', kind: 'date' },
+  filemakerCreatedBy: { expression: 'e.filemaker_created_by', kind: 'text' },
+  filemakerModifiedAt: { expression: 'e.filemaker_modified_at', kind: 'date' },
+  filemakerModifiedBy: { expression: 'e.filemaker_modified_by', kind: 'text' },
+  filemakerLoginEmployeeNo: { expression: 'e.filemaker_login_employee_no', kind: 'number' },
+  filemakerLoginEmployeeName: { expression: 'e.filemaker_login_employee_name', kind: 'text' },
+  createdAt: { expression: 'e.created_at', kind: 'date' },
 };
 
 function ledgerOrderBy(filter: LedgerEntryListFilter): string {
@@ -463,13 +464,33 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     if (filter.entryTypeCode != null) where.push(`e.entry_type_code = ${add(filter.entryTypeCode)}`);
     if (filter.cursorLedgerNo != null) where.push(`e.ledger_no > ${add(filter.cursorLedgerNo)}`);
     for (const [key, value] of Object.entries(filter.columnFilters ?? {})) {
-      const expression = LEDGER_COLUMN_FILTER_EXPRESSIONS[key];
+      const filterColumn = LEDGER_COLUMN_FILTER_EXPRESSIONS[key];
       const trimmed = value?.trim();
-      if (!expression || !trimmed) continue;
-      const pattern = key.toLowerCase().includes('date') || key.toLowerCase().endsWith('at')
-        ? likePattern(normalizeDateFilter(trimmed))
-        : likePattern(trimmed);
-      where.push(`${expression} ILIKE ${add(pattern)}`);
+      if (!filterColumn || !trimmed) continue;
+      if (filterColumn.kind === 'number') {
+        const numericValue = Number(trimmed);
+        where.push(Number.isFinite(numericValue) && Number.isInteger(numericValue)
+          ? `${filterColumn.expression} = ${add(numericValue)}`
+          : 'false');
+        continue;
+      }
+      if (filterColumn.kind === 'date') {
+        where.push(`${filterColumn.expression}::text ILIKE ${add(likePattern(normalizeDateFilter(trimmed)))}`);
+        continue;
+      }
+      if (filterColumn.kind === 'boolean') {
+        if (trimmed !== 'true' && trimmed !== 'false') {
+          where.push('false');
+          continue;
+        }
+        where.push(`${filterColumn.expression} = ${add(trimmed === 'true')}`);
+        continue;
+      }
+      if (filterColumn.kind === 'exactText') {
+        where.push(`${filterColumn.expression} = ${add(trimmed)}`);
+        continue;
+      }
+      where.push(`${filterColumn.expression} ILIKE ${add(likePattern(trimmed))}`);
     }
     if (!filter.includeDeleted) where.push('e.is_deleted = false');
 

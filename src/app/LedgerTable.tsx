@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 
 import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
+import type { LedgerFormOptions } from '@/server/ledger';
 import { openEntryWorkflowEvent } from './LedgerToolbar';
 
 type LedgerTableProps = Readonly<{
@@ -18,12 +19,14 @@ type LedgerTableProps = Readonly<{
   includeDeleted: boolean;
   deletedToggleHref: string;
   unsortHref: string;
+  filterOptions: LedgerFormOptions;
 }>;
 
 type ColumnDefinition = Readonly<{
   key: keyof LedgerEntryRecord | 'otherAmountYen';
   label: string;
   kind: 'text' | 'integer' | 'money' | 'date' | 'year' | 'month' | 'datetime';
+  optionsKey?: keyof LedgerFormOptions | 'deleted';
   defaultVisible?: boolean;
   sortable?: boolean;
 }>;
@@ -41,46 +44,72 @@ type FadeFrame = Readonly<{
   right: number;
 }>;
 
+type FilterOption = Readonly<{
+  value: string | number;
+  label: string;
+}>;
+
+type SaveFormat = 'csv-comma' | 'csv-tab' | 'html';
+type FilePickerAcceptType = Readonly<{
+  description: string;
+  accept: Record<string, readonly string[]>;
+}>;
+type SaveFilePickerOptions = Readonly<{
+  suggestedName?: string;
+  types?: readonly FilePickerAcceptType[];
+}>;
+type FileSystemWritableFileStream = WritableStream & Readonly<{
+  write: (data: Blob) => Promise<void>;
+  close: () => Promise<void>;
+}>;
+type FileSystemFileHandle = Readonly<{
+  createWritable: () => Promise<FileSystemWritableFileStream>;
+}>;
+type NativeSaveWindow = Window & Readonly<{
+  showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<FileSystemFileHandle>;
+}>;
+
 const columnStorageKey = 'voucher-ledger:visible-columns';
+const exportColumnStorageKey = 'voucher-ledger:export-columns';
 const filterPrefix = 'filter_';
 const minYear = 1990;
 const maxYear = 2035;
 const columns: readonly ColumnDefinition[] = [
   { key: 'ledgerNo', label: '出納No', kind: 'integer', defaultVisible: true, sortable: true },
   { key: 'processingDate', label: '処理日', kind: 'date', defaultVisible: true, sortable: true },
-  { key: 'branchName', label: '拠点', kind: 'text', defaultVisible: true, sortable: true },
-  { key: 'entryTypeName', label: '区分', kind: 'text', defaultVisible: true, sortable: true },
-  { key: 'responsibleEmployeeName', label: '担当', kind: 'text', defaultVisible: true, sortable: true },
+  { key: 'branchName', label: '拠点', kind: 'text', optionsKey: 'branches', defaultVisible: true, sortable: true },
+  { key: 'entryTypeName', label: '区分', kind: 'text', optionsKey: 'entryTypes', defaultVisible: true, sortable: true },
+  { key: 'responsibleEmployeeName', label: '担当', kind: 'text', optionsKey: 'employees', defaultVisible: true, sortable: true },
   { key: 'description', label: '摘要', kind: 'text', defaultVisible: true, sortable: true },
   { key: 'otherAmountYen', label: 'その他', kind: 'money', defaultVisible: true, sortable: true },
   { key: 'applicationDate', label: '申請処理日', kind: 'date' },
   { key: 'branchCode', label: '拠点CD', kind: 'integer' },
   { key: 'departmentCode', label: '部門CD', kind: 'integer' },
-  { key: 'departmentName', label: '部門', kind: 'text' },
+  { key: 'departmentName', label: '部門', kind: 'text', optionsKey: 'departments' },
   { key: 'periodYear', label: '年', kind: 'year' },
   { key: 'periodMonth', label: '月', kind: 'month' },
   { key: 'entryTypeCode', label: '入出区分CD', kind: 'integer' },
   { key: 'transactionCategoryCode', label: '出納区分CD', kind: 'integer' },
-  { key: 'transactionCategoryName', label: '出納区分', kind: 'text' },
+  { key: 'transactionCategoryName', label: '出納区分', kind: 'text', optionsKey: 'transactionCategories' },
   { key: 'counterpartyBranchCode', label: '入出拠点CD', kind: 'integer' },
-  { key: 'counterpartyBranchName', label: '入出拠点', kind: 'text' },
+  { key: 'counterpartyBranchName', label: '入出拠点', kind: 'text', optionsKey: 'branches' },
   { key: 'companyCode', label: '会社CD', kind: 'integer' },
-  { key: 'companyName', label: '会社', kind: 'text' },
+  { key: 'companyName', label: '会社', kind: 'text', optionsKey: 'companies' },
   { key: 'responsibleEmployeeNo', label: '担当者CD', kind: 'integer' },
   { key: 'remarks', label: '備考', kind: 'text' },
   { key: 'otherAmountNote', label: 'その他金額備考', kind: 'text' },
   { key: 'redVoucherStatusCode', label: '赤伝票CD', kind: 'integer' },
-  { key: 'redVoucherStatusName', label: '赤伝票状態', kind: 'text' },
-  { key: 'isDeleted', label: '削除', kind: 'text' },
+  { key: 'redVoucherStatusName', label: '赤伝票状態', kind: 'text', optionsKey: 'redVoucherStatuses' },
+  { key: 'isDeleted', label: '削除', kind: 'text', optionsKey: 'deleted' },
   { key: 'originalLedgerNo', label: '元伝票No', kind: 'integer' },
   { key: 'reversalLedgerNo', label: '赤伝票No', kind: 'integer' },
   { key: 'correctionLedgerNo', label: '訂正伝票No', kind: 'integer' },
   { key: 'registeredAt', label: '登録日時', kind: 'datetime' },
   { key: 'registeredByEmployeeNo', label: '登録者CD', kind: 'integer' },
-  { key: 'registeredByEmployeeName', label: '登録者', kind: 'text' },
+  { key: 'registeredByEmployeeName', label: '登録者', kind: 'text', optionsKey: 'employees' },
   { key: 'updatedAt', label: '更新日時', kind: 'datetime' },
   { key: 'updatedByEmployeeNo', label: '更新者CD', kind: 'integer' },
-  { key: 'updatedByEmployeeName', label: '更新者', kind: 'text' },
+  { key: 'updatedByEmployeeName', label: '更新者', kind: 'text', optionsKey: 'employees' },
   { key: 'postedAt', label: '登録済', kind: 'datetime' },
   { key: 'filemakerCreatedAt', label: 'FM作成日時', kind: 'datetime' },
   { key: 'filemakerCreatedBy', label: 'FM作成者', kind: 'text' },
@@ -104,10 +133,13 @@ export function LedgerTable({
   includeDeleted,
   deletedToggleHref,
   unsortHref,
+  filterOptions,
 }: LedgerTableProps) {
   const [openColumnKey, setOpenColumnKey] = useState<string | null>(null);
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
+  const [exportWindowOpen, setExportWindowOpen] = useState(false);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(defaultColumnKeys);
+  const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(defaultColumnKeys);
   const tableWrapRef = useRef<HTMLDivElement>(null);
   const columnChooserDrag = useDraggablePopup();
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -122,6 +154,19 @@ export function LedgerTable({
       if (!Array.isArray(parsed)) return;
       const validKeys = parsed.filter((key) => columns.some((column) => column.key === key));
       if (validKeys.length > 0) setVisibleColumnKeys(validKeys);
+    } catch {
+      return;
+    }
+  }, []);
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem(exportColumnStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const validKeys = parsed.filter((key) => columns.some((column) => column.key === key));
+      if (validKeys.length > 0) setExportColumnKeys(validKeys);
     } catch {
       return;
     }
@@ -174,6 +219,21 @@ export function LedgerTable({
     window.localStorage.removeItem(columnStorageKey);
   }
 
+  function setExportColumn(key: string, visible: boolean) {
+    const next = visible
+      ? [...exportColumnKeys, key]
+      : exportColumnKeys.filter((columnKey) => columnKey !== key);
+    const normalized = next.length > 0 ? columns.map((column) => column.key).filter((columnKey) => next.includes(columnKey)) : [key];
+    setExportColumnKeys(normalized);
+    window.localStorage.setItem(exportColumnStorageKey, JSON.stringify(normalized));
+  }
+
+  function setExportColumns(next: readonly string[]) {
+    const normalized = next.length > 0 ? columns.map((column) => column.key).filter((columnKey) => next.includes(columnKey)) : defaultColumnKeys;
+    setExportColumnKeys(normalized);
+    window.localStorage.setItem(exportColumnStorageKey, JSON.stringify(normalized));
+  }
+
   function setTableScroll(value: number) {
     const tableWrap = tableWrapRef.current;
     if (!tableWrap) return;
@@ -192,14 +252,23 @@ export function LedgerTable({
   const canScrollRight = maxScrollLeft - scrollLeft > 2;
 
   function openWorkflow(workflow: 'movement' | 'inventory') {
+    setOpenColumnKey(null);
+    setColumnMenuOpen(false);
+    setExportWindowOpen(false);
     window.dispatchEvent(new CustomEvent(openEntryWorkflowEvent, { detail: workflow }));
+  }
+
+  function openExportWindow() {
+    setOpenColumnKey(null);
+    setColumnMenuOpen(false);
+    setExportWindowOpen(true);
   }
 
   return (
     <>
       <div className="tableTools">
         <div className="tableCommandTools" aria-label="FileMaker commands">
-          <a className="toolbarButton" href={exportHref}>CSV出力</a>
+          <button type="button" className="toolbarButton" onClick={openExportWindow}>出力</button>
           <a className="toolbarButton" href={showAllHref}>全件表示</a>
           <a className={includeDeleted ? 'toolbarButton activeToggle' : 'toolbarButton'} href={deletedToggleHref}>
             {includeDeleted ? '削除も表示' : '削除を表示'}
@@ -274,6 +343,7 @@ export function LedgerTable({
                         currentFilter={params[filterName(column.key)] ?? ''}
                         onClose={() => setOpenColumnKey(null)}
                         tableWrapRef={tableWrapRef}
+                        options={columnFilterOptions(column, filterOptions)}
                       />
                     ) : null}
                   </th>
@@ -319,8 +389,221 @@ export function LedgerTable({
           />
         ) : null}
       </div>
+      {exportWindowOpen ? (
+        <ExportWindow
+          exportHref={exportHref}
+          entries={entries}
+          selectedColumnKeys={exportColumnKeys}
+          visibleColumnKeys={visibleColumnKeys}
+          onColumnChange={setExportColumn}
+          onSetColumns={setExportColumns}
+          onClose={() => setExportWindowOpen(false)}
+        />
+      ) : null}
     </>
   );
+}
+
+function ExportWindow({
+  exportHref,
+  entries,
+  selectedColumnKeys,
+  visibleColumnKeys,
+  onColumnChange,
+  onSetColumns,
+  onClose,
+}: Readonly<{
+  exportHref: string;
+  entries: LedgerEntryListRecord['items'];
+  selectedColumnKeys: readonly string[];
+  visibleColumnKeys: readonly string[];
+  onColumnChange: (key: string, visible: boolean) => void;
+  onSetColumns: (keys: readonly string[]) => void;
+  onClose: () => void;
+}>) {
+  const [saveFormat, setSaveFormat] = useState<SaveFormat>('csv-comma');
+
+  return (
+    <div className="modalBackdrop exportBackdrop" role="presentation">
+      <section className="entryModal exportWindow" role="dialog" aria-modal="true" aria-labelledby="export-title">
+        <div className="modalHeader">
+          <h2 id="export-title">出力</h2>
+          <button type="button" className="secondaryButton" onClick={onClose}>閉じる</button>
+        </div>
+        <div className="exportBody">
+          <div className="exportColumnActions">
+            <button type="button" className="secondaryButton" onClick={() => onSetColumns(visibleColumnKeys)}>表示列</button>
+            <button type="button" className="secondaryButton" onClick={() => onSetColumns(columns.map((column) => column.key))}>全選択</button>
+            <button type="button" className="secondaryButton" onClick={() => onSetColumns(defaultColumnKeys)}>標準</button>
+          </div>
+          <div className="exportColumnList" aria-label="出力列">
+            {columns.map((column) => (
+              <label key={column.key} className="columnChoice">
+                <input
+                  type="checkbox"
+                  checked={selectedColumnKeys.includes(column.key)}
+                  onChange={(event) => onColumnChange(String(column.key), event.target.checked)}
+                />
+                <span>{column.label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="exportSaveMenu">
+            <label>
+              <span>保存形式</span>
+              <select value={saveFormat} onChange={(event) => setSaveFormat(event.target.value as SaveFormat)}>
+                <option value="csv-comma">.csv カンマ区切り</option>
+                <option value="csv-tab">.tsv タブ区切り</option>
+                <option value="html">.html</option>
+              </select>
+            </label>
+            <div className="exportSaveActions">
+              <button type="button" className="secondaryButton" onClick={() => saveCurrentTable(entries, visibleColumnKeys, saveFormat)}>現在の表を保存</button>
+              <button type="button" className="secondaryButton" onClick={() => saveSearchResults(exportHref, selectedColumnKeys, saveFormat)}>検索結果を保存</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function exportFormatHref(exportHref: string, format: 'csv-comma' | 'csv-tab' | 'html', selectedColumnKeys: readonly string[]): string {
+  const url = new URL(exportHref, 'http://local');
+  url.searchParams.set('format', format);
+  url.searchParams.set('columns', selectedColumnKeys.join(','));
+  const query = url.searchParams.toString();
+  return `${url.pathname}${query ? `?${query}` : ''}`;
+}
+
+function saveCurrentTable(entries: LedgerEntryListRecord['items'], visibleColumnKeys: readonly string[], format: SaveFormat) {
+  const visibleColumns = columns.filter((column) => visibleColumnKeys.includes(column.key));
+  const header = visibleColumns.map((column) => column.label);
+  const rows = entries.map((entry) => visibleColumns.map((column) => displayCell(entry, column)));
+  const content = format === 'html'
+    ? currentTableHtml(header, rows)
+    : `\uFEFF${delimitedText(header, rows, format === 'csv-tab' ? '\t' : ',')}\r\n`;
+  const blob = new Blob([content], { type: mimeTypeForFormat(format) });
+  void saveBlob(blob, `voucher-ledger-table-${timestampForFileName()}.${extensionForFormat(format)}`, format);
+}
+
+async function saveSearchResults(exportHref: string, selectedColumnKeys: readonly string[], format: SaveFormat) {
+  const response = await fetch(exportFormatHref(exportHref, format, selectedColumnKeys), { cache: 'no-store' });
+  if (!response.ok) throw new Error('Export failed');
+  const blob = await response.blob();
+  await saveBlob(blob, `voucher-ledger-${timestampForFileName()}.${extensionForFormat(format)}`, format);
+}
+
+async function saveBlob(blob: Blob, suggestedName: string, format: SaveFormat) {
+  const nativeWindow = window as NativeSaveWindow;
+  if (nativeWindow.showSaveFilePicker) {
+    try {
+      const handle = await nativeWindow.showSaveFilePicker({
+        suggestedName,
+        types: [filePickerTypeForFormat(format)],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      throw error;
+    }
+  }
+  downloadBlob(blob, suggestedName);
+}
+
+function downloadBlob(blob: Blob, suggestedName: string) {
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = suggestedName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(href);
+}
+
+function extensionForFormat(format: SaveFormat): 'csv' | 'tsv' | 'html' {
+  if (format === 'html') return 'html';
+  return format === 'csv-tab' ? 'tsv' : 'csv';
+}
+
+function mimeTypeForFormat(format: SaveFormat): string {
+  if (format === 'html') return 'text/html;charset=utf-8';
+  return `${format === 'csv-tab' ? 'text/tab-separated-values' : 'text/csv'};charset=utf-8`;
+}
+
+function filePickerTypeForFormat(format: SaveFormat): FilePickerAcceptType {
+  if (format === 'html') {
+    return { description: 'HTML', accept: { 'text/html': ['.html'] } };
+  }
+  if (format === 'csv-tab') {
+    return { description: 'Tab-separated values', accept: { 'text/tab-separated-values': ['.tsv'] } };
+  }
+  return { description: 'CSV', accept: { 'text/csv': ['.csv'] } };
+}
+
+function currentTableHtml(header: readonly string[], rows: readonly (readonly string[])[]): string {
+  const head = header.map((column) => `<th>${htmlCell(column)}</th>`).join('');
+  const body = rows.map((row) => `<tr>${row.map((cell) => `<td>${htmlCell(cell)}</td>`).join('')}</tr>`).join('');
+  const html = `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>金券管理台帳</title>
+  <style>
+    body { font-family: Arial, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif; }
+    table { border-collapse: collapse; }
+    th, td { border: 1px solid #999; padding: 4px 8px; text-align: left; white-space: nowrap; }
+    th { background: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <table>
+    <thead><tr>${head}</tr></thead>
+    <tbody>${body}</tbody>
+  </table>
+</body>
+</html>`;
+  return html;
+}
+
+function delimitedText(header: readonly string[], rows: readonly (readonly string[])[], delimiter: ',' | '\t'): string {
+  return [
+    header.map(csvCell).join(delimiter),
+    ...rows.map((row) => row.map(csvCell).join(delimiter)),
+  ].join('\r\n');
+}
+
+function csvCell(value: string): string {
+  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  return `"${safe.replaceAll('"', '""')}"`;
+}
+
+function htmlCell(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function timestampForFileName(): string {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}${byType.month}${byType.day}-${byType.hour}${byType.minute}`;
 }
 
 function ColumnFilterPopover({
@@ -330,6 +613,7 @@ function ColumnFilterPopover({
   currentFilter,
   onClose,
   tableWrapRef,
+  options,
 }: Readonly<{
   column: ColumnDefinition;
   params: Record<string, string>;
@@ -337,12 +621,17 @@ function ColumnFilterPopover({
   currentFilter: string;
   onClose: () => void;
   tableWrapRef: RefObject<HTMLDivElement | null>;
+  options: readonly FilterOption[];
 }>) {
   const [value, setValue] = useState(currentFilter);
   const [dateParts, setDateParts] = useState(() => datePartsFromFilter(currentFilter));
-  const popupBounds = useCallback(() => visibleTableBodyBounds(tableWrapRef.current), [tableWrapRef]);
+  const popupBounds = useCallback(() => visibleTableBounds(tableWrapRef.current), [tableWrapRef]);
   const drag = useDraggablePopup(popupBounds);
   const effectiveValue = filterValue(column, value, dateParts);
+
+  useLayoutEffect(() => {
+    drag.clampPosition();
+  }, [drag.clampPosition]);
 
   useEffect(() => {
     const tableWrap = tableWrapRef.current;
@@ -374,6 +663,7 @@ function ColumnFilterPopover({
         column={column}
         value={value}
         dateParts={dateParts}
+        options={options}
         onValueChange={setValue}
         onDatePartsChange={setDateParts}
       />
@@ -389,15 +679,28 @@ function FilterControl({
   column,
   value,
   dateParts,
+  options,
   onValueChange,
   onDatePartsChange,
 }: Readonly<{
   column: ColumnDefinition;
   value: string;
   dateParts: DateParts;
+  options: readonly FilterOption[];
   onValueChange: (value: string) => void;
   onDatePartsChange: (parts: DateParts) => void;
 }>) {
+  if (options.length > 0) {
+    return (
+      <select value={value} onChange={(event) => onValueChange(event.target.value)} aria-label={column.label}>
+        <option value="">すべて</option>
+        {options.map((option) => (
+          <option key={`${column.key}-${option.value}`} value={String(option.value)}>{option.label}</option>
+        ))}
+      </select>
+    );
+  }
+
   if (column.kind === 'date' || column.kind === 'datetime') {
     return (
       <div className="dateFilterFields">
@@ -422,13 +725,13 @@ function FilterControl({
 
   return (
     <label>
-      <span>{column.label}</span>
       <input
         type={column.kind === 'integer' || column.kind === 'money' ? 'number' : 'search'}
         inputMode={column.kind === 'integer' || column.kind === 'money' ? 'numeric' : undefined}
         step="1"
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
+        aria-label={column.label}
         placeholder="条件"
       />
     </label>
@@ -450,7 +753,6 @@ function NumberField({
 }>) {
   return (
     <label className="numberFilterField">
-      <span>{label}</span>
       <input
         type="number"
         inputMode="numeric"
@@ -458,6 +760,7 @@ function NumberField({
         max={max}
         step="1"
         value={value}
+        aria-label={label}
         onChange={(event) => onChange(clampNumber(Number(event.target.value), min, max))}
       />
     </label>
@@ -466,6 +769,20 @@ function NumberField({
 
 function filterName(columnKey: string): string {
   return `${filterPrefix}${columnKey}`;
+}
+
+function columnFilterOptions(column: ColumnDefinition, filterOptions: LedgerFormOptions): readonly FilterOption[] {
+  if (!column.optionsKey) return [];
+  if (column.optionsKey === 'deleted') {
+    return [
+      { value: 'false', label: '未削除' },
+      { value: 'true', label: '削除済' },
+    ];
+  }
+  return filterOptions[column.optionsKey].map((option) => ({
+    value: option.label,
+    label: option.label,
+  }));
 }
 
 function useDraggablePopup(bounds: () => DOMRect | null = () => null) {
@@ -604,6 +921,17 @@ function visibleTableBodyBounds(tableWrap: HTMLDivElement | null): DOMRect | nul
   const left = Math.max(rect.left, 0);
   const right = Math.min(rect.right, window.innerWidth);
   const top = Math.max(rect.top + headerHeight, 0);
+  const bottom = Math.min(rect.bottom, window.innerHeight);
+  if (right - left <= 0 || bottom - top <= 0) return null;
+  return new DOMRect(left, top, right - left, bottom - top);
+}
+
+function visibleTableBounds(tableWrap: HTMLDivElement | null): DOMRect | null {
+  if (!tableWrap) return null;
+  const rect = tableWrap.getBoundingClientRect();
+  const left = Math.max(rect.left, 0);
+  const right = Math.min(rect.right, window.innerWidth);
+  const top = Math.max(rect.top, 0);
   const bottom = Math.min(rect.bottom, window.innerHeight);
   if (right - left <= 0 || bottom - top <= 0) return null;
   return new DOMRect(left, top, right - left, bottom - top);

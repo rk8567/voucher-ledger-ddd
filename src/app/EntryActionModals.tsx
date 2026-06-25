@@ -263,8 +263,10 @@ function PersistedEntryForm({
 const DraftValueContext = createContext<DraftValues>({});
 const FormOptionsContext = createContext<LedgerFormOptions>({
   branches: [],
+  entryTypes: [],
   employees: [],
   transactionCategories: [],
+  redVoucherStatuses: [],
   companies: [],
   departments: [],
 });

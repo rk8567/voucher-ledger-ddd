@@ -50,8 +50,10 @@ export type LedgerSelectOption = Readonly<{
 
 export type LedgerFormOptions = Readonly<{
   branches: readonly LedgerSelectOption[];
+  entryTypes: readonly LedgerSelectOption[];
   employees: readonly LedgerSelectOption[];
   transactionCategories: readonly LedgerSelectOption[];
+  redVoucherStatuses: readonly LedgerSelectOption[];
   companies: readonly LedgerSelectOption[];
   departments: readonly LedgerSelectOption[];
 }>;
@@ -179,8 +181,10 @@ async function getLedgerFormOptions(): Promise<LedgerFormOptions> {
   const pgPool = await getPgPool();
   const [
     branches,
+    entryTypes,
     employees,
     transactionCategories,
+    redVoucherStatuses,
     companies,
     departments,
   ] = await Promise.all([
@@ -189,6 +193,11 @@ async function getLedgerFormOptions(): Promise<LedgerFormOptions> {
         FROM branches
        WHERE active = true
        ORDER BY branch_code
+    `),
+    pgPool.query<{ value: number; label: string }>(`
+      SELECT code AS value, name_japanese AS label
+        FROM entry_types
+       ORDER BY code
     `),
     pgPool.query<{ value: number; label: string }>(`
       SELECT employee_no AS value, employee_name AS label
@@ -200,6 +209,11 @@ async function getLedgerFormOptions(): Promise<LedgerFormOptions> {
       SELECT code AS value, name_japanese AS label
         FROM transaction_categories
        WHERE selectable = true
+       ORDER BY code
+    `),
+    pgPool.query<{ value: number; label: string }>(`
+      SELECT code AS value, name_japanese AS label
+        FROM red_voucher_statuses
        ORDER BY code
     `),
     pgPool.query<{ value: number; label: string }>(`
@@ -217,8 +231,10 @@ async function getLedgerFormOptions(): Promise<LedgerFormOptions> {
 
   return {
     branches: branches.rows.map(optionFromRow),
+    entryTypes: entryTypes.rows.map(optionFromRow),
     employees: employees.rows.map(optionFromRow),
     transactionCategories: transactionCategories.rows.map(optionFromRow),
+    redVoucherStatuses: redVoucherStatuses.rows.map(optionFromRow),
     companies: companies.rows.map(optionFromRow),
     departments: departments.rows.map(optionFromRow),
   };
