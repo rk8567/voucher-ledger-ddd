@@ -9,7 +9,16 @@
     "test:postgres": "node tests/postgres-read-model.test.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "migrate": "tsx scripts/migrate/migrate.ts"
+    "migrate": "tsx scripts/migrate/migrate.ts",
+    "docker:up": "docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml up -d --build db app",
+    "docker:down": "docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml down",
+    "docker:schema": "docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate schema",
+    "docker:import": "docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate all --branches filemaker/exports/M拠点L.htm --entry-types filemaker/exports/M入出区分.htm --transaction-categories filemaker/exports/M出納区分.htm --red-voucher-statuses filemaker/exports/M_赤伝票.htm --employees filemaker/exports/L_M社員.htm --ledger filemaker/exports/L_T金券管理台帳.htm",
+    "ops:status": "node scripts/ops/docker-ops.mjs status",
+    "ops:backup": "node scripts/ops/docker-ops.mjs backup",
+    "ops:failed-backup": "node scripts/ops/docker-ops.mjs failed-backup",
+    "ops:verify-backup": "node scripts/ops/docker-ops.mjs verify-backup",
+    "ops:restore": "node scripts/ops/docker-ops.mjs restore"
   },
   "dependencies": {
     "next": "^16.2.9",
