@@ -1,5 +1,6 @@
 import type { QuantityInput, QuantitySnapshot } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
+import type { RedVoucherStatusCode } from '@/domain/redVoucherStatuses';
 
 export type ActorContext = Readonly<{
   employeeNo?: number | null;
@@ -102,7 +103,7 @@ export type DraftLedgerEntryInput = Readonly<{
   remarks?: string | null;
   otherAmountYen: number;
   otherAmountNote?: string | null;
-  redVoucherStatusCode?: 0 | 1 | 2 | 3 | null;
+  redVoucherStatusCode?: RedVoucherStatusCode | null;
   originalLedgerNo?: number | null;
   reversalLedgerNo?: number | null;
   correctionLedgerNo?: number | null;

@@ -12,6 +12,7 @@ import type {
 import type { DraftLedgerEntryInput } from '@/application/dto';
 import { DENOMINATIONS, type QuantitySnapshot, stampAmountYen } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
+import { RedVoucherStatus, redVoucherStatusCodeOf } from '@/domain/redVoucherStatuses';
 
 function numberOf(value: unknown): number {
   if (typeof value === 'number') return value;
@@ -79,7 +80,7 @@ function mapEntry(row: Record<string, unknown>): LedgerEntryRecord {
     remarks: nullableStringOf(row.remarks),
     otherAmountYen: numberOf(row.other_amount),
     otherAmountNote: nullableStringOf(row.other_amount_note),
-    redVoucherStatusCode: numberOf(row.red_voucher_status_code) as 0 | 1 | 2 | 3,
+    redVoucherStatusCode: redVoucherStatusCodeOf(numberOf(row.red_voucher_status_code)),
     redVoucherStatusName: nullableStringOf(row.red_voucher_status_name),
     originalLedgerNo: nullableNumberOf(row.original_ledger_no),
     reversalLedgerNo: nullableNumberOf(row.reversal_ledger_no),
@@ -203,6 +204,18 @@ function normalizeDateFilter(value: string): string {
   return value.trim().replaceAll('/', '-');
 }
 
+function numberFilterBounds(columnKey: string): { min?: number; max?: number } {
+  if (columnKey === 'periodMonth') return { min: 1, max: 12 };
+  return { min: 0 };
+}
+
+function numberFilterInBounds(columnKey: string, value: number): boolean {
+  const bounds = numberFilterBounds(columnKey);
+  if (bounds.min != null && value < bounds.min) return false;
+  if (bounds.max != null && value > bounds.max) return false;
+  return true;
+}
+
 export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -314,7 +327,7 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
         input.remarks ?? null,
         input.otherAmountYen,
         input.otherAmountNote ?? null,
-        input.redVoucherStatusCode ?? 0,
+        input.redVoucherStatusCode ?? RedVoucherStatus.Normal,
         input.originalLedgerNo ?? null,
         input.reversalLedgerNo ?? null,
         input.correctionLedgerNo ?? null,
@@ -402,13 +415,13 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
   ): Promise<void> {
     const result = await this.db.query(
       `UPDATE voucher_ledger_entries
-          SET red_voucher_status_code = 1,
+          SET red_voucher_status_code = $4,
               reversal_ledger_no = $2,
               updated_by_employee_no = $3
         WHERE ledger_no = $1
           AND posted_at IS NOT NULL
           AND is_deleted = false`,
-      [originalLedgerNo, reversalLedgerNo, actorEmployeeNo ?? null],
+      [originalLedgerNo, reversalLedgerNo, actorEmployeeNo ?? null, RedVoucherStatus.Original],
     );
 
     if (result.rowCount !== 1) {
@@ -469,7 +482,7 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
       if (!filterColumn || !trimmed) continue;
       if (filterColumn.kind === 'number') {
         const numericValue = Number(trimmed);
-        where.push(Number.isFinite(numericValue) && Number.isInteger(numericValue)
+        where.push(Number.isFinite(numericValue) && Number.isInteger(numericValue) && numberFilterInBounds(key, numericValue)
           ? `${filterColumn.expression} = ${add(numericValue)}`
           : 'false');
         continue;

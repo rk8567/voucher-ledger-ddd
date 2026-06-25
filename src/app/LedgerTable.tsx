@@ -723,11 +723,14 @@ function FilterControl({
     );
   }
 
+  const numericBounds = numericFilterBounds(column);
   return (
     <label>
       <input
         type={column.kind === 'integer' || column.kind === 'money' ? 'number' : 'search'}
         inputMode={column.kind === 'integer' || column.kind === 'money' ? 'numeric' : undefined}
+        min={numericBounds.min}
+        max={numericBounds.max}
         step="1"
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
@@ -736,6 +739,11 @@ function FilterControl({
       />
     </label>
   );
+}
+
+function numericFilterBounds(column: ColumnDefinition): { min?: number; max?: number } {
+  if (column.kind !== 'integer' && column.kind !== 'money') return {};
+  return { min: 0 };
 }
 
 function NumberField({

@@ -5,6 +5,7 @@ import { Balance } from '@/domain/balance';
 import { DomainError } from '@/domain/errors';
 import { isMovementEntryType, reverseMovementEntryType } from '@/domain/entryTypes';
 import { assertCanPost } from '@/domain/ledgerPolicies';
+import { RedVoucherStatus } from '@/domain/redVoucherStatuses';
 
 export class IssueRedVoucherCorrectionUseCase {
   constructor(private readonly uow: UnitOfWork) {}
@@ -23,7 +24,7 @@ export class IssueRedVoucherCorrectionUseCase {
         });
       }
 
-      if (original.redVoucherStatusCode !== 0 || original.reversalLedgerNo !== null) {
+      if (original.redVoucherStatusCode !== RedVoucherStatus.Normal || original.reversalLedgerNo !== null) {
         throw new DomainError('LEDGER_ENTRY_ALREADY_CORRECTED', 'この伝票は既に赤伝票処理済みです', { ledgerNo: original.ledgerNo });
       }
 
@@ -53,7 +54,7 @@ export class IssueRedVoucherCorrectionUseCase {
         remarks: command.reversalRemarks ?? original.remarks,
         otherAmountYen: original.otherAmountYen,
         otherAmountNote: original.otherAmountNote,
-        redVoucherStatusCode: 2,
+        redVoucherStatusCode: RedVoucherStatus.Reversal,
         originalLedgerNo: original.ledgerNo,
         actorEmployeeNo,
       });
@@ -134,7 +135,7 @@ export class IssueRedVoucherCorrectionUseCase {
       remarks: input.remarks,
       otherAmountYen: balance.otherAmountYen,
       otherAmountNote: input.otherAmountNote,
-      redVoucherStatusCode: 3,
+      redVoucherStatusCode: RedVoucherStatus.Correction,
       originalLedgerNo,
       actorEmployeeNo,
     });

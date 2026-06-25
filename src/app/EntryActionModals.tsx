@@ -4,6 +4,7 @@ import { createContext, useActionState, useContext, useEffect, useMemo, useRef, 
 
 import { DENOMINATIONS } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
+import { RedVoucherStatus, type RedVoucherStatusCode } from '@/domain/redVoucherStatuses';
 import type { LedgerFormOptions, LedgerSelectOption } from '@/server/ledger';
 import {
   issueRedVoucherCorrectionAction,
@@ -47,7 +48,7 @@ type CorrectionSelectedEntry = Readonly<{
   remarks: string | null;
   otherAmountYen: number;
   otherAmountNote: string | null;
-  redVoucherStatusCode: 0 | 1 | 2 | 3;
+  redVoucherStatusCode: RedVoucherStatusCode;
   reversalLedgerNo: number | null;
   isDeleted: boolean;
   quantities: Readonly<Record<number, number>>;
@@ -572,7 +573,7 @@ function baseInitialValues(props: EntryActionModalsProps): DraftValues {
 
 function canCorrect(entry: CorrectionSelectedEntry): boolean {
   return !entry.isDeleted
-    && entry.redVoucherStatusCode === 0
+    && entry.redVoucherStatusCode === RedVoucherStatus.Normal
     && entry.reversalLedgerNo === null
     && [
       EntryTypeCode.Incoming,

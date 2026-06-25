@@ -1,5 +1,6 @@
 import type { QuantitySnapshot } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
+import type { RedVoucherStatusCode } from '@/domain/redVoucherStatuses';
 import type { DraftLedgerEntryInput } from '@/application/dto';
 
 export type BranchRecord = Readonly<{
@@ -35,7 +36,7 @@ export type LedgerEntryRecord = Readonly<{
   remarks: string | null;
   otherAmountYen: number;
   otherAmountNote: string | null;
-  redVoucherStatusCode: 0 | 1 | 2 | 3;
+  redVoucherStatusCode: RedVoucherStatusCode;
   redVoucherStatusName: string | null;
   originalLedgerNo: number | null;
   reversalLedgerNo: number | null;

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { DENOMINATIONS, quantityOf, stampQuantityCount } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
+import { RedVoucherStatus, type RedVoucherStatusCode } from '@/domain/redVoucherStatuses';
 import { getLedgerDashboardData, type LedgerSearchInput } from '@/server/ledger';
 import { EntryActionModals } from './EntryActionModals';
 import { LedgerTable } from './LedgerTable';
@@ -647,13 +648,13 @@ function unsortHref(params: Record<string, string | string[] | undefined>): stri
   return query ? `/?${query}` : '/';
 }
 
-function redVoucherText(code: 0 | 1 | 2 | 3): string {
+function redVoucherText(code: RedVoucherStatusCode): string {
   switch (code) {
-    case 1:
+    case RedVoucherStatus.Original:
       return '元伝票';
-    case 2:
+    case RedVoucherStatus.Reversal:
       return '赤伝票';
-    case 3:
+    case RedVoucherStatus.Correction:
       return '訂正伝票';
     default:
       return '通常';
