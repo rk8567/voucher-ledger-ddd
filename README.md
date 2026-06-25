@@ -9,12 +9,13 @@ The web UI supports ledger search/detail, CSV export, new movement registration,
 ## Current Scope
 
 - Next.js owns both frontend and backend execution.
-- PostgreSQL stores source-of-truth ledger/master data and deterministic balance views.
+- PostgreSQL stores source-of-truth ledger data, imported master snapshots, and deterministic balance views.
 - FileMaker DDR XML files document legacy schema/scripts.
 - FileMaker HTML exports under `filemaker/exports/` are the supported migration input.
 - CSV import support has been removed; CSV is only an application export format.
 - A separate REST API is intentionally not part of the current architecture.
 - Legacy carry rows (`前葉より繰越`, `次葉へ繰越`) are preserved as history/display rows only; the new app does not actively generate period-close/open carry records.
+- Master data is imported from upstream/FileMaker exports for ledger selection and validation; the app does not maintain branches, employees, companies, departments, or code tables directly.
 
 ## Structure
 
