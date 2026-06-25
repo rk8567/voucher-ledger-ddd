@@ -3,6 +3,7 @@ import type { LedgerSearchInput } from '@/server/ledger';
 import { ledgerSortableKeys } from './ledgerColumns';
 
 type SearchParamValue = string | string[] | undefined;
+type QueryParamInput = Record<string, SearchParamValue>;
 export type TableSortKey = NonNullable<LedgerSearchInput['sortKey']>;
 export type SortDirection = NonNullable<LedgerSearchInput['sortDirection']>;
 
@@ -57,6 +58,24 @@ export function columnFiltersParam(params: Record<string, SearchParamValue>): Re
     if (filterValue) filters[key.slice('filter_'.length)] = filterValue;
   }
   return filters;
+}
+
+export function paramsWithout(
+  params: QueryParamInput,
+  options: Readonly<{
+    keys?: readonly string[];
+    prefixes?: readonly string[];
+  }>,
+): URLSearchParams {
+  const omittedKeys = new Set(options.keys ?? []);
+  const omittedPrefixes = options.prefixes ?? [];
+  const next = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (omittedKeys.has(key) || omittedPrefixes.some((prefix) => key.startsWith(prefix))) continue;
+    const first = firstParam(value);
+    if (first) next.set(key, first);
+  }
+  return next;
 }
 
 export function urlParam(params: URLSearchParams, key: string): string | undefined {

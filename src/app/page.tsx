@@ -6,7 +6,7 @@ import { getLedgerDashboardData } from '@/server/ledger';
 import { EntryActionModals } from './EntryActionModals';
 import { LedgerTable } from './LedgerTable';
 import { dateOnly, dateTime, yen } from './ledgerDisplayFormat';
-import { firstParam, parseLedgerSearchParams } from './ledgerSearchParams';
+import { firstParam, paramsWithout, parseLedgerSearchParams } from './ledgerSearchParams';
 import { ReturnTopButton } from './ReturnTopButton';
 
 export const dynamic = 'force-dynamic';
@@ -417,112 +417,36 @@ function paginationItems(currentPage: number, totalPages: number): (number | 'el
 }
 
 function pageHref(params: Record<string, string | string[] | undefined>, page: number): string {
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (
-      key === 'ledgerNo'
-      || key === 'q'
-      || key === 'cursorLedgerNo'
-      || key === 'cursorStack'
-      || key === 'page'
-      || key === 'actionMessage'
-      || key === 'clearDraft'
-    ) {
-      continue;
-    }
-    const first = firstParam(value);
-    if (first) next.set(key, first);
-  }
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'q', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'] });
   if (page > 1) next.set('page', String(page));
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }
 
 function clearFiltersHref(params: Record<string, string | string[] | undefined>): string {
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (
-      key.startsWith('filter_')
-      || key === 'q'
-      || key === 'ledgerNo'
-      || key === 'cursorLedgerNo'
-      || key === 'cursorStack'
-      || key === 'page'
-      || key === 'actionMessage'
-      || key === 'clearDraft'
-    ) {
-      continue;
-    }
-    const first = firstParam(value);
-    if (first) next.set(key, first);
-  }
+  const next = paramsWithout(params, {
+    keys: ['q', 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'],
+    prefixes: ['filter_'],
+  });
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }
 
 function exportCsvHref(params: Record<string, string | string[] | undefined>): string {
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (
-      key === 'ledgerNo'
-      || key === 'q'
-      || key === 'cursorLedgerNo'
-      || key === 'cursorStack'
-      || key === 'page'
-      || key === 'actionMessage'
-      || key === 'clearDraft'
-    ) {
-      continue;
-    }
-    const first = firstParam(value);
-    if (first) next.set(key, first);
-  }
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'q', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/export/ledger?${query}` : '/export/ledger';
 }
 
 function deletedToggleHref(params: Record<string, string | string[] | undefined>, includeDeleted: boolean): string {
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (
-      key === 'ledgerNo'
-      || key === 'q'
-      || key === 'cursorLedgerNo'
-      || key === 'cursorStack'
-      || key === 'page'
-      || key === 'includeDeleted'
-      || key === 'actionMessage'
-      || key === 'clearDraft'
-    ) {
-      continue;
-    }
-    const first = firstParam(value);
-    if (first) next.set(key, first);
-  }
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'q', 'cursorLedgerNo', 'cursorStack', 'page', 'includeDeleted', 'actionMessage', 'clearDraft'] });
   if (!includeDeleted) next.set('includeDeleted', '1');
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }
 
 function unsortHref(params: Record<string, string | string[] | undefined>): string {
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (
-      key === 'ledgerNo'
-      || key === 'q'
-      || key === 'cursorLedgerNo'
-      || key === 'cursorStack'
-      || key === 'page'
-      || key === 'sort'
-      || key === 'dir'
-      || key === 'actionMessage'
-      || key === 'clearDraft'
-    ) {
-      continue;
-    }
-    const first = firstParam(value);
-    if (first) next.set(key, first);
-  }
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'q', 'cursorLedgerNo', 'cursorStack', 'page', 'sort', 'dir', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }

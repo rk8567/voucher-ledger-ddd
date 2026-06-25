@@ -10,6 +10,7 @@ import { openEntryWorkflowEvent } from './entryWorkflowEvents';
 import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from './ledgerColumns';
 import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
 import { delimitedText, htmlTable, tokyoTimestampForFileName } from './ledgerExportFormat';
+import { paramsWithout } from './ledgerSearchParams';
 
 type LedgerTableProps = Readonly<{
   entries: LedgerEntryListRecord['items'];
@@ -911,31 +912,19 @@ function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string
 }
 
 function queryHref(params: Record<string, string>, ledgerNo: number): string {
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (['ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft'].includes(key)) continue;
-    if (value) next.set(key, value);
-  }
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'cursorLedgerNo', 'cursorStack', 'actionMessage', 'clearDraft'] });
   next.set('ledgerNo', String(ledgerNo));
   return `/?${next.toString()}`;
 }
 
 function clearFilterHref(params: Record<string, string>, columnKey: string): string {
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if ([filterName(columnKey), 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'].includes(key)) continue;
-    if (value) next.set(key, value);
-  }
+  const next = paramsWithout(params, { keys: [filterName(columnKey), 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }
 
 function applyFilterHref(params: Record<string, string>, columnKey: string, value: string): string {
-  const next = new URLSearchParams();
-  for (const [key, paramValue] of Object.entries(params)) {
-    if ([filterName(columnKey), 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'].includes(key)) continue;
-    if (paramValue) next.set(key, paramValue);
-  }
+  const next = paramsWithout(params, { keys: [filterName(columnKey), 'ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'actionMessage', 'clearDraft'] });
   if (value.trim()) next.set(filterName(columnKey), value.trim());
   const query = next.toString();
   return query ? `/?${query}` : '/';
@@ -952,11 +941,7 @@ function nextSortHref(
     : currentSortDirection === 'asc'
       ? 'desc'
       : null;
-  const next = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (['ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'sort', 'dir', 'actionMessage', 'clearDraft'].includes(key)) continue;
-    if (value) next.set(key, value);
-  }
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'cursorLedgerNo', 'cursorStack', 'page', 'sort', 'dir', 'actionMessage', 'clearDraft'] });
   if (nextDirection) {
     next.set('sort', sortKey);
     next.set('dir', nextDirection);
