@@ -69,8 +69,12 @@ async function insertPostedEntry(client, input) {
        daily_sequence,
        entry_type_code,
        description,
-       other_amount
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+       other_amount,
+       red_voucher_status_code,
+       original_ledger_no,
+       reversal_ledger_no,
+       correction_ledger_no
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
      RETURNING id`,
     [
       input.ledgerNo,
@@ -80,6 +84,10 @@ async function insertPostedEntry(client, input) {
       input.entryTypeCode,
       input.description,
       input.otherAmount ?? 0,
+      input.redVoucherStatusCode ?? 0,
+      input.originalLedgerNo ?? null,
+      input.reversalLedgerNo ?? null,
+      input.correctionLedgerNo ?? null,
     ],
   );
 
@@ -399,6 +407,84 @@ test('SQL running totals match independent balance arithmetic', async (t) => {
     ]),
     expectedRows,
   );
+});
+
+test('red-voucher correction running totals cancel original before corrected replacement', async (t) => {
+  const { client } = await setupDatabase(t);
+
+  await client.query(`INSERT INTO branches (branch_code, branch_name) VALUES (1, 'Test branch')`);
+  await insertPostedEntry(client, {
+    ledgerNo: 5,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 0,
+    entryTypeCode: 99,
+    description: 'opening',
+    otherAmount: 1,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 10,
+    branchCode: 1,
+    processingDate: '2026-01-01',
+    dailySequence: 1,
+    entryTypeCode: 2,
+    description: 'original incoming',
+    quantities: { 84: 2 },
+    otherAmount: 100,
+    redVoucherStatusCode: 1,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 20,
+    branchCode: 1,
+    processingDate: '2026-01-02',
+    dailySequence: 1,
+    entryTypeCode: 3,
+    description: 'red voucher reversal',
+    quantities: { 84: 2 },
+    otherAmount: 100,
+    redVoucherStatusCode: 2,
+    originalLedgerNo: 10,
+  });
+  await insertPostedEntry(client, {
+    ledgerNo: 30,
+    branchCode: 1,
+    processingDate: '2026-01-02',
+    dailySequence: 2,
+    entryTypeCode: 2,
+    description: 'corrected incoming',
+    quantities: { 84: 1 },
+    otherAmount: 60,
+    redVoucherStatusCode: 3,
+    originalLedgerNo: 10,
+  });
+  await client.query(
+    `UPDATE voucher_ledger_entries
+        SET reversal_ledger_no = 20,
+            correction_ledger_no = 30
+      WHERE ledger_no = 10`,
+  );
+  await client.query(
+    `UPDATE voucher_ledger_entries
+        SET correction_ledger_no = 30
+      WHERE ledger_no = 20`,
+  );
+
+  const balances = await client.query(
+    `SELECT ledger_no,
+            running_stamp_amount::text,
+            running_other_amount::text,
+            running_total_amount::text
+       FROM voucher_ledger_running_amounts
+      WHERE branch_code = 1
+      ORDER BY processing_date, daily_sequence, ledger_no`,
+  );
+
+  assert.deepEqual(balances.rows, [
+    { ledger_no: '5', running_stamp_amount: '0', running_other_amount: '1', running_total_amount: '1' },
+    { ledger_no: '10', running_stamp_amount: '168', running_other_amount: '101', running_total_amount: '269' },
+    { ledger_no: '20', running_stamp_amount: '0', running_other_amount: '1', running_total_amount: '1' },
+    { ledger_no: '30', running_stamp_amount: '84', running_other_amount: '61', running_total_amount: '145' },
+  ]);
 });
 
 test('carry rows are display-only and duplicate openings are additive', async (t) => {

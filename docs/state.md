@@ -23,7 +23,7 @@ The repository is aligned with the issue direction, with several parts already i
 
 The main remaining gaps are:
 
-- Additional domain/SQL drift guards should be added as new money-path scenarios are implemented.
+- No active P0/P1 remediation item is open in this document.
 
 ## Previous FileMaker System
 
@@ -201,7 +201,7 @@ Current implementation:
 - Running balance order is deterministic by `processing_date`, `daily_sequence`, then `ledger_no`, not FileMaker found-set/sort state.
 - `tests/domain.test.ts` locks the FileMaker denomination mapping and basic balance arithmetic.
 - `tests/domain.test.ts` also locks legacy carry rows as zero-effect, non-postable history rows.
-- `tests/postgres-read-model.test.mjs` includes SQL/domain drift guards for entry total arithmetic and representative running-balance totals.
+- `tests/postgres-read-model.test.mjs` includes SQL/domain drift guards for entry total arithmetic, representative running-balance totals, and red-voucher correction running-total cancellation/replacement.
 - PostgreSQL tests also cover red-voucher status/link integrity and orphan-link rejection.
 
 ### Entry Type Rules
@@ -384,7 +384,7 @@ Production backup, restore, and rollback operations are documented in `README.md
 
 ## Follow-Up Work
 
-- Add new domain/SQL drift guards as new money-path scenarios are implemented.
+- Add new domain/SQL drift guards only when a new money-path scenario is implemented.
 
 Skipped for now:
 
