@@ -324,7 +324,7 @@ Important files:
 - `src/app/LedgerTable.tsx`: table UI, filters, sorting, command toolbar, and export window.
 - `src/app/ledgerColumns.ts`: shared table/export column metadata.
 - `src/app/ledgerSearchParams.ts`: shared ledger search/export query parsing.
-- `src/app/ledgerExportFormat.ts`: shared CSV/HTML export formatting helpers.
+- `src/app/ledgerExportFormat.ts`: shared CSV/TSV/HTML export formatting helpers.
 - `src/app/EntryActionModals.tsx`: new record and inventory-check popups.
 
 ### Current UI Behavior
@@ -380,7 +380,7 @@ Production backup, restore, and rollback operations are documented in `README.md
 - Keep domain and application code independent from Next.js.
 - Keep database import as CLI/admin operation, not user-facing workflow.
 - Keep master data as imported/read-only workflow data owned by upstream systems.
-- Keep CSV as export only.
+- Keep CSV/TSV/HTML as export-only output formats.
 - Keep REST API out of scope unless an external integration appears.
 - Use tRPC only later if client-heavy interaction needs typed query/mutation hooks.
 - Treat generated legacy placeholders as compatibility data, not active master truth.
