@@ -9,7 +9,7 @@ import type { LedgerFormOptions } from '@/server/ledger';
 import { openEntryWorkflowEvent } from './entryWorkflowEvents';
 import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from './ledgerColumns';
 import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
-import { delimitedText, htmlTable, tokyoTimestampForFileName } from './ledgerExportFormat';
+import { delimitedText, htmlTable, tokyoTimestampForFileName, type LedgerExportFormat } from './ledgerExportFormat';
 import { booleanParam, firstParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
 
 type LedgerTableProps = Readonly<{
@@ -39,7 +39,6 @@ type FilterOption = Readonly<{
   label: string;
 }>;
 
-type SaveFormat = 'csv-comma' | 'csv-tab' | 'html';
 type FilePickerAcceptType = Readonly<{
   description: string;
   accept: Record<string, readonly string[]>;
@@ -363,7 +362,7 @@ function ExportWindow({
   onSetColumns: (keys: readonly string[]) => void;
   onClose: () => void;
 }>) {
-  const [saveFormat, setSaveFormat] = useState<SaveFormat>('csv-comma');
+  const [saveFormat, setSaveFormat] = useState<LedgerExportFormat>('csv-comma');
 
   return (
     <div className="modalBackdrop exportBackdrop" role="presentation">
@@ -393,7 +392,7 @@ function ExportWindow({
           <div className="exportSaveMenu">
             <label>
               <span>保存形式</span>
-              <select value={saveFormat} onChange={(event) => setSaveFormat(event.target.value as SaveFormat)}>
+              <select value={saveFormat} onChange={(event) => setSaveFormat(event.target.value as LedgerExportFormat)}>
                 <option value="csv-comma">.csv カンマ区切り</option>
                 <option value="csv-tab">.tsv タブ区切り</option>
                 <option value="html">.html</option>
@@ -410,7 +409,7 @@ function ExportWindow({
   );
 }
 
-function exportFormatHref(exportHref: string, format: 'csv-comma' | 'csv-tab' | 'html', selectedColumnKeys: readonly string[]): string {
+function exportFormatHref(exportHref: string, format: LedgerExportFormat, selectedColumnKeys: readonly string[]): string {
   const url = new URL(exportHref, 'http://local');
   url.searchParams.set('format', format);
   url.searchParams.set('columns', selectedColumnKeys.join(','));
@@ -437,7 +436,7 @@ function unsortHref(params: Record<string, string | string[] | undefined>): stri
   return query ? `/?${query}` : '/';
 }
 
-function saveCurrentTable(entries: LedgerEntryListRecord['items'], visibleColumnKeys: readonly string[], format: SaveFormat) {
+function saveCurrentTable(entries: LedgerEntryListRecord['items'], visibleColumnKeys: readonly string[], format: LedgerExportFormat) {
   const visibleColumns = columns.filter((column) => visibleColumnKeys.includes(column.key));
   const header = visibleColumns.map((column) => column.label);
   const rows = entries.map((entry) => visibleColumns.map((column) => displayCell(entry, column)));
@@ -448,14 +447,14 @@ function saveCurrentTable(entries: LedgerEntryListRecord['items'], visibleColumn
   void saveBlob(blob, `voucher-ledger-table-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`, format);
 }
 
-async function saveSearchResults(exportHref: string, selectedColumnKeys: readonly string[], format: SaveFormat) {
+async function saveSearchResults(exportHref: string, selectedColumnKeys: readonly string[], format: LedgerExportFormat) {
   const response = await fetch(exportFormatHref(exportHref, format, selectedColumnKeys), { cache: 'no-store' });
   if (!response.ok) throw new Error('Export failed');
   const blob = await response.blob();
   await saveBlob(blob, `voucher-ledger-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`, format);
 }
 
-async function saveBlob(blob: Blob, suggestedName: string, format: SaveFormat) {
+async function saveBlob(blob: Blob, suggestedName: string, format: LedgerExportFormat) {
   const nativeWindow = window as NativeSaveWindow;
   if (nativeWindow.showSaveFilePicker) {
     try {
@@ -486,17 +485,17 @@ function downloadBlob(blob: Blob, suggestedName: string) {
   URL.revokeObjectURL(href);
 }
 
-function extensionForFormat(format: SaveFormat): 'csv' | 'tsv' | 'html' {
+function extensionForFormat(format: LedgerExportFormat): 'csv' | 'tsv' | 'html' {
   if (format === 'html') return 'html';
   return format === 'csv-tab' ? 'tsv' : 'csv';
 }
 
-function mimeTypeForFormat(format: SaveFormat): string {
+function mimeTypeForFormat(format: LedgerExportFormat): string {
   if (format === 'html') return 'text/html;charset=utf-8';
   return `${format === 'csv-tab' ? 'text/tab-separated-values' : 'text/csv'};charset=utf-8`;
 }
 
-function filePickerTypeForFormat(format: SaveFormat): FilePickerAcceptType {
+function filePickerTypeForFormat(format: LedgerExportFormat): FilePickerAcceptType {
   if (format === 'html') {
     return { description: 'HTML', accept: { 'text/html': ['.html'] } };
   }

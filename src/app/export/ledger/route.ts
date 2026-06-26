@@ -1,14 +1,13 @@
 import { getLedgerExportEntries } from '@/server/ledger';
 import type { LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
 import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from '@/app/ledgerColumns';
-import { dateOnly, dateTime, delimitedText, htmlTable, tokyoTimestampForFileName } from '@/app/ledgerExportFormat';
+import { dateOnly, dateTime, delimitedText, htmlTable, tokyoTimestampForFileName, type LedgerExportFormat } from '@/app/ledgerExportFormat';
 import { parseLedgerExportSearchParams, urlParam } from '@/app/ledgerSearchParams';
 
-type ExportFormat = 'csv-comma' | 'csv-tab' | 'html';
 type ExportColumn = LedgerColumnDefinition;
 const defaultExportColumnKeys = new Set(defaultLedgerColumnKeys.map(String));
 
-function exportFormatParam(params: URLSearchParams): ExportFormat {
+function exportFormatParam(params: URLSearchParams): LedgerExportFormat {
   const raw = urlParam(params, 'format');
   return raw === 'csv-tab' || raw === 'html' ? raw : 'csv-comma';
 }

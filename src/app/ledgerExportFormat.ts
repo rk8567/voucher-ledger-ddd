@@ -1,4 +1,5 @@
 export type ExportCell = string | number | boolean | null | undefined;
+export type LedgerExportFormat = 'csv-comma' | 'csv-tab' | 'html';
 
 export function csvCell(value: ExportCell): string {
   if (value == null) return '';
@@ -83,4 +84,3 @@ export function tokyoTimestampForFileName(): string {
   const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${byType.year}${byType.month}${byType.day}-${byType.hour}${byType.minute}`;
 }
-
