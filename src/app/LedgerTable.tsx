@@ -10,19 +10,12 @@ import { openEntryWorkflowEvent } from './entryWorkflowEvents';
 import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from './ledgerColumns';
 import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
 import { delimitedText, htmlTable, tokyoTimestampForFileName } from './ledgerExportFormat';
-import { paramsWithout } from './ledgerSearchParams';
+import { booleanParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
 
 type LedgerTableProps = Readonly<{
   entries: LedgerEntryListRecord['items'];
   selectedLedgerNo: number | null;
   params: Record<string, string>;
-  currentSortKey: string;
-  currentSortDirection: 'asc' | 'desc';
-  exportHref: string;
-  showAllHref: string;
-  includeDeleted: boolean;
-  deletedToggleHref: string;
-  unsortHref: string;
   filterOptions: LedgerFormOptions;
 }>;
 
@@ -78,13 +71,6 @@ export function LedgerTable({
   entries,
   selectedLedgerNo,
   params,
-  currentSortKey,
-  currentSortDirection,
-  exportHref,
-  showAllHref,
-  includeDeleted,
-  deletedToggleHref,
-  unsortHref,
   filterOptions,
 }: LedgerTableProps) {
   const [openColumnKey, setOpenColumnKey] = useState<string | null>(null);
@@ -202,6 +188,10 @@ export function LedgerTable({
 
   const canScrollLeft = scrollLeft > 2;
   const canScrollRight = maxScrollLeft - scrollLeft > 2;
+  const currentSortKey = sortKeyParam(params.sort) ?? '';
+  const currentSortDirection = sortDirectionParam(params.dir) ?? 'asc';
+  const includeDeleted = booleanParam(params.includeDeleted);
+  const exportHref = ledgerExportHref(params);
 
   function openWorkflow(workflow: 'movement' | 'inventory') {
     setOpenColumnKey(null);
@@ -221,13 +211,13 @@ export function LedgerTable({
       <div className="tableTools">
         <div className="tableCommandTools" aria-label="FileMaker commands">
           <button type="button" className="toolbarButton" onClick={openExportWindow}>出力</button>
-          <a className="toolbarButton" href={showAllHref}>全件表示</a>
-          <a className={includeDeleted ? 'toolbarButton activeToggle' : 'toolbarButton'} href={deletedToggleHref}>
+          <a className="toolbarButton" href="/">全件表示</a>
+          <a className={includeDeleted ? 'toolbarButton activeToggle' : 'toolbarButton'} href={deletedToggleHref(params, includeDeleted)}>
             {includeDeleted ? '削除も表示' : '削除を表示'}
           </a>
           <button type="button" className="toolbarButton" onClick={() => openWorkflow('movement')}>新規レコード</button>
           <button type="button" className="toolbarButton" onClick={() => openWorkflow('inventory')}>現在高チェック</button>
-          <a className="toolbarButton" href={unsortHref}>標準ソート</a>
+          <a className="toolbarButton" href={unsortHref(params)}>標準ソート</a>
         </div>
         <button type="button" className="toolbarButton" onClick={() => setColumnMenuOpen((open) => !open)}>表示列</button>
       </div>
@@ -426,6 +416,25 @@ function exportFormatHref(exportHref: string, format: 'csv-comma' | 'csv-tab' | 
   url.searchParams.set('columns', selectedColumnKeys.join(','));
   const query = url.searchParams.toString();
   return `${url.pathname}${query ? `?${query}` : ''}`;
+}
+
+function ledgerExportHref(params: Record<string, string>): string {
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
+  const query = next.toString();
+  return query ? `/export/ledger?${query}` : '/export/ledger';
+}
+
+function deletedToggleHref(params: Record<string, string>, includeDeleted: boolean): string {
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'includeDeleted', 'actionMessage', 'clearDraft'] });
+  if (!includeDeleted) next.set('includeDeleted', '1');
+  const query = next.toString();
+  return query ? `/?${query}` : '/';
+}
+
+function unsortHref(params: Record<string, string>): string {
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'sort', 'dir', 'actionMessage', 'clearDraft'] });
+  const query = next.toString();
+  return query ? `/?${query}` : '/';
 }
 
 function saveCurrentTable(entries: LedgerEntryListRecord['items'], visibleColumnKeys: readonly string[], format: SaveFormat) {

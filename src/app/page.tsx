@@ -58,9 +58,6 @@ export default async function Page({ searchParams }: PageProps) {
     const clearDraft = firstParam(params.clearDraft);
     const pageSize = input.limit ?? DEFAULT_PAGE_SIZE;
     const currentPage = input.page ?? 1;
-    const currentSortKey = input.sortKey ?? '';
-    const currentSortDirection = input.sortDirection ?? 'asc';
-    const includeDeleted = input.includeDeleted === true;
     const totalPages = Math.max(Math.ceil(data.entries.totalCount / pageSize), 1);
     const previousHref = currentPage > 1 ? pageHref(params, currentPage - 1) : null;
     const nextHref = currentPage < totalPages ? pageHref(params, currentPage + 1) : null;
@@ -109,13 +106,6 @@ export default async function Page({ searchParams }: PageProps) {
               entries={data.entries.items}
               selectedLedgerNo={selected?.ledgerNo ?? null}
               params={plainParams(params)}
-              currentSortKey={currentSortKey}
-              currentSortDirection={currentSortDirection}
-              exportHref={exportCsvHref(params)}
-              showAllHref="/"
-              includeDeleted={includeDeleted}
-              deletedToggleHref={deletedToggleHref(params, includeDeleted)}
-              unsortHref={unsortHref(params)}
               filterOptions={data.formOptions}
             />
             <PaginationControls
@@ -382,10 +372,6 @@ function codeName(code: number | null | undefined, name: string | null | undefin
   return name ? `${code} ${name}` : String(code);
 }
 
-function nameOnly(name: string | null | undefined): string {
-  return name || '-';
-}
-
 function periodText(year: number | null, month: number | null): string {
   if (year == null && month == null) return '-';
   return `${year ?? '-'} / ${month ?? '-'}`;
@@ -419,34 +405,6 @@ function paginationItems(currentPage: number, totalPages: number): (number | 'el
 function pageHref(params: Record<string, string | string[] | undefined>, page: number): string {
   const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
   if (page > 1) next.set('page', String(page));
-  const query = next.toString();
-  return query ? `/?${query}` : '/';
-}
-
-function clearFiltersHref(params: Record<string, string | string[] | undefined>): string {
-  const next = paramsWithout(params, {
-    keys: ['ledgerNo', 'page', 'actionMessage', 'clearDraft'],
-    prefixes: ['filter_'],
-  });
-  const query = next.toString();
-  return query ? `/?${query}` : '/';
-}
-
-function exportCsvHref(params: Record<string, string | string[] | undefined>): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
-  const query = next.toString();
-  return query ? `/export/ledger?${query}` : '/export/ledger';
-}
-
-function deletedToggleHref(params: Record<string, string | string[] | undefined>, includeDeleted: boolean): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'includeDeleted', 'actionMessage', 'clearDraft'] });
-  if (!includeDeleted) next.set('includeDeleted', '1');
-  const query = next.toString();
-  return query ? `/?${query}` : '/';
-}
-
-function unsortHref(params: Record<string, string | string[] | undefined>): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'sort', 'dir', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }
