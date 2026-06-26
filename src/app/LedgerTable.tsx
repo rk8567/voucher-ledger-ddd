@@ -10,12 +10,12 @@ import { openEntryWorkflowEvent } from './entryWorkflowEvents';
 import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from './ledgerColumns';
 import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
 import { delimitedText, htmlTable, tokyoTimestampForFileName } from './ledgerExportFormat';
-import { booleanParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
+import { booleanParam, firstParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
 
 type LedgerTableProps = Readonly<{
   entries: LedgerEntryListRecord['items'];
   selectedLedgerNo: number | null;
-  params: Record<string, string>;
+  params: Record<string, string | string[] | undefined>;
   filterOptions: LedgerFormOptions;
 }>;
 
@@ -262,7 +262,7 @@ export function LedgerTable({
                     <div className="columnHeaderControls">
                       <button
                         type="button"
-                        className={params[filterName(column.key)] ? 'columnTitleButton filteredColumn' : 'columnTitleButton'}
+                        className={firstParam(params[filterName(column.key)]) ? 'columnTitleButton filteredColumn' : 'columnTitleButton'}
                         onClick={() => setOpenColumnKey(openColumnKey === column.key ? null : String(column.key))}
                       >
                         <span>{column.label}</span>
@@ -282,7 +282,7 @@ export function LedgerTable({
                         column={column}
                         params={params}
                         align={index >= visibleColumns.length - 2 ? 'right' : 'left'}
-                        currentFilter={params[filterName(column.key)] ?? ''}
+                        currentFilter={firstParam(params[filterName(column.key)]) ?? ''}
                         onClose={() => setOpenColumnKey(null)}
                         tableWrapRef={tableWrapRef}
                         options={columnFilterOptions(column, filterOptions)}
@@ -418,20 +418,20 @@ function exportFormatHref(exportHref: string, format: 'csv-comma' | 'csv-tab' | 
   return `${url.pathname}${query ? `?${query}` : ''}`;
 }
 
-function ledgerExportHref(params: Record<string, string>): string {
+function ledgerExportHref(params: Record<string, string | string[] | undefined>): string {
   const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/export/ledger?${query}` : '/export/ledger';
 }
 
-function deletedToggleHref(params: Record<string, string>, includeDeleted: boolean): string {
+function deletedToggleHref(params: Record<string, string | string[] | undefined>, includeDeleted: boolean): string {
   const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'includeDeleted', 'actionMessage', 'clearDraft'] });
   if (!includeDeleted) next.set('includeDeleted', '1');
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }
 
-function unsortHref(params: Record<string, string>): string {
+function unsortHref(params: Record<string, string | string[] | undefined>): string {
   const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'sort', 'dir', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/?${query}` : '/';
@@ -516,7 +516,7 @@ function ColumnFilterPopover({
   options,
 }: Readonly<{
   column: ColumnDefinition;
-  params: Record<string, string>;
+  params: Record<string, string | string[] | undefined>;
   align: 'left' | 'right';
   currentFilter: string;
   onClose: () => void;
@@ -920,19 +920,19 @@ function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string
   return column.kind === 'text' ? limitText(text, 10) : text;
 }
 
-function queryHref(params: Record<string, string>, ledgerNo: number): string {
+function queryHref(params: Record<string, string | string[] | undefined>, ledgerNo: number): string {
   const next = paramsWithout(params, { keys: ['ledgerNo', 'actionMessage', 'clearDraft'] });
   next.set('ledgerNo', String(ledgerNo));
   return `/?${next.toString()}`;
 }
 
-function clearFilterHref(params: Record<string, string>, columnKey: string): string {
+function clearFilterHref(params: Record<string, string | string[] | undefined>, columnKey: string): string {
   const next = paramsWithout(params, { keys: [filterName(columnKey), 'ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }
 
-function applyFilterHref(params: Record<string, string>, columnKey: string, value: string): string {
+function applyFilterHref(params: Record<string, string | string[] | undefined>, columnKey: string, value: string): string {
   const next = paramsWithout(params, { keys: [filterName(columnKey), 'ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
   if (value.trim()) next.set(filterName(columnKey), value.trim());
   const query = next.toString();
@@ -940,7 +940,7 @@ function applyFilterHref(params: Record<string, string>, columnKey: string, valu
 }
 
 function nextSortHref(
-  params: Record<string, string>,
+  params: Record<string, string | string[] | undefined>,
   sortKey: string,
   currentSortKey: string,
   currentSortDirection: 'asc' | 'desc',

@@ -33,14 +33,6 @@ function entryTypeName(code: number): string {
   return ENTRY_TYPE_LABELS[code] ?? `入出区分 ${code}`;
 }
 
-function plainParams(params: Record<string, string | string[] | undefined>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(params)
-      .map(([key, value]) => [key, firstParam(value) ?? ''] as const)
-      .filter(([, value]) => value !== ''),
-  );
-}
-
 export default async function Page({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
   const input = parseLedgerSearchParams(params, { pageSizeOptions: PAGE_SIZE_OPTIONS });
@@ -105,7 +97,7 @@ export default async function Page({ searchParams }: PageProps) {
             <LedgerTable
               entries={data.entries.items}
               selectedLedgerNo={selected?.ledgerNo ?? null}
-              params={plainParams(params)}
+              params={params}
               filterOptions={data.formOptions}
             />
             <PaginationControls
