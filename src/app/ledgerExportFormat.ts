@@ -1,3 +1,5 @@
+import { dateOnlyText, exportDateTimeText } from './ledgerDateFormat';
+
 export type ExportCell = string | number | boolean | null | undefined;
 export type LedgerExportFormat = 'csv-comma' | 'csv-tab' | 'html';
 
@@ -59,15 +61,11 @@ export function htmlTable(
 }
 
 export function dateOnly(value: string | null | undefined): string {
-  if (!value) return '';
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  if (match) return `${match[1]}/${match[2]}/${match[3]}`;
-  return value.replaceAll('-', '/');
+  return dateOnlyText(value) ?? '';
 }
 
 export function dateTime(value: ExportCell): string | number | null {
-  if (value == null || typeof value === 'number') return value ?? null;
-  return String(value).replace('T', ' ').replace(/\.\d{3}Z$/, '').replace(/Z$/, '');
+  return exportDateTimeText(value);
 }
 
 export function tokyoTimestampForFileName(): string {
