@@ -105,7 +105,6 @@ export function parseLedgerSearchParams(
     entryTypeCode: entryType == null ? null : (entryType as EntryTypeCode),
     columnFilters: columnFiltersParam(params),
     ledgerNo: positiveNumberParam(params.ledgerNo),
-    limit: null,
     page: positiveNumberParam(params.page),
     sortKey: sortKeyParam(params.sort),
     sortDirection: sortDirectionParam(params.dir),
