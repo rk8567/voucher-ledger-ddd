@@ -18,6 +18,7 @@ import { EntryTypeCode } from '@/domain/entryTypes';
 
 export const LEDGER_DATA_CACHE_TAG = 'ledger-data';
 export const LEDGER_REFERENCE_CACHE_TAG = 'ledger-reference-data';
+export const DEFAULT_LEDGER_PAGE_SIZE = 50;
 
 export type LedgerSearchInput = Readonly<{
   branchCode?: number | null;
@@ -80,7 +81,7 @@ function createQueries(unitOfWork: UnitOfWork) {
 }
 
 export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<LedgerDashboardData> {
-  const limit = input.limit ?? 100;
+  const limit = input.limit ?? DEFAULT_LEDGER_PAGE_SIZE;
   const page = Math.max(input.page ?? 1, 1);
   const filter: LedgerEntryListFilter = {
     ...ledgerFilterFromInput(input),

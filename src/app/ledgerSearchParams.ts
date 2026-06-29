@@ -94,11 +94,8 @@ export function columnFiltersFromUrlParams(params: URLSearchParams): Record<stri
 
 export function parseLedgerSearchParams(
   params: Record<string, SearchParamValue>,
-  options: Readonly<{ pageSizeOptions?: readonly number[] }> = {},
 ): LedgerSearchInput {
   const entryType = numberParam(params.entryTypeCode);
-  const parsedLimit = numberParam(params.limit);
-  const allowedLimit = options.pageSizeOptions?.some((option) => option === parsedLimit) ? parsedLimit : null;
   return {
     branchCode: numberParam(params.branchCode),
     periodYear: numberParam(params.periodYear),
@@ -108,7 +105,7 @@ export function parseLedgerSearchParams(
     entryTypeCode: entryType == null ? null : (entryType as EntryTypeCode),
     columnFilters: columnFiltersParam(params),
     ledgerNo: positiveNumberParam(params.ledgerNo),
-    limit: allowedLimit,
+    limit: null,
     page: positiveNumberParam(params.page),
     sortKey: sortKeyParam(params.sort),
     sortDirection: sortDirectionParam(params.dir),

@@ -1019,13 +1019,6 @@ tr:last-child td {
   text-align: left;
 }
 
-.detailPanel {
-  position: sticky;
-  top: 16px;
-  max-height: calc(100vh - 32px);
-  overflow: auto;
-}
-
 .detailActions {
   display: flex;
   justify-content: stretch;
@@ -1127,11 +1120,6 @@ dd {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .detailPanel {
-    position: static;
-    max-height: none;
-    overflow: visible;
-  }
 }
 
 @media (max-width: 1080px) {

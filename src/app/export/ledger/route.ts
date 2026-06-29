@@ -1,6 +1,7 @@
 import { getLedgerExportEntries } from '@/server/ledger';
 import type { LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
 import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from '@/app/ledgerColumns';
+import { deletionStatusText } from '@/app/ledgerDisplayFormat';
 import { dateOnly, dateTime, delimitedText, htmlTable, tokyoTimestampForFileName, type LedgerExportFormat } from '@/app/ledgerExportFormat';
 import { parseLedgerExportSearchParams, urlParam } from '@/app/ledgerSearchParams';
 
@@ -24,7 +25,7 @@ function exportValue(entry: LedgerEntryRecord, column: ExportColumn): string | n
   const value = entry[column.key as keyof LedgerEntryRecord];
   if (column.kind === 'date') return dateOnly(typeof value === 'string' ? value : null);
   if (column.kind === 'datetime') return dateTime(value);
-  if (column.key === 'isDeleted') return value === true ? 'true' : 'false';
+  if (column.key === 'isDeleted') return deletionStatusText(value === true);
   if (value == null) return null;
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   return value;

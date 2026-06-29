@@ -19,3 +19,11 @@ export function dateTime(value: string | null | undefined): string | null {
 export function limitText(value: string, maxLength: number): string {
   return Array.from(value).slice(0, maxLength).join('');
 }
+
+export function deletionStatusText(value: boolean): string {
+  return value ? '削除済' : '未削除';
+}
+
+export function legacyRegistrationFlagText(value: boolean): string {
+  return value ? '登録済' : '未登録';
+}

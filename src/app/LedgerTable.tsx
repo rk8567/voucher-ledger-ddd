@@ -8,7 +8,7 @@ import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/rep
 import type { LedgerFormOptions } from '@/server/ledger';
 import { openEntryWorkflowEvent } from './entryWorkflowEvents';
 import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from './ledgerColumns';
-import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
+import { dateOnly, deletionStatusText, limitText, yen } from './ledgerDisplayFormat';
 import { delimitedText, htmlTable, tokyoTimestampForFileName, type LedgerExportFormat } from './ledgerExportFormat';
 import { booleanParam, firstParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
 
@@ -913,6 +913,7 @@ function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string
     return typeof value === 'string' ? dateOnly(value) ?? '-' : '-';
   }
   if (column.key === 'otherAmountYen') return yen(Number(value ?? 0));
+  if (column.key === 'isDeleted') return deletionStatusText(Boolean(value));
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (value == null || value === '') return '-';
   const text = String(value);

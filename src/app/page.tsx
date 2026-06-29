@@ -2,10 +2,10 @@ import Link from 'next/link';
 import { DENOMINATIONS, quantityOf, stampQuantityCount } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
 import { RedVoucherStatus, type RedVoucherStatusCode } from '@/domain/redVoucherStatuses';
-import { getLedgerDashboardData } from '@/server/ledger';
+import { DEFAULT_LEDGER_PAGE_SIZE, getLedgerDashboardData } from '@/server/ledger';
 import { EntryActionModals } from './EntryActionModals';
 import { LedgerTable } from './LedgerTable';
-import { dateOnly, dateTime, yen } from './ledgerDisplayFormat';
+import { dateOnly, dateTime, deletionStatusText, legacyRegistrationFlagText, yen } from './ledgerDisplayFormat';
 import { firstParam, paramsWithout, parseLedgerSearchParams } from './ledgerSearchParams';
 import { ReturnTopButton } from './ReturnTopButton';
 
@@ -26,16 +26,13 @@ const ENTRY_TYPE_LABELS: Record<number, string> = {
   [EntryTypeCode.OpeningBalance]: '開始時残高',
 };
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
-const DEFAULT_PAGE_SIZE = 100;
-
 function entryTypeName(code: number): string {
   return ENTRY_TYPE_LABELS[code] ?? `入出区分 ${code}`;
 }
 
 export default async function Page({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
-  const input = parseLedgerSearchParams(params, { pageSizeOptions: PAGE_SIZE_OPTIONS });
+  const input = parseLedgerSearchParams(params);
 
   try {
     const data = await getLedgerDashboardData(input);
@@ -48,7 +45,7 @@ export default async function Page({ searchParams }: PageProps) {
     const defaultActorEmployeeNo = selected?.filemakerLoginEmployeeNo ?? selected?.updatedByEmployeeNo ?? null;
     const actionMessage = firstParam(params.actionMessage);
     const clearDraft = firstParam(params.clearDraft);
-    const pageSize = input.limit ?? DEFAULT_PAGE_SIZE;
+    const pageSize = input.limit ?? DEFAULT_LEDGER_PAGE_SIZE;
     const currentPage = input.page ?? 1;
     const totalPages = Math.max(Math.ceil(data.entries.totalCount / pageSize), 1);
     const previousHref = currentPage > 1 ? pageHref(params, currentPage - 1) : null;
@@ -150,8 +147,8 @@ export default async function Page({ searchParams }: PageProps) {
                     ['入出区分', codeName(selected.entryTypeCode, selected.entryTypeName ?? entryTypeName(selected.entryTypeCode))],
                     ['出納区分', codeName(selected.transactionCategoryCode, selected.transactionCategoryName)],
                     ['状態CD', selected.statusCode],
-                    ['削除', selected.isDeleted ? 'true' : 'false'],
-                    ['登録ボタン', selected.legacyRegisteredButtonClicked ? 'true' : 'false'],
+                    ['削除', deletionStatusText(selected.isDeleted)],
+                    ['登録ボタン', legacyRegistrationFlagText(selected.legacyRegisteredButtonClicked)],
                   ]}
                 />
                 <DetailSection
