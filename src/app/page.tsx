@@ -54,6 +54,7 @@ export default async function Page({ searchParams }: PageProps) {
     const previousHref = currentPage > 1 ? pageHref(params, currentPage - 1) : null;
     const nextHref = currentPage < totalPages ? pageHref(params, currentPage + 1) : null;
     const pageNumbers = paginationItems(currentPage, totalPages);
+    const loginGreeting = selected ? loginEmployeeGreeting(selected.filemakerLoginEmployeeNo, selected.filemakerLoginEmployeeName) : null;
 
     return (
       <main id="top" className="shell">
@@ -63,6 +64,7 @@ export default async function Page({ searchParams }: PageProps) {
             <h1>金券管理台帳</h1>
           </div>
           <div className="headerStats">
+            {loginGreeting ? <span>{loginGreeting}</span> : null}
             <span>{data.entries.totalCount} entries</span>
             <span>{data.currentBalance ? `Branch ${data.currentBalance.branchCode}` : 'No balance'}</span>
           </div>
@@ -197,17 +199,6 @@ export default async function Page({ searchParams }: PageProps) {
                     ['更新日時', dateTime(selected.updatedAt)],
                     ['更新担当', codeName(selected.updatedByEmployeeNo, selected.updatedByEmployeeName)],
                     ['作成日時', dateTime(selected.createdAt)],
-                  ]}
-                />
-                <DetailSection
-                  title="FileMaker"
-                  rows={[
-                    ['ログイン社員', codeName(selected.filemakerLoginEmployeeNo, selected.filemakerLoginEmployeeName)],
-                    ['作成情報タイムスタンプ', dateTime(selected.filemakerCreatedAt)],
-                    ['作成者', selected.filemakerCreatedBy],
-                    ['修正情報タイムスタンプ', dateTime(selected.filemakerModifiedAt)],
-                    ['修正者', selected.filemakerModifiedBy],
-                    ['ID', selected.id],
                   ]}
                 />
               </>
@@ -362,6 +353,12 @@ function codeName(code: number | null | undefined, name: string | null | undefin
   if (code == null && !name) return '-';
   if (code == null) return name ?? '-';
   return name ? `${code} ${name}` : String(code);
+}
+
+function loginEmployeeGreeting(employeeNo: number | null | undefined, employeeName: string | null | undefined): string | null {
+  if (employeeName) return `こんにちは、${employeeName}さん`;
+  if (employeeNo != null) return `ログイン社員 ${employeeNo}`;
+  return null;
 }
 
 function periodText(year: number | null, month: number | null): string {

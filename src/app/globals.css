@@ -1028,13 +1028,13 @@ tr:last-child td {
 
 .detailActions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: stretch;
   border-bottom: 1px solid var(--line);
   padding: 12px 16px;
 }
 
 .detailActions button {
-  width: auto;
+  width: 100%;
 }
 
 .detailSection {
@@ -1083,7 +1083,7 @@ dd {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  padding: 0 16px 14px;
+  padding: 10px 16px 14px;
 }
 
 .denomination {
