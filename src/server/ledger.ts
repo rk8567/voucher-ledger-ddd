@@ -33,11 +33,11 @@ export type LedgerSearchInput = Readonly<{
   page?: number | null;
   sortKey?: LedgerEntrySortKey | null;
   sortDirection?: SortDirection | null;
-  includeDeleted?: boolean | null;
 }>;
 
 export type LedgerDashboardData = Readonly<{
   entries: LedgerEntryListRecord;
+  deletedEntries: LedgerEntryListRecord;
   selectedEntry: PostedLedgerEntryWithAmounts | null;
   currentBalance: CurrentBalanceRecord | null;
   formOptions: LedgerFormOptions;
@@ -85,12 +85,27 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
   const page = Math.max(input.page ?? 1, 1);
   const filter: LedgerEntryListFilter = {
     ...ledgerFilterFromInput(input),
-    includeDeleted: input.includeDeleted === true,
     limit,
     offset: (page - 1) * limit,
   };
 
-  const entries = await getCachedLedgerEntries(filter);
+  const deletedFilter: LedgerEntryListFilter = {
+    ...ledgerFilterFromInput(input),
+    columnFilters: {
+      ...(input.columnFilters ?? {}),
+      isDeleted: 'true',
+    },
+    includeDeleted: true,
+    limit: 50,
+    offset: 0,
+    sortKey: input.sortKey ?? 'ledgerNo',
+    sortDirection: input.sortDirection ?? 'desc',
+  };
+
+  const [entries, deletedEntries] = await Promise.all([
+    getCachedLedgerEntries(filter),
+    getCachedLedgerEntries(deletedFilter),
+  ]);
   const selectedLedgerNo = input.ledgerNo ?? entries.items[0]?.ledgerNo ?? null;
   const selectedEntry = selectedLedgerNo == null ? null : await getCachedLedgerEntry(selectedLedgerNo);
   const balanceBranchCode = input.branchCode ?? selectedEntry?.branchCode ?? entries.items[0]?.branchCode ?? null;
@@ -101,6 +116,7 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
 
   return {
     entries,
+    deletedEntries,
     selectedEntry,
     currentBalance,
     formOptions,
@@ -116,7 +132,6 @@ export async function getLedgerExportEntries(input: LedgerSearchInput): Promise<
   for (let offset = 0; offset < maxRows; offset += pageSize) {
     const result = await listLedgerEntriesQuery.execute({
       ...ledgerFilterFromInput(input),
-      includeDeleted: input.includeDeleted === true,
       limit: pageSize,
       offset,
     });
@@ -139,7 +154,6 @@ function ledgerFilterFromInput(input: LedgerSearchInput): LedgerEntryListFilter 
     columnFilters: input.columnFilters,
     sortKey: input.sortKey,
     sortDirection: input.sortDirection,
-    includeDeleted: input.includeDeleted === true,
   };
 }
 

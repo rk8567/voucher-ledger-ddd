@@ -5,7 +5,7 @@ import { RedVoucherStatus, type RedVoucherStatusCode } from '@/domain/redVoucher
 import { DEFAULT_LEDGER_PAGE_SIZE, getLedgerDashboardData } from '@/server/ledger';
 import { EntryActionModals } from './EntryActionModals';
 import { LedgerTable } from './LedgerTable';
-import { dateOnly, dateTime, deletionStatusText, legacyRegistrationFlagText, yen } from './ledgerDisplayFormat';
+import { dateOnly, dateTime, legacyRegistrationFlagText, yen } from './ledgerDisplayFormat';
 import { firstParam, paramsWithout, parseLedgerSearchParams } from './ledgerSearchParams';
 import { ReturnTopButton } from './ReturnTopButton';
 
@@ -95,6 +95,7 @@ export default async function Page({ searchParams }: PageProps) {
             />
             <LedgerTable
               entries={data.entries.items}
+              deletedEntries={data.deletedEntries}
               selectedLedgerNo={selected?.ledgerNo ?? null}
               params={params}
               filterOptions={data.formOptions}
@@ -136,7 +137,7 @@ export default async function Page({ searchParams }: PageProps) {
                     ['備考', selected.remarks],
                     ['処理日', dateOnly(selected.processingDate)],
                     ['申請処理日', dateOnly(selected.applicationDate)],
-                    ['年/月', periodText(selected.periodYear, selected.periodMonth)],
+                    ['対象年月', periodText(selected.periodYear, selected.periodMonth)],
                     ['連番', selected.dailySequence],
                     ['登録済', dateTime(selected.postedAt)],
                   ]}
@@ -147,7 +148,6 @@ export default async function Page({ searchParams }: PageProps) {
                     ['入出区分', codeName(selected.entryTypeCode, selected.entryTypeName ?? entryTypeName(selected.entryTypeCode))],
                     ['出納区分', codeName(selected.transactionCategoryCode, selected.transactionCategoryName)],
                     ['状態CD', selected.statusCode],
-                    ['削除', deletionStatusText(selected.isDeleted)],
                     ['登録ボタン', legacyRegistrationFlagText(selected.legacyRegisteredButtonClicked)],
                   ]}
                 />

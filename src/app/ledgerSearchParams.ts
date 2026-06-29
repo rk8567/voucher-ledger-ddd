@@ -1,6 +1,6 @@
 import { EntryTypeCode } from '@/domain/entryTypes';
 import type { LedgerSearchInput } from '@/server/ledger';
-import { ledgerSortableKeys } from './ledgerColumns';
+import { ledgerFilterableKeys, ledgerSortableKeys } from './ledgerColumns';
 
 type SearchParamValue = string | string[] | undefined;
 type QueryParamInput = Record<string, SearchParamValue>;
@@ -35,11 +35,6 @@ export function textParam(value: SearchParamValue): string | null {
   return raw ? raw.slice(0, 100) : null;
 }
 
-export function booleanParam(value: SearchParamValue): boolean {
-  const raw = firstParam(value);
-  return raw === '1' || raw === 'true';
-}
-
 export function sortKeyParam(value: SearchParamValue): TableSortKey | null {
   const raw = firstParam(value);
   return ledgerSortableKeys.some((sortKey) => sortKey === raw) ? raw as TableSortKey : null;
@@ -52,10 +47,13 @@ export function sortDirectionParam(value: SearchParamValue): SortDirection | nul
 
 export function columnFiltersParam(params: Record<string, SearchParamValue>): Record<string, string> {
   const filters: Record<string, string> = {};
+  const filterableKeys = new Set<string>(ledgerFilterableKeys);
   for (const [key, value] of Object.entries(params)) {
     if (!key.startsWith('filter_')) continue;
+    const columnKey = key.slice('filter_'.length);
+    if (!filterableKeys.has(columnKey)) continue;
     const filterValue = textParam(value);
-    if (filterValue) filters[key.slice('filter_'.length)] = filterValue;
+    if (filterValue) filters[columnKey] = filterValue;
   }
   return filters;
 }
@@ -84,10 +82,13 @@ export function urlParam(params: URLSearchParams, key: string): string | undefin
 
 export function columnFiltersFromUrlParams(params: URLSearchParams): Record<string, string> {
   const filters: Record<string, string> = {};
+  const filterableKeys = new Set<string>(ledgerFilterableKeys);
   for (const [key, value] of params.entries()) {
     if (!key.startsWith('filter_')) continue;
+    const columnKey = key.slice('filter_'.length);
+    if (!filterableKeys.has(columnKey)) continue;
     const filterValue = textParam(value);
-    if (filterValue) filters[key.slice('filter_'.length)] = filterValue;
+    if (filterValue) filters[columnKey] = filterValue;
   }
   return filters;
 }
@@ -108,7 +109,6 @@ export function parseLedgerSearchParams(
     page: positiveNumberParam(params.page),
     sortKey: sortKeyParam(params.sort),
     sortDirection: sortDirectionParam(params.dir),
-    includeDeleted: booleanParam(params.includeDeleted),
   };
 }
 
@@ -124,6 +124,5 @@ export function parseLedgerExportSearchParams(params: URLSearchParams): LedgerSe
     columnFilters: columnFiltersFromUrlParams(params),
     sortKey: sortKeyParam(urlParam(params, 'sort')),
     sortDirection: sortDirectionParam(urlParam(params, 'dir')),
-    includeDeleted: booleanParam(urlParam(params, 'includeDeleted')),
   };
 }

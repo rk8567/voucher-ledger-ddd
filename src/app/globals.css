@@ -998,15 +998,6 @@ tr:last-child td {
   background: #e7f4f1;
 }
 
-.deletedRow td {
-  background: #f7f1ef;
-  color: #7b5d57;
-}
-
-.selectedRow.deletedRow td {
-  background: #eadfda;
-}
-
 .description {
   width: 34%;
 }

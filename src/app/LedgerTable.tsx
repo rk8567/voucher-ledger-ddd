@@ -8,12 +8,13 @@ import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/rep
 import type { LedgerFormOptions } from '@/server/ledger';
 import { openEntryWorkflowEvent } from './entryWorkflowEvents';
 import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from './ledgerColumns';
-import { dateOnly, deletionStatusText, limitText, yen } from './ledgerDisplayFormat';
+import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
 import { delimitedText, htmlTable, tokyoTimestampForFileName, type LedgerExportFormat } from './ledgerExportFormat';
-import { booleanParam, firstParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
+import { firstParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
 
 type LedgerTableProps = Readonly<{
   entries: LedgerEntryListRecord['items'];
+  deletedEntries: LedgerEntryListRecord;
   selectedLedgerNo: number | null;
   params: Record<string, string | string[] | undefined>;
   filterOptions: LedgerFormOptions;
@@ -68,6 +69,7 @@ const defaultColumnKeys = defaultLedgerColumnKeys;
 
 export function LedgerTable({
   entries,
+  deletedEntries,
   selectedLedgerNo,
   params,
   filterOptions,
@@ -75,6 +77,7 @@ export function LedgerTable({
   const [openColumnKey, setOpenColumnKey] = useState<string | null>(null);
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
   const [exportWindowOpen, setExportWindowOpen] = useState(false);
+  const [deletedView, setDeletedView] = useState(false);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(defaultColumnKeys);
   const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(defaultColumnKeys);
   const tableWrapRef = useRef<HTMLDivElement>(null);
@@ -82,6 +85,7 @@ export function LedgerTable({
   const [scrollLeft, setScrollLeft] = useState(0);
   const [maxScrollLeft, setMaxScrollLeft] = useState(0);
   const [fadeFrame, setFadeFrame] = useState<FadeFrame | null>(null);
+  const tableEntries = deletedView ? deletedEntries.items : entries;
 
   useEffect(() => {
     const raw = window.localStorage.getItem(columnStorageKey);
@@ -115,9 +119,9 @@ export function LedgerTable({
   );
   const columnWidths = useMemo(() => {
     const widths = new Map<string, number>();
-    for (const column of visibleColumns) widths.set(String(column.key), columnWidth(column, entries));
+    for (const column of visibleColumns) widths.set(String(column.key), columnWidth(column, tableEntries));
     return widths;
-  }, [entries, visibleColumns]);
+  }, [tableEntries, visibleColumns]);
   const tableMinWidth = useMemo(
     () => visibleColumns.reduce((total, column) => total + (columnWidths.get(String(column.key)) ?? 150), 0),
     [columnWidths, visibleColumns],
@@ -140,7 +144,7 @@ export function LedgerTable({
       window.removeEventListener('scroll', handleLayoutChange);
       window.removeEventListener('resize', handleLayoutChange);
     };
-  }, [entries, visibleColumns]);
+  }, [tableEntries, visibleColumns]);
 
   function setVisible(key: string, visible: boolean) {
     const next = visible
@@ -189,13 +193,13 @@ export function LedgerTable({
   const canScrollRight = maxScrollLeft - scrollLeft > 2;
   const currentSortKey = sortKeyParam(params.sort) ?? '';
   const currentSortDirection = sortDirectionParam(params.dir) ?? 'asc';
-  const includeDeleted = booleanParam(params.includeDeleted);
   const exportHref = ledgerExportHref(params);
 
   function openWorkflow(workflow: 'movement' | 'inventory') {
     setOpenColumnKey(null);
     setColumnMenuOpen(false);
     setExportWindowOpen(false);
+    setDeletedView(false);
     window.dispatchEvent(new CustomEvent(openEntryWorkflowEvent, { detail: workflow }));
   }
 
@@ -211,9 +215,18 @@ export function LedgerTable({
         <div className="tableCommandTools" aria-label="FileMaker commands">
           <button type="button" className="toolbarButton" onClick={openExportWindow}>出力</button>
           <a className="toolbarButton" href="/">全件表示</a>
-          <a className={includeDeleted ? 'toolbarButton activeToggle' : 'toolbarButton'} href={deletedToggleHref(params, includeDeleted)}>
-            {includeDeleted ? '削除も表示' : '削除を表示'}
-          </a>
+          <button
+            type="button"
+            className={deletedView ? 'toolbarButton activeToggle' : 'toolbarButton'}
+            onClick={() => {
+              setOpenColumnKey(null);
+              setColumnMenuOpen(false);
+              setExportWindowOpen(false);
+              setDeletedView((current) => !current);
+            }}
+          >
+            {deletedView ? '通常表示' : '削除済'}
+          </button>
           <button type="button" className="toolbarButton" onClick={() => openWorkflow('movement')}>新規レコード</button>
           <button type="button" className="toolbarButton" onClick={() => openWorkflow('inventory')}>現在高チェック</button>
           <a className="toolbarButton" href={unsortHref(params)}>標準ソート</a>
@@ -292,14 +305,11 @@ export function LedgerTable({
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry) => {
+              {tableEntries.map((entry) => {
                 const href = queryHref(params, entry.ledgerNo);
                 const isSelected = selectedLedgerNo === entry.ledgerNo;
-                const rowClassName = [isSelected ? 'selectedRow' : '', entry.isDeleted ? 'deletedRow' : '']
-                  .filter(Boolean)
-                  .join(' ') || undefined;
                 return (
-                  <tr key={entry.id} className={rowClassName}>
+                  <tr key={entry.id} className={isSelected ? 'selectedRow' : undefined}>
                     {visibleColumns.map((column) => (
                       <td key={`${entry.id}-${column.key}`} className={cellClassName(column)}>
                         {column.key === 'ledgerNo' ? <Link href={href}>#{entry.ledgerNo}</Link> : displayCell(entry, column)}
@@ -333,7 +343,7 @@ export function LedgerTable({
       {exportWindowOpen ? (
         <ExportWindow
           exportHref={exportHref}
-          entries={entries}
+          entries={tableEntries}
           selectedColumnKeys={exportColumnKeys}
           visibleColumnKeys={visibleColumnKeys}
           onColumnChange={setExportColumn}
@@ -421,13 +431,6 @@ function ledgerExportHref(params: Record<string, string | string[] | undefined>)
   const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/export/ledger?${query}` : '/export/ledger';
-}
-
-function deletedToggleHref(params: Record<string, string | string[] | undefined>, includeDeleted: boolean): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'includeDeleted', 'actionMessage', 'clearDraft'] });
-  if (!includeDeleted) next.set('includeDeleted', '1');
-  const query = next.toString();
-  return query ? `/?${query}` : '/';
 }
 
 function unsortHref(params: Record<string, string | string[] | undefined>): string {
@@ -685,12 +688,6 @@ function filterName(columnKey: string): string {
 
 function columnFilterOptions(column: ColumnDefinition, filterOptions: LedgerFormOptions): readonly FilterOption[] {
   if (!column.optionsKey) return [];
-  if (column.optionsKey === 'deleted') {
-    return [
-      { value: 'false', label: '未削除' },
-      { value: 'true', label: '削除済' },
-    ];
-  }
   return filterOptions[column.optionsKey].map((option) => ({
     value: option.label,
     label: option.label,
@@ -913,7 +910,6 @@ function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string
     return typeof value === 'string' ? dateOnly(value) ?? '-' : '-';
   }
   if (column.key === 'otherAmountYen') return yen(Number(value ?? 0));
-  if (column.key === 'isDeleted') return deletionStatusText(Boolean(value));
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (value == null || value === '') return '-';
   const text = String(value);
