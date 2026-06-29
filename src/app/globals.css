@@ -916,6 +916,9 @@ button:disabled {
   align-items: center;
   flex: 0 0 auto;
   gap: 6px;
+  margin-left: 4px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
   min-height: 34px;
   white-space: nowrap;
 }

@@ -281,13 +281,6 @@ function PaginationControls({
           ) : (
             <Link key={pageNumber} className="pagerButton" href={pageHref(params, pageNumber)} scroll={false}>{pageNumber}</Link>
           ))}
-          {nextHref ? (
-            <Link className="pagerButton" href={nextHref} scroll={false}>次へ</Link>
-          ) : (
-            <span className="pagerButton pagerButtonDisabled" aria-disabled="true">次へ</span>
-          )}
-        </div>
-        <div className="paginationSide paginationSideRight">
           <form className="pageJumpForm" action="/#ledger-entries" method="get">
             <HiddenQueryFields params={params} omit={['page', 'ledgerNo', 'actionMessage', 'clearDraft']} />
             <label>
@@ -295,6 +288,13 @@ function PaginationControls({
             </label>
             <button className="pagerButton" type="submit">移動</button>
           </form>
+        </div>
+        <div className="paginationSide paginationSideRight">
+          {nextHref ? (
+            <Link className="pagerButton" href={nextHref} scroll={false}>次へ</Link>
+          ) : (
+            <span className="pagerButton pagerButtonDisabled" aria-disabled="true">次へ</span>
+          )}
         </div>
       </div>
     </nav>
