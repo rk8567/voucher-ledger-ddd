@@ -50,7 +50,7 @@ a:hover {
 
 .pageHeader {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
@@ -172,6 +172,17 @@ h3 {
   color: var(--accent-dark);
 }
 
+.primaryToolbarButton {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.primaryToolbarButton:hover {
+  background: var(--accent-dark);
+  color: #fff;
+}
+
 .activeToggle {
   border-color: var(--accent);
   background: #e7f4f1;
@@ -281,8 +292,14 @@ button:disabled {
 }
 
 .ledgerPanel,
-.detailPanel {
+.detailPanel,
+.detailColumn {
   min-width: 0;
+}
+
+.detailColumn {
+  display: grid;
+  gap: 10px;
 }
 
 .panelHeader {
@@ -296,9 +313,80 @@ button:disabled {
 
 .panelHeaderActions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.displayDateRangeForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 8px;
+  width: 100%;
+}
+
+.displayDateRangeForm label {
+  display: grid;
+  gap: 3px;
+}
+
+.displayDateRangeForm label span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.displayDateRangeForm input[type="date"] {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.displayDateRangeForm .compactToolbarButton {
+  min-height: 32px;
+  padding-inline: 8px;
+}
+
+.entryWorkflowButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detailPrimaryActions {
+  display: grid;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 94px;
+  padding: 12px;
+  background: var(--surface);
+}
+
+.detailPrimaryActions .entryWorkflowButtons {
+  width: 100%;
+  height: 100%;
+  align-self: stretch;
+}
+
+.detailPrimaryActions .entryWorkflowButtons .toolbarButton {
+  flex: 1;
+  align-self: stretch;
+  min-height: 54px;
+  font-size: 14px;
+}
+
+.displayDateRangePanel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
 }
 
 .secondaryButton {
@@ -1131,7 +1219,6 @@ dd {
   .contentGrid {
     grid-template-columns: minmax(0, 1fr);
   }
-
 }
 
 @media (max-width: 1080px) {

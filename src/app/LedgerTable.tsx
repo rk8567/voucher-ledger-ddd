@@ -6,7 +6,6 @@ import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 
 import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
 import type { LedgerFormOptions } from '@/server/ledger';
-import { openEntryWorkflowEvent } from './entryWorkflowEvents';
 import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from './ledgerColumns';
 import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
 import { delimitedText, htmlTable, tokyoTimestampForFileName, type LedgerExportFormat } from './ledgerExportFormat';
@@ -21,12 +20,6 @@ type LedgerTableProps = Readonly<{
 }>;
 
 type ColumnDefinition = LedgerColumnDefinition;
-
-type DateParts = Readonly<{
-  year: number;
-  month: number;
-  day: number;
-}>;
 
 type FadeFrame = Readonly<{
   top: number;
@@ -195,14 +188,6 @@ export function LedgerTable({
   const currentSortDirection = sortDirectionParam(params.dir) ?? 'asc';
   const exportHref = ledgerExportHref(params);
 
-  function openWorkflow(workflow: 'movement' | 'inventory') {
-    setOpenColumnKey(null);
-    setColumnMenuOpen(false);
-    setExportWindowOpen(false);
-    setDeletedView(false);
-    window.dispatchEvent(new CustomEvent(openEntryWorkflowEvent, { detail: workflow }));
-  }
-
   function openExportWindow() {
     setOpenColumnKey(null);
     setColumnMenuOpen(false);
@@ -214,7 +199,7 @@ export function LedgerTable({
       <div className="tableTools">
         <div className="tableCommandTools" aria-label="FileMaker commands">
           <button type="button" className="toolbarButton" onClick={openExportWindow}>出力</button>
-          <a className="toolbarButton" href="/">全件表示</a>
+          <a className="toolbarButton" href={showAllHref(params)}>全件表示</a>
           <button
             type="button"
             className={deletedView ? 'toolbarButton activeToggle' : 'toolbarButton'}
@@ -227,8 +212,6 @@ export function LedgerTable({
           >
             {deletedView ? '通常表示' : '削除済'}
           </button>
-          <button type="button" className="toolbarButton" onClick={() => openWorkflow('movement')}>新規レコード</button>
-          <button type="button" className="toolbarButton" onClick={() => openWorkflow('inventory')}>現在高チェック</button>
           <a className="toolbarButton" href={unsortHref(params)}>標準ソート</a>
         </div>
         <button type="button" className="toolbarButton" onClick={() => setColumnMenuOpen((open) => !open)}>表示列</button>
@@ -525,11 +508,10 @@ function ColumnFilterPopover({
   tableWrapRef: RefObject<HTMLDivElement | null>;
   options: readonly FilterOption[];
 }>) {
-  const [value, setValue] = useState(currentFilter);
-  const [dateParts, setDateParts] = useState(() => datePartsFromFilter(currentFilter));
+  const [value, setValue] = useState(() => initialFilterValue(column, currentFilter));
   const popupBounds = useCallback(() => visibleTableBounds(tableWrapRef.current), [tableWrapRef]);
   const drag = useDraggablePopup(popupBounds);
-  const effectiveValue = filterValue(column, value, dateParts);
+  const effectiveValue = filterValue(value);
 
   useLayoutEffect(() => {
     drag.clampPosition();
@@ -564,13 +546,11 @@ function ColumnFilterPopover({
       <FilterControl
         column={column}
         value={value}
-        dateParts={dateParts}
         options={options}
         onValueChange={setValue}
-        onDatePartsChange={setDateParts}
       />
       <div className="columnFilterActions">
-        <a className="filterButton" href={applyFilterHref(params, column.key, effectiveValue)}>絞込</a>
+        <a className="filterButton" href={applyFilterHref(params, column, effectiveValue)}>絞込</a>
         {currentFilter ? <a className="filterButton secondaryButton" href={clearFilterHref(params, column.key)}>解除</a> : null}
       </div>
     </div>
@@ -580,17 +560,13 @@ function ColumnFilterPopover({
 function FilterControl({
   column,
   value,
-  dateParts,
   options,
   onValueChange,
-  onDatePartsChange,
 }: Readonly<{
   column: ColumnDefinition;
   value: string;
-  dateParts: DateParts;
   options: readonly FilterOption[];
   onValueChange: (value: string) => void;
-  onDatePartsChange: (parts: DateParts) => void;
 }>) {
   if (options.length > 0) {
     return (
@@ -605,23 +581,27 @@ function FilterControl({
 
   if (column.kind === 'date' || column.kind === 'datetime') {
     return (
-      <div className="dateFilterFields">
-        <NumberField label="年" min={minYear} max={maxYear} value={dateParts.year} onChange={(year) => onDatePartsChange({ ...dateParts, year })} />
-        <NumberField label="月" min={1} max={12} value={dateParts.month} onChange={(month) => onDatePartsChange({ ...dateParts, month })} />
-        <NumberField label="日" min={1} max={31} value={dateParts.day} onChange={(day) => onDatePartsChange({ ...dateParts, day })} />
-      </div>
+      <label>
+        <input
+          type="date"
+          value={dateFilterValue(value)}
+          lang="ja-JP"
+          onChange={(event) => onValueChange(slashDate(event.target.value))}
+          aria-label={column.label}
+        />
+      </label>
     );
   }
 
   if (column.kind === 'year') {
     return (
-      <NumberField label="年" min={minYear} max={maxYear} value={numericValue(value, new Date().getFullYear())} onChange={(next) => onValueChange(String(next))} showLabel={false} />
+      <NumberField label="年" min={minYear} max={maxYear} value={clampNumber(numericValue(value, new Date().getFullYear()), minYear, maxYear)} onChange={(next) => onValueChange(String(next))} showLabel={false} />
     );
   }
 
   if (column.kind === 'month') {
     return (
-      <NumberField label="月" min={1} max={12} value={numericValue(value, 1)} onChange={(next) => onValueChange(String(next))} showLabel={false} />
+      <NumberField label="月" min={1} max={12} value={clampNumber(numericValue(value, 1), 1, 12)} onChange={(next) => onValueChange(String(next))} showLabel={false} />
     );
   }
 
@@ -868,22 +848,34 @@ function cellClassName(column: ColumnDefinition): string | undefined {
   return undefined;
 }
 
-function datePartsFromFilter(value: string): DateParts {
-  const normalized = value.replaceAll('/', '-');
-  const match = /^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?/.exec(normalized);
-  const now = new Date();
-  return {
-    year: clampNumber(match?.[1] ? Number(match[1]) : now.getFullYear(), minYear, maxYear),
-    month: clampNumber(match?.[2] ? Number(match[2]) : now.getMonth() + 1, 1, 12),
-    day: clampNumber(match?.[3] ? Number(match[3]) : now.getDate(), 1, 31),
-  };
+function dateFilterValue(value: string): string {
+  const normalized = value.trim().replaceAll('/', '-');
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : todayInTokyo();
 }
 
-function filterValue(column: ColumnDefinition, value: string, dateParts: DateParts): string {
-  if (column.kind === 'date' || column.kind === 'datetime') {
-    return `${dateParts.year}-${pad2(dateParts.month)}-${pad2(dateParts.day)}`;
-  }
+function initialFilterValue(column: ColumnDefinition, value: string): string {
+  if (column.kind !== 'date' && column.kind !== 'datetime') return value;
+  const normalized = dateFilterValue(value);
+  return slashDate(normalized);
+}
+
+function filterValue(value: string): string {
   return value.trim();
+}
+
+function slashDate(value: string): string {
+  return value.replaceAll('-', '/');
+}
+
+function todayInTokyo(): string {
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
 }
 
 function numericValue(value: string, fallback: number): number {
@@ -893,10 +885,6 @@ function numericValue(value: string, fallback: number): number {
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
-}
-
-function pad2(value: number): string {
-  return String(value).padStart(2, '0');
 }
 
 function sortIcon(columnKey: string, currentSortKey: string, currentSortDirection: 'asc' | 'desc'): string {
@@ -928,9 +916,36 @@ function clearFilterHref(params: Record<string, string | string[] | undefined>, 
   return query ? `/?${query}` : '/';
 }
 
-function applyFilterHref(params: Record<string, string | string[] | undefined>, columnKey: string, value: string): string {
-  const next = paramsWithout(params, { keys: [filterName(columnKey), 'ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
-  if (value.trim()) next.set(filterName(columnKey), value.trim());
+function showAllHref(params: Record<string, string | string[] | undefined>): string {
+  const preserved = new URLSearchParams();
+  preserveDisplayDate(params, preserved, 'processingDateFrom', 'displayDateFrom');
+  preserveDisplayDate(params, preserved, 'processingDateTo', 'displayDateTo');
+  const query = preserved.toString();
+  return query ? `/?${query}` : '/';
+}
+
+function preserveDisplayDate(
+  params: Record<string, string | string[] | undefined>,
+  preserved: URLSearchParams,
+  filterKey: string,
+  displayKey: string,
+) {
+  if (Object.prototype.hasOwnProperty.call(params, filterKey)) {
+    preserved.set(displayKey, firstParam(params[filterKey]) ?? '');
+    return;
+  }
+  if (Object.prototype.hasOwnProperty.call(params, displayKey)) {
+    preserved.set(displayKey, firstParam(params[displayKey]) ?? '');
+  }
+}
+
+function applyFilterHref(params: Record<string, string | string[] | undefined>, column: ColumnDefinition, value: string): string {
+  const keys = [filterName(column.key), 'ledgerNo', 'page', 'actionMessage', 'clearDraft'];
+  if (column.kind === 'date' || column.kind === 'datetime') {
+    keys.push('dateRange', 'processingDateFrom', 'processingDateTo', 'displayDateFrom', 'displayDateTo');
+  }
+  const next = paramsWithout(params, { keys });
+  if (value.trim()) next.set(filterName(column.key), value.trim());
   const query = next.toString();
   return query ? `/?${query}` : '/';
 }

@@ -11,7 +11,9 @@ import { EntryTypeCode } from '@/domain/entryTypes';
 import { RedVoucherStatus, type RedVoucherStatusCode } from '@/domain/redVoucherStatuses';
 import { DEFAULT_LEDGER_PAGE_SIZE, getLedgerDashboardData } from '@/server/ledger';
 import { EntryActionModals } from './EntryActionModals';
+import { EntryWorkflowButtons } from './EntryWorkflowButtons';
 import { LedgerTable } from './LedgerTable';
+import { ledgerColumns } from './ledgerColumns';
 import { dateOnly, dateTime, legacyRegistrationFlagText, yen } from './ledgerDisplayFormat';
 import { firstParam, paramsWithout, parseLedgerSearchParams } from './ledgerSearchParams';
 import { ReturnTopButton } from './ReturnTopButton';
@@ -44,7 +46,7 @@ export default async function Page({ searchParams }: PageProps) {
   try {
     const data = await getLedgerDashboardData(input);
     const selected = data.selectedEntry;
-    const defaultProcessingDate = input.processingDateFrom ?? selected?.processingDate ?? todayInTokyo();
+    const defaultProcessingDate = selected?.processingDate ?? input.processingDateTo ?? todayInTokyo();
     const defaultPeriodYear = input.periodYear ?? selected?.periodYear ?? Number(defaultProcessingDate.slice(0, 4));
     const defaultPeriodMonth = input.periodMonth ?? selected?.periodMonth ?? Number(defaultProcessingDate.slice(5, 7));
     const defaultBranchCode = input.branchCode ?? selected?.branchCode ?? data.currentBalance?.branchCode ?? null;
@@ -59,6 +61,7 @@ export default async function Page({ searchParams }: PageProps) {
     const nextHref = currentPage < totalPages ? pageHref(params, currentPage + 1) : null;
     const pageNumbers = paginationItems(currentPage, totalPages);
     const loginGreeting = selected ? loginEmployeeGreeting(selected.filemakerLoginEmployeeNo, selected.filemakerLoginEmployeeName) : null;
+    const displayDateRange = displayDateRangeValues(params, input.processingDateFrom, input.processingDateTo);
 
     return (
       <main id="top" className="shell">
@@ -118,7 +121,18 @@ export default async function Page({ searchParams }: PageProps) {
             />
           </section>
 
-          <aside className="panel detailPanel" aria-label="Selected entry detail">
+          <div className="detailColumn">
+            <div className="detailPrimaryActions" aria-label="Entry actions">
+              <EntryWorkflowButtons />
+            </div>
+            <div className="displayDateRangePanel">
+              <DisplayDateRangeForm
+                params={params}
+                processingDateFrom={displayDateRange.from}
+                processingDateTo={displayDateRange.to}
+              />
+            </div>
+            <aside className="panel detailPanel" aria-label="Selected entry detail">
             <div className="panelHeader">
               <h2>明細</h2>
               <span>{selected ? `出納No ${selected.ledgerNo}` : '未選択'}</span>
@@ -203,7 +217,8 @@ export default async function Page({ searchParams }: PageProps) {
             ) : (
               <p className="emptyState">条件に一致する出納がありません。</p>
             )}
-          </aside>
+            </aside>
+          </div>
         </div>
         <ReturnTopButton />
       </main>
@@ -233,6 +248,121 @@ function Metric({ label, value }: Readonly<{ label: string; value: string }>) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function DisplayDateRangeForm({
+  params,
+  processingDateFrom,
+  processingDateTo,
+}: Readonly<{
+  params: Record<string, string | string[] | undefined>;
+  processingDateFrom: string;
+  processingDateTo: string;
+}>) {
+  const preserved = paramsWithout(params, {
+    keys: [
+      'dateRange',
+      'processingDateFrom',
+      'processingDateTo',
+      'displayDateFrom',
+      'displayDateTo',
+      'page',
+      'ledgerNo',
+      'actionMessage',
+      'clearDraft',
+      ...dateColumnFilterKeys(),
+    ],
+  });
+  const clearHref = displayDateRangeClearHref(params, processingDateFrom, processingDateTo);
+
+  return (
+    <form className="displayDateRangeForm" method="get">
+      {Array.from(preserved.entries()).map(([key, value]) => (
+        <input key={key} type="hidden" name={key} value={value} />
+      ))}
+      <label>
+        <span>表示開始日付</span>
+        <input type="date" name="processingDateFrom" defaultValue={processingDateFrom} />
+      </label>
+      <label>
+        <span>終了日付</span>
+        <input type="date" name="processingDateTo" defaultValue={processingDateTo} />
+      </label>
+      <button type="submit" className="toolbarButton">表示</button>
+      <a className="toolbarButton secondaryButton compactToolbarButton" href={clearHref}>解除</a>
+    </form>
+  );
+}
+
+function displayDateRangeClearHref(
+  params: Record<string, string | string[] | undefined>,
+  processingDateFrom: string,
+  processingDateTo: string,
+): string {
+  const preserved = paramsWithout(params, {
+    keys: [
+      'dateRange',
+      'processingDateFrom',
+      'processingDateTo',
+      'displayDateFrom',
+      'displayDateTo',
+      'page',
+      'ledgerNo',
+      'actionMessage',
+      'clearDraft',
+    ],
+  });
+  preserved.set('displayDateFrom', processingDateFrom);
+  preserved.set('displayDateTo', processingDateTo);
+  const query = preserved.toString();
+  return query ? `/?${query}` : '/';
+}
+
+function displayDateRangeValues(
+  params: Record<string, string | string[] | undefined>,
+  processingDateFrom: string | null | undefined,
+  processingDateTo: string | null | undefined,
+): { from: string; to: string } {
+  const defaults = defaultDisplayDateRange();
+  return {
+    from: processingDateFrom ?? displayOnlyDate(params, 'displayDateFrom') ?? defaults.from,
+    to: processingDateTo ?? displayOnlyDate(params, 'displayDateTo') ?? defaults.to,
+  };
+}
+
+function displayOnlyDate(params: Record<string, string | string[] | undefined>, key: string): string | null {
+  return Object.prototype.hasOwnProperty.call(params, key) ? firstParam(params[key]) ?? '' : null;
+}
+
+function defaultDisplayDateRange(): { from: string; to: string } {
+  const today = todayInTokyo();
+  return {
+    from: subtractMonths(today, 1),
+    to: today,
+  };
+}
+
+function subtractMonths(dateText: string, months: number): string {
+  const [year, month, day] = dateText.split('-').map(Number);
+  const targetMonthIndex = (month ?? 1) - 1 - months;
+  const targetYear = (year ?? 1970) + Math.floor(targetMonthIndex / 12);
+  const normalizedMonthIndex = ((targetMonthIndex % 12) + 12) % 12;
+  const targetDay = Math.min(day ?? 1, daysInMonth(targetYear, normalizedMonthIndex));
+  return formatDate(targetYear, normalizedMonthIndex + 1, targetDay);
+}
+
+function daysInMonth(year: number, monthIndex: number): number {
+  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+}
+
+function formatDate(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function dateColumnFilterKeys(): string[] {
+  return ledgerColumns
+    .filter((column) => column.kind === 'date' || column.kind === 'datetime')
+    .map((column) => `filter_${column.key}`);
 }
 
 function DenominationDetailGroup({
