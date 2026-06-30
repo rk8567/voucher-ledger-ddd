@@ -1,8 +1,13 @@
 import { DomainError } from '@/domain/errors';
 
 export const DENOMINATIONS = [
-  1, 2, 10, 50, 84, 94, 120, 140, 210, 5, 20, 52, 110, 270, 430, 600,
+  1, 2, 5, 10, 20, 50, 110, 140, 430, 600,
 ] as const;
+
+export const LETTER_PACK_DENOMINATIONS = [430, 600] as const;
+export const STAMP_DENOMINATIONS = DENOMINATIONS.filter(
+  (denomination) => !LETTER_PACK_DENOMINATIONS.includes(denomination as (typeof LETTER_PACK_DENOMINATIONS)[number]),
+);
 
 export type DenominationYen = (typeof DENOMINATIONS)[number];
 export type QuantityInput = Record<number, number | undefined | null>;
@@ -12,6 +17,10 @@ const DENOMINATION_SET = new Set<number>(DENOMINATIONS);
 
 export function isKnownDenomination(yen: number): yen is DenominationYen {
   return DENOMINATION_SET.has(yen);
+}
+
+export function isLetterPackDenomination(yen: number): boolean {
+  return (LETTER_PACK_DENOMINATIONS as readonly number[]).includes(yen);
 }
 
 export function normalizeQuantities(input: QuantityInput = {}): QuantitySnapshot {

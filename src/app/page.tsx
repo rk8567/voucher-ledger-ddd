@@ -1,5 +1,12 @@
 import Link from 'next/link';
-import { DENOMINATIONS, quantityOf, stampQuantityCount } from '@/domain/denominations';
+import {
+  DENOMINATIONS,
+  isLetterPackDenomination,
+  LETTER_PACK_DENOMINATIONS,
+  quantityOf,
+  stampQuantityCount,
+  STAMP_DENOMINATIONS,
+} from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
 import { RedVoucherStatus, type RedVoucherStatusCode } from '@/domain/redVoucherStatuses';
 import { DEFAULT_LEDGER_PAGE_SIZE, getLedgerDashboardData } from '@/server/ledger';
@@ -171,14 +178,8 @@ export default async function Page({ searchParams }: PageProps) {
                     ['枚数合計', stampQuantityCount(selected.quantities)],
                   ]}
                 />
-                <div className="denominationGrid">
-                  {DENOMINATIONS.map((denomination) => (
-                    <div key={denomination} className="denomination">
-                      <span>{denomination}円</span>
-                      <strong>{quantityOf(selected.quantities, denomination)}</strong>
-                    </div>
-                  ))}
-                </div>
+                <DenominationDetailGroup title="切手" denominations={displayStampDenominations(selected.quantities)} quantities={selected.quantities} />
+                <DenominationDetailGroup title="レターパック" denominations={displayLetterPackDenominations(selected.quantities)} quantities={selected.quantities} />
                 <DetailSection
                   title="赤伝票/訂正"
                   rows={[
@@ -232,6 +233,54 @@ function Metric({ label, value }: Readonly<{ label: string; value: string }>) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function DenominationDetailGroup({
+  title,
+  denominations,
+  quantities,
+}: Readonly<{
+  title: string;
+  denominations: readonly number[];
+  quantities: Record<number, number>;
+}>) {
+  return (
+    <section className="denominationSection" aria-label={title}>
+      <h3>{title}</h3>
+      <div className="denominationGrid">
+        {denominations.map((denomination) => (
+          <div key={denomination} className="denomination">
+            <span>{denomination}円</span>
+            <strong>{quantityOf(quantities, denomination)}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function displayStampDenominations(quantities: Record<number, number>): number[] {
+  const active = new Set<number>(DENOMINATIONS);
+  const historical = Object.entries(quantities)
+    .filter(([denomination, quantity]) => {
+      const value = Number(denomination);
+      return !active.has(value) && !isLetterPackDenomination(value) && quantity !== 0;
+    })
+    .map(([denomination]) => Number(denomination))
+    .sort((a, b) => a - b);
+  return [...STAMP_DENOMINATIONS, ...historical];
+}
+
+function displayLetterPackDenominations(quantities: Record<number, number>): number[] {
+  const active = new Set<number>(DENOMINATIONS);
+  const historical = Object.entries(quantities)
+    .filter(([denomination, quantity]) => {
+      const value = Number(denomination);
+      return !active.has(value) && isLetterPackDenomination(value) && quantity !== 0;
+    })
+    .map(([denomination]) => Number(denomination))
+    .sort((a, b) => a - b);
+  return [...LETTER_PACK_DENOMINATIONS, ...historical];
 }
 
 function PaginationControls({

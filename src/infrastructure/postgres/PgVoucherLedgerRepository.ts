@@ -200,6 +200,17 @@ function numberFilterInBounds(columnKey: string, value: number): boolean {
   return true;
 }
 
+function displayBalanceDenominations(
+  denominationMap: ReadonlyMap<number, { runningQuantity: number; runningAmountYen: number }>,
+): number[] {
+  const active = new Set<number>(DENOMINATIONS);
+  const historical = Array.from(denominationMap.entries())
+    .filter(([denominationYen, balance]) => !active.has(denominationYen) && balance.runningQuantity !== 0)
+    .map(([denominationYen]) => denominationYen)
+    .sort((a, b) => a - b);
+  return [...DENOMINATIONS, ...historical];
+}
+
 export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -619,7 +630,7 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
       runningStampAmountYen: numberOf(row.running_stamp_amount),
       runningOtherAmountYen: numberOf(row.running_other_amount),
       runningTotalAmountYen: numberOf(row.running_total_amount),
-      denominations: DENOMINATIONS.map((denominationYen) => {
+      denominations: displayBalanceDenominations(denominationMap).map((denominationYen) => {
         const balance = denominationMap.get(denominationYen);
         return {
           denominationYen,

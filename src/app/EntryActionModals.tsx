@@ -2,7 +2,7 @@
 
 import { createContext, useActionState, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { DENOMINATIONS } from '@/domain/denominations';
+import { DENOMINATIONS, LETTER_PACK_DENOMINATIONS, STAMP_DENOMINATIONS } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
 import { RedVoucherStatus, type RedVoucherStatusCode } from '@/domain/redVoucherStatuses';
 import type { LedgerFormOptions, LedgerSelectOption } from '@/server/ledger';
@@ -452,8 +452,28 @@ function QuantityFields() {
   return (
     <fieldset className={`quantityFieldset ${fieldClass(errors, 'quantities')}`}>
       <legend>枚数</legend>
+      <QuantityInputGroup title="切手" denominations={STAMP_DENOMINATIONS} values={values} errors={errors} />
+      <QuantityInputGroup title="レターパック" denominations={LETTER_PACK_DENOMINATIONS} values={values} errors={errors} />
+    </fieldset>
+  );
+}
+
+function QuantityInputGroup({
+  title,
+  denominations,
+  values,
+  errors,
+}: Readonly<{
+  title: string;
+  denominations: readonly number[];
+  values: DraftValues;
+  errors: Record<string, string>;
+}>) {
+  return (
+    <div className="quantityGroup">
+      <h4>{title}</h4>
       <div className="quantityInputs">
-        {DENOMINATIONS.map((denomination) => (
+        {denominations.map((denomination) => (
           <label key={denomination} className={fieldClass(errors, `quantity_${denomination}`)}>
             <span>{denomination}円</span>
             <input
@@ -467,7 +487,7 @@ function QuantityFields() {
           </label>
         ))}
       </div>
-    </fieldset>
+    </div>
   );
 }
 

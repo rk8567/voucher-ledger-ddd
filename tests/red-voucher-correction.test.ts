@@ -212,7 +212,7 @@ test('red-voucher correction posts reversal and corrected rows atomically', asyn
   const original = makeEntry({
     ledgerNo: 10,
     entryTypeCode: EntryTypeCode.Incoming,
-    quantities: { 84: 2, 10: 1 },
+    quantities: { 110: 2, 10: 1 },
     otherAmountYen: 50,
   });
   const repo = new InMemoryVoucherLedgerRepository([original]);
@@ -225,7 +225,7 @@ test('red-voucher correction posts reversal and corrected rows atomically', asyn
       processingDate: '2026-01-10',
       entryTypeCode: EntryTypeCode.Outgoing,
       description: 'corrected movement',
-      quantities: { 84: 1 },
+      quantities: { 110: 1 },
       otherAmountYen: 0,
     },
     actor: { employeeNo: 123 },
@@ -249,7 +249,7 @@ test('red-voucher correction posts reversal and corrected rows atomically', asyn
   assert.equal(corrected?.entryTypeCode, EntryTypeCode.Outgoing);
   assert.equal(corrected?.redVoucherStatusCode, 3);
   assert.equal(corrected?.originalLedgerNo, 10);
-  assert.deepEqual(corrected?.quantities, { 84: 1 });
+  assert.deepEqual(corrected?.quantities, { 110: 1 });
 });
 
 test('red-voucher correction rejects already corrected originals', async () => {
@@ -259,7 +259,7 @@ test('red-voucher correction rejects already corrected originals', async () => {
       entryTypeCode: EntryTypeCode.Incoming,
       redVoucherStatusCode: 1,
       reversalLedgerNo: 1000,
-      quantities: { 84: 1 },
+      quantities: { 110: 1 },
     }),
   ]);
   const useCase = new IssueRedVoucherCorrectionUseCase(new InMemoryUnitOfWork(repo));
@@ -277,7 +277,7 @@ test('red-voucher correction rolls back reversal when correction linking fails',
   const original = makeEntry({
     ledgerNo: 10,
     entryTypeCode: EntryTypeCode.Incoming,
-    quantities: { 84: 1 },
+    quantities: { 110: 1 },
     otherAmountYen: 10,
   });
   const repo = new InMemoryVoucherLedgerRepository([original]);
@@ -292,7 +292,7 @@ test('red-voucher correction rolls back reversal when correction linking fails',
         processingDate: '2026-01-10',
         entryTypeCode: EntryTypeCode.Outgoing,
         description: 'corrected movement',
-        quantities: { 84: 1 },
+        quantities: { 110: 1 },
       },
     }),
     /forced link failure/,

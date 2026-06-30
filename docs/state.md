@@ -53,15 +53,22 @@ The FileMaker application revolves around a ledger table:
 - `赤伝票CD`, `元伝票No`, `赤伝票No`, `訂正伝票No`: correction linkage.
 - `推定残*`, `残高合計`, `差異`: FileMaker calculations/summaries that are now explicit SQL read models.
 
-### Denomination Repetition Mapping
+### Current Denominations
 
-FileMaker stores voucher quantities in a 16-repetition field. The current migration maps repetitions to denominations in this order:
+The current application accepts these active denominations:
+
+- Stamps: `1`, `2`, `5`, `10`, `20`, `50`, `110`, `140`
+- Letter packs: `430`, `600`
+
+### Legacy Denomination Repetition Mapping
+
+FileMaker stores voucher quantities in a 16-repetition field. Legacy imports keep the full historical repetition mapping so old rows can transform and reconcile even when a denomination is no longer active:
 
 ```text
 1, 2, 10, 50, 84, 94, 120, 140, 210, 5, 20, 52, 110, 270, 430, 600
 ```
 
-PostgreSQL normalizes this into `voucher_ledger_entry_denominations`.
+PostgreSQL normalizes this into `voucher_ledger_entry_denominations`. Obsolete legacy-only denominations are seeded as inactive.
 
 ## Migration
 
