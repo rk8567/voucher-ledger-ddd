@@ -67,6 +67,8 @@ npm run migrate -- all `
   --ledger filemaker/exports/L_T金券管理台帳.htm
 ```
 
+Note: the expected ledger input is one complete `L_T金券管理台帳` export. If FileMaker has to be exported in branch-specific files because of an export issue (like same branch code for all entries), import those files separately; the importer aborts if `出納No` overlaps.
+
 Start development server:
 
 ```bash

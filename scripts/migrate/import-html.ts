@@ -126,6 +126,17 @@ const LEGACY_DENOMINATIONS_BY_REPETITION = [
   1, 2, 10, 50, 84, 94, 120, 140, 210, 5, 20, 52, 110, 270, 430, 600,
 ] as const;
 
+type ExistingStagingLedger = {
+  ledgerNo: number;
+  branchCode: number | null;
+  sourceFile: string;
+};
+
+type SeenImportLedger = {
+  branchCode: number;
+  rowNumber: number;
+};
+
 function mapRow(row: HtmlTableRow, columnMap: Record<string, string>): Record<string, string> {
   const mapped: Record<string, string> = {};
   for (const [source, target] of Object.entries(columnMap)) {
@@ -211,20 +222,33 @@ async function importRawLedgerRows(
 ): Promise<number> {
   let inserted = 0;
   const skippedRows: string[] = [];
+  const existingLedgerNos = await loadExistingStagingLedgerNos(client);
+  const seenLedgerNos = new Map<number, SeenImportLedger>();
 
   for (const [index, row] of rows.entries()) {
     const entryTypeCode = asNullableInt(row.入出区分CD);
     const processingDate = asNullableDate(row.処理日);
     const branchCode = asNullableInt(row.拠点CD);
+    const counterpartyBranchCode = normalizedCounterpartyBranchCode(row, branchCode);
     const ledgerNo = asNullableInt(row.出納No);
     if (entryTypeCode == null || processingDate == null || branchCode == null || ledgerNo == null) {
       if (isLegacySummaryOnlyRow(row)) continue;
 
       skippedRows.push(
-        `row ${index + 1}: 出納No=${row.出納No || '(blank)'}, 拠点CD=${row.拠点CD || '(blank)'}, 処理日=${row.処理日 || '(blank)'}, 入出区分CD=${row.入出区分CD || '(blank)'}`,
+        `row ${index + 1}: 出納No=${row.出納No || '(blank)'}, 拠点CD=${row.拠点CD || '(blank)'}, 拠点CD[2]=${row['拠点CD[2]'] || '(blank)'}, 処理日=${row.処理日 || '(blank)'}, 入出区分CD=${row.入出区分CD || '(blank)'}`,
       );
       continue;
     }
+
+    assertLedgerNoImportIsSafe({
+      filePath,
+      ledgerNo,
+      branchCode,
+      rowNumber: index + 1,
+      existing: existingLedgerNos.get(ledgerNo),
+      seen: seenLedgerNos.get(ledgerNo),
+    });
+    seenLedgerNos.set(ledgerNo, { branchCode, rowNumber: index + 1 });
 
     const originalLedgerNo = asNullableInt(row.元伝票No);
     const reversalLedgerNo = asNullableInt(row.赤伝票No);
@@ -255,7 +279,7 @@ async function importRawLedgerRows(
       asNullableInt(row.連番) ?? index + 1,
       entryTypeCode,
       null,
-      null,
+      counterpartyBranchCode,
       null,
       row.摘要 || row.内容 || '(raw legacy import)',
       responsibleEmployeeNo,
@@ -290,6 +314,63 @@ async function importRawLedgerRows(
   }
 
   return inserted;
+}
+
+async function loadExistingStagingLedgerNos(client: PoolClient): Promise<Map<number, ExistingStagingLedger>> {
+  const result = await client.query<{
+    ledger_no: string | number;
+    branch_code: string | number | null;
+    source_file: string;
+  }>(
+    `SELECT ledger_no, branch_code, source_file
+       FROM legacy_filemaker_voucher_ledger_staging
+      WHERE ledger_no IS NOT NULL`,
+  );
+
+  const existing = new Map<number, ExistingStagingLedger>();
+  for (const row of result.rows) {
+    const ledgerNo = Number(row.ledger_no);
+    if (!Number.isInteger(ledgerNo)) continue;
+
+    existing.set(ledgerNo, {
+      ledgerNo,
+      branchCode: row.branch_code == null ? null : Number(row.branch_code),
+      sourceFile: row.source_file,
+    });
+  }
+  return existing;
+}
+
+function assertLedgerNoImportIsSafe(input: {
+  filePath: string;
+  ledgerNo: number;
+  branchCode: number;
+  rowNumber: number;
+  existing: ExistingStagingLedger | undefined;
+  seen: SeenImportLedger | undefined;
+}): void {
+  if (input.seen) {
+    throw new Error(
+      `Ledger import aborted: 出納No ${input.ledgerNo} appears more than once in ${input.filePath} `
+      + `(rows ${input.seen.rowNumber} and ${input.rowNumber}).`,
+    );
+  }
+
+  if (!input.existing || input.existing.sourceFile === input.filePath) return;
+
+  throw new Error(
+    `Ledger import aborted: 出納No ${input.ledgerNo} from ${input.filePath} row ${input.rowNumber} `
+    + `overlaps with ${input.existing.sourceFile} `
+    + `(existing 拠点CD=${input.existing.branchCode ?? 'blank'}, incoming 拠点CD=${input.branchCode}). `
+    + 'The current application treats 出納No as globally unique, so overlapping exports must be resolved before import.',
+  );
+}
+
+function normalizedCounterpartyBranchCode(row: Record<string, string>, branchCode: number | null): number | null {
+  const counterpartyBranchCode = asNullableInt(row['拠点CD[2]']);
+  if (counterpartyBranchCode == null) return null;
+  if (branchCode != null && counterpartyBranchCode === branchCode) return null;
+  return counterpartyBranchCode;
 }
 
 async function loadEmployeeResolver(

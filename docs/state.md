@@ -99,6 +99,10 @@ npm run migrate -- status
 
 Ledger import now fails instead of silently skipping rows when required source fields are missing (`出納No`, `拠点CD`, `処理日`, `入出区分CD`). When the export includes `切手金額合計` or `金額合計`, the importer recomputes totals from `枚数N[1..16]` and `その他金額` and aborts on mismatch. The importer also preserves FileMaker `残高合計` in staging for golden-master comparison against PostgreSQL running totals.
 
+Repeat ledger import is safe for the same export file and safe for additional exports only when `出納No` does not overlap. The current schema keeps `出納No` globally unique for correction links and UI lookup, and also has branch-scoped `(拠点CD, 出納No)` uniqueness/indexing to document the FileMaker identity shape. If a future source proves that `出納No` is branch-scoped rather than global, correction links and UI lookup should be migrated before dropping the global uniqueness rule.
+
+FileMaker correction references are preserved in staging exactly as exported. The normalized `voucher_ledger_entries.correction_ledger_no` foreign key is populated only when the referenced `訂正伝票No` exists in staging or already exists in the ledger table; partial exports can therefore load without inventing placeholder correction rows.
+
 The 2026-06-24 local reconciliation run against `postgresql://voucher:pass@localhost:5432/test` completed import and transform for `filemaker/exports/L_T金券管理台帳.htm` after preserving legacy numeric quirks (`20.`, `￥25`, `1808;`) and skipping summary-only placeholder rows that have no posting fields. The first run exposed `9016` mismatches out of `9045` rows because the application running-balance view intentionally orders by business date and excludes deleted rows, while FileMaker `残高合計` uses legacy `連番, 出納No` order and includes deleted legacy rows in the historical total. The reconciliation view now uses the FileMaker-compatible order for golden-master comparison only. Result after reapplying schema on 2026-06-24: `9045` rows compared, `0` mismatches.
 
 ### Data Compatibility Decisions

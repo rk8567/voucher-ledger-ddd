@@ -197,9 +197,33 @@ CREATE INDEX IF NOT EXISTS idx_legacy_import_audit_event_at
 CREATE INDEX IF NOT EXISTS idx_legacy_voucher_staging_branch
   ON legacy_filemaker_voucher_ledger_staging(branch_code, processing_date, ledger_no);
 
+DO $$
+DECLARE
+  duplicate_ledger_no bigint;
+  duplicate_count integer;
+BEGIN
+  SELECT ledger_no, count(*)::integer
+    INTO duplicate_ledger_no, duplicate_count
+    FROM legacy_filemaker_voucher_ledger_staging
+   WHERE ledger_no IS NOT NULL
+   GROUP BY ledger_no
+  HAVING count(*) > 1
+   ORDER BY ledger_no
+   LIMIT 1;
+
+  IF duplicate_ledger_no IS NOT NULL THEN
+    RAISE EXCEPTION 'legacy staging contains duplicate 出納No=% across % rows; resolve overlap before applying uniqueness', duplicate_ledger_no, duplicate_count;
+  END IF;
+END;
+$$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_legacy_voucher_staging_ledger_no
   ON legacy_filemaker_voucher_ledger_staging(ledger_no)
   WHERE ledger_no IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_legacy_voucher_staging_branch_ledger_no
+  ON legacy_filemaker_voucher_ledger_staging(branch_code, ledger_no)
+  WHERE branch_code IS NOT NULL AND ledger_no IS NOT NULL;
 
 DO $$
 BEGIN

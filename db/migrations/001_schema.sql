@@ -196,11 +196,14 @@ ALTER TABLE voucher_ledger_entries
   DROP CONSTRAINT IF EXISTS voucher_ledger_entries_other_amount_check;
 
 COMMENT ON TABLE voucher_ledger_entries IS 'Source-of-truth ledger rows migrated from T切手出納台帳 / T金券管理台帳.';
-COMMENT ON COLUMN voucher_ledger_entries.ledger_no IS 'Legacy 出納No. Use voucher_ledger_no_seq for new rows; reset sequence after importing legacy rows.';
+COMMENT ON COLUMN voucher_ledger_entries.ledger_no IS 'Legacy 出納No. Currently treated as globally unique. (branch_code, ledger_no) is also indexed to make the branch-scoped legacy identity explicit.';
 COMMENT ON COLUMN voucher_ledger_entries.daily_sequence IS 'Legacy 連番. Not unique: 赤伝票/correction rows may duplicate the original legacy sequence.';
 COMMENT ON COLUMN voucher_ledger_entries.posted_at IS 'When set, financial fields and denomination rows are immutable; correction must use 赤伝票.';
 
 CREATE INDEX IF NOT EXISTS idx_voucher_entries_branch_ledger_no
+  ON voucher_ledger_entries(branch_code, ledger_no);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_voucher_entries_branch_ledger_no
   ON voucher_ledger_entries(branch_code, ledger_no);
 
 CREATE INDEX IF NOT EXISTS idx_voucher_entries_branch_processing_date

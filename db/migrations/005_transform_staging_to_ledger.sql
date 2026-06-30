@@ -28,6 +28,42 @@ ALTER TABLE voucher_ledger_entries
   ADD COLUMN IF NOT EXISTS filemaker_login_employee_no integer,
   ADD COLUMN IF NOT EXISTS filemaker_login_employee_name text;
 
+DO $$
+DECLARE
+  duplicate_ledger_no bigint;
+  duplicate_count integer;
+  conflicting_ledger_no bigint;
+  existing_branch integer;
+  staging_branch integer;
+BEGIN
+  SELECT ledger_no, count(*)::integer
+    INTO duplicate_ledger_no, duplicate_count
+    FROM legacy_filemaker_voucher_ledger_staging
+   WHERE ledger_no IS NOT NULL
+   GROUP BY ledger_no
+  HAVING count(*) > 1
+   ORDER BY ledger_no
+   LIMIT 1;
+
+  IF duplicate_ledger_no IS NOT NULL THEN
+    RAISE EXCEPTION 'legacy transform aborted: staging contains duplicate 出納No=% across % rows', duplicate_ledger_no, duplicate_count;
+  END IF;
+
+  SELECT s.ledger_no, e.branch_code, s.branch_code
+    INTO conflicting_ledger_no, existing_branch, staging_branch
+    FROM legacy_filemaker_voucher_ledger_staging s
+    JOIN voucher_ledger_entries e ON e.ledger_no = s.ledger_no
+   WHERE s.branch_code IS NOT NULL
+     AND e.branch_code IS DISTINCT FROM s.branch_code
+   ORDER BY s.ledger_no
+   LIMIT 1;
+
+  IF conflicting_ledger_no IS NOT NULL THEN
+    RAISE EXCEPTION 'legacy transform aborted: 出納No=% already exists for 拠点CD=% but staging has 拠点CD=%', conflicting_ledger_no, existing_branch, staging_branch;
+  END IF;
+END;
+$$;
+
 -- Stub missing FK targets so legacy rows can load before full master cleanup.
 INSERT INTO branches (branch_code, branch_name, active)
 SELECT DISTINCT s.branch_code, 'Legacy branch ' || s.branch_code, false
@@ -72,9 +108,32 @@ WHERE e.employee_no IS NOT NULL
 ON CONFLICT (employee_no) DO NOTHING;
 
 UPDATE voucher_ledger_entries e
-SET responsible_employee_no = s.responsible_employee_no,
+SET branch_code = s.branch_code,
+    counterparty_branch_code = CASE
+      WHEN s.counterparty_branch_code IS NOT NULL AND s.counterparty_branch_code <> s.branch_code
+        THEN s.counterparty_branch_code
+      ELSE NULL
+    END,
+    responsible_employee_no = s.responsible_employee_no,
     registered_by_employee_no = s.registered_by_employee_no,
     updated_by_employee_no = s.updated_by_employee_no,
+    correction_ledger_no = CASE
+      WHEN s.correction_ledger_no IS NOT NULL
+       AND (
+         EXISTS (
+           SELECT 1
+             FROM legacy_filemaker_voucher_ledger_staging linked_staging
+            WHERE linked_staging.ledger_no = s.correction_ledger_no
+         )
+         OR EXISTS (
+           SELECT 1
+             FROM voucher_ledger_entries linked_entry
+            WHERE linked_entry.ledger_no = s.correction_ledger_no
+         )
+       )
+        THEN s.correction_ledger_no
+      ELSE NULL
+    END,
     registered_at = COALESCE(s.registered_at, e.registered_at),
     updated_at = COALESCE(s.updated_at, e.updated_at),
     filemaker_login_employee_no = s.filemaker_login_employee_no,
@@ -82,9 +141,32 @@ SET responsible_employee_no = s.responsible_employee_no,
 FROM legacy_filemaker_voucher_ledger_staging s
 WHERE s.ledger_no = e.ledger_no
   AND (
-    e.responsible_employee_no IS DISTINCT FROM s.responsible_employee_no
+    e.branch_code IS DISTINCT FROM s.branch_code
+    OR e.counterparty_branch_code IS DISTINCT FROM CASE
+      WHEN s.counterparty_branch_code IS NOT NULL AND s.counterparty_branch_code <> s.branch_code
+        THEN s.counterparty_branch_code
+      ELSE NULL
+    END
+    OR e.responsible_employee_no IS DISTINCT FROM s.responsible_employee_no
     OR e.registered_by_employee_no IS DISTINCT FROM s.registered_by_employee_no
     OR e.updated_by_employee_no IS DISTINCT FROM s.updated_by_employee_no
+    OR e.correction_ledger_no IS DISTINCT FROM CASE
+      WHEN s.correction_ledger_no IS NOT NULL
+       AND (
+         EXISTS (
+           SELECT 1
+             FROM legacy_filemaker_voucher_ledger_staging linked_staging
+            WHERE linked_staging.ledger_no = s.correction_ledger_no
+         )
+         OR EXISTS (
+           SELECT 1
+             FROM voucher_ledger_entries linked_entry
+            WHERE linked_entry.ledger_no = s.correction_ledger_no
+         )
+       )
+        THEN s.correction_ledger_no
+      ELSE NULL
+    END
     OR (s.registered_at IS NOT NULL AND e.registered_at IS DISTINCT FROM s.registered_at)
     OR (s.updated_at IS NOT NULL AND e.updated_at IS DISTINCT FROM s.updated_at)
     OR e.filemaker_login_employee_no IS DISTINCT FROM s.filemaker_login_employee_no
@@ -155,7 +237,23 @@ SELECT
   COALESCE(s.red_voucher_status_code, 0),
   s.original_ledger_no,
   s.reversal_ledger_no,
-  s.correction_ledger_no,
+  CASE
+    WHEN s.correction_ledger_no IS NOT NULL
+     AND (
+       EXISTS (
+         SELECT 1
+           FROM legacy_filemaker_voucher_ledger_staging linked_staging
+          WHERE linked_staging.ledger_no = s.correction_ledger_no
+       )
+       OR EXISTS (
+         SELECT 1
+           FROM voucher_ledger_entries linked_entry
+          WHERE linked_entry.ledger_no = s.correction_ledger_no
+       )
+     )
+      THEN s.correction_ledger_no
+    ELSE NULL
+  END,
   COALESCE(s.is_deleted, false),
   COALESCE(s.registered_at, s.imported_at, now()),
   s.registered_by_employee_no,
