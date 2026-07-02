@@ -124,6 +124,9 @@ SET branch_code = s.branch_code,
            SELECT 1
              FROM legacy_filemaker_voucher_ledger_staging linked_staging
             WHERE linked_staging.ledger_no = s.correction_ledger_no
+              AND linked_staging.branch_code IS NOT NULL
+              AND linked_staging.processing_date IS NOT NULL
+              AND linked_staging.entry_type_code IS NOT NULL
          )
          OR EXISTS (
            SELECT 1
@@ -157,6 +160,9 @@ WHERE s.ledger_no = e.ledger_no
            SELECT 1
              FROM legacy_filemaker_voucher_ledger_staging linked_staging
             WHERE linked_staging.ledger_no = s.correction_ledger_no
+              AND linked_staging.branch_code IS NOT NULL
+              AND linked_staging.processing_date IS NOT NULL
+              AND linked_staging.entry_type_code IS NOT NULL
          )
          OR EXISTS (
            SELECT 1
@@ -244,6 +250,9 @@ SELECT
          SELECT 1
            FROM legacy_filemaker_voucher_ledger_staging linked_staging
           WHERE linked_staging.ledger_no = s.correction_ledger_no
+            AND linked_staging.branch_code IS NOT NULL
+            AND linked_staging.processing_date IS NOT NULL
+            AND linked_staging.entry_type_code IS NOT NULL
        )
        OR EXISTS (
          SELECT 1
