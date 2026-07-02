@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { createPool, queryCount, runSchemaMigrations, runSqlFile, withTransaction } from './db.js';
 import { importLedgerHtml, importMasterHtml } from './import-html.js';
 import type { MasterImportTarget } from './field-mapping.js';
@@ -16,8 +16,10 @@ function usage(): never {
   npm run migrate -- schema
   npm run migrate -- import-masters --branches filemaker/exports/M拠点L.htm [--entry-types ...] [--transaction-categories ...] [--red-voucher-statuses ...] [--employees ...]
   npm run migrate -- import-ledger --file filemaker/exports/L_T金券管理台帳.htm
+  npm run migrate -- import-ledger --file "filemaker/exports/L_T金券管理台帳_*.htm"
   npm run migrate -- transform
   npm run migrate -- all --ledger filemaker/exports/L_T金券管理台帳.htm [--branches ...] [--entry-types ...] [--transaction-categories ...] [--red-voucher-statuses ...] [--employees ...]
+  npm run migrate -- all --ledger "filemaker/exports/L_T金券管理台帳_*.htm" [--branches ...]
   npm run migrate -- status
 
 Environment:
@@ -30,17 +32,63 @@ Note:
 }
 
 function readArg(flag: string): string | undefined {
-  const index = process.argv.indexOf(flag);
-  if (index === -1) return undefined;
-  return process.argv[index + 1];
+  return readArgs(flag)[0];
 }
 
-function requireFile(flag: string, label: string): string {
-  const value = readArg(flag);
-  if (!value) throw new Error(`${label} requires ${flag} <path>`);
-  const path = resolve(ROOT, value);
-  if (!existsSync(path)) throw new Error(`File not found: ${path}`);
-  return path;
+function readArgs(flag: string): string[] {
+  const values: string[] = [];
+  for (let index = 0; index < process.argv.length; index += 1) {
+    if (process.argv[index] !== flag) continue;
+    for (let valueIndex = index + 1; valueIndex < process.argv.length; valueIndex += 1) {
+      const value = process.argv[valueIndex];
+      if (!value || value.startsWith('--')) break;
+      values.push(value);
+    }
+  }
+  return values;
+}
+
+function expandFilePatterns(inputs: readonly string[], label: string): string[] {
+  if (inputs.length === 0) throw new Error(`${label} requires at least one path or glob`);
+
+  const files = inputs.flatMap((input) => expandFilePattern(input));
+  const unique = [...new Set(files)].sort((a, b) => a.localeCompare(b, 'ja'));
+  if (unique.length === 0) throw new Error(`${label} did not match any files`);
+  return unique;
+}
+
+function expandFilePattern(input: string): string[] {
+  const absolutePattern = resolve(ROOT, input);
+  if (!hasGlob(input)) {
+    if (!existsSync(absolutePattern)) throw new Error(`File not found: ${absolutePattern}`);
+    if (!statSync(absolutePattern).isFile()) throw new Error(`Not a file: ${absolutePattern}`);
+    return [absolutePattern];
+  }
+
+  const directory = dirname(absolutePattern);
+  const namePattern = basename(absolutePattern);
+  if (hasGlob(directory)) {
+    throw new Error(`Glob directories are not supported: ${input}`);
+  }
+  if (!existsSync(directory)) throw new Error(`Directory not found: ${directory}`);
+
+  const regex = globNameRegex(namePattern);
+  const matches = readdirSync(directory)
+    .filter((name) => regex.test(name))
+    .map((name) => join(directory, name))
+    .filter((path) => statSync(path).isFile());
+  if (matches.length === 0) throw new Error(`No files matched: ${absolutePattern}`);
+  return matches;
+}
+
+function hasGlob(value: string): boolean {
+  return /[*?]/.test(value);
+}
+
+function globNameRegex(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const regex = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(`^${regex}$`, 'i');
 }
 
 async function runSchema(): Promise<void> {
@@ -87,15 +135,19 @@ async function runImportMasters(): Promise<void> {
   }
 }
 
-async function runImportLedger(fileArg?: string): Promise<void> {
-  const filePath = fileArg
-    ? resolve(ROOT, fileArg)
-    : requireFile('--file', 'import-ledger');
-  if (!existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
+async function runImportLedger(fileArgs?: readonly string[]): Promise<void> {
+  const filePaths = expandFilePatterns(fileArgs && fileArgs.length > 0 ? fileArgs : readArgs('--file'), 'import-ledger');
   const pool = createPool();
   try {
-    const inserted = await withTransaction(pool, (client) => importLedgerHtml(client, filePath));
-    console.log(`Loaded ${inserted} ledger rows into legacy_filemaker_voucher_ledger_staging.`);
+    let total = 0;
+    await withTransaction(pool, async (client) => {
+      for (const filePath of filePaths) {
+        const inserted = await importLedgerHtml(client, filePath);
+        total += inserted;
+        console.log(`Loaded ${inserted} ledger rows from ${filePath} into legacy_filemaker_voucher_ledger_staging.`);
+      }
+    });
+    console.log(`Loaded ${total} ledger rows from ${filePaths.length} file(s) into legacy_filemaker_voucher_ledger_staging.`);
   } finally {
     await pool.end();
   }
@@ -133,9 +185,9 @@ async function runAll(): Promise<void> {
     '--red-voucher-statuses',
   ].some((flag) => readArg(flag));
   if (hasMasters) await runImportMasters();
-  const ledgerPath = readArg('--ledger') ?? readArg('--file');
-  if (!ledgerPath) throw new Error('all requires --ledger <path> (ledger HTML export)');
-  await runImportLedger(ledgerPath);
+  const ledgerPaths = [...readArgs('--ledger'), ...readArgs('--file')];
+  if (ledgerPaths.length === 0) throw new Error('all requires --ledger <path-or-glob> (ledger HTML export)');
+  await runImportLedger(ledgerPaths);
   await runTransform();
 }
 

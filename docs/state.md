@@ -87,6 +87,8 @@ filemaker/exports/L_M社員.htm
 filemaker/exports/L_T金券管理台帳.htm
 ```
 
+The ledger input may also be split across multiple HTML exports, for example `filemaker/exports/L_T金券管理台帳_*.htm`. The migration CLI expands quoted `*` and `?` patterns in the final filename segment and imports matching files in sorted order.
+
 ### Migration Flow
 
 1. Apply schema and views: migrations `001` through `006`.
@@ -106,7 +108,7 @@ npm run migrate -- status
 
 Ledger import now fails instead of silently skipping rows when required source fields are missing (`出納No`, `拠点CD`, `処理日`, `入出区分CD`). When the export includes `切手金額合計` or `金額合計`, the importer recomputes totals from `枚数N[1..16]` and `その他金額` and aborts on mismatch. The importer also preserves FileMaker `残高合計` in staging for golden-master comparison against PostgreSQL running totals.
 
-Repeat ledger import is safe for the same export file and safe for additional exports only when `出納No` does not overlap. The current schema keeps `出納No` globally unique for correction links and UI lookup, and also has branch-scoped `(拠点CD, 出納No)` uniqueness/indexing to document the FileMaker identity shape. If a future source proves that `出納No` is branch-scoped rather than global, correction links and UI lookup should be migrated before dropping the global uniqueness rule.
+Repeat ledger import is safe for the same export file and safe for additional exports or glob-matched split exports only when `出納No` does not overlap. The current schema keeps `出納No` globally unique for correction links and UI lookup, and also has branch-scoped `(拠点CD, 出納No)` uniqueness/indexing to document the FileMaker identity shape. If a future source proves that `出納No` is branch-scoped rather than global, correction links and UI lookup should be migrated before dropping the global uniqueness rule.
 
 FileMaker correction references are preserved in staging exactly as exported. The normalized `voucher_ledger_entries.correction_ledger_no` foreign key is populated only when the referenced `訂正伝票No` exists in staging or already exists in the ledger table; partial exports can therefore load without inventing placeholder correction rows.
 

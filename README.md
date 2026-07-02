@@ -67,7 +67,19 @@ npm run migrate -- all `
   --ledger filemaker/exports/L_T金券管理台帳.htm
 ```
 
-Note: the expected ledger input is one complete `L_T金券管理台帳` export. If FileMaker has to be exported in branch-specific files because of an export issue (like same branch code for all entries), import those files separately; the importer aborts if `出納No` overlaps.
+If FileMaker has to be exported in multiple ledger files, pass repeated paths or a quoted filename glob. The migration CLI expands `*` and `?` in the final filename segment:
+
+```powershell
+npm run migrate -- all `
+  --branches filemaker/exports/M拠点L.htm `
+  --entry-types filemaker/exports/M入出区分.htm `
+  --transaction-categories filemaker/exports/M出納区分.htm `
+  --red-voucher-statuses filemaker/exports/M_赤伝票.htm `
+  --employees filemaker/exports/L_M社員.htm `
+  --ledger "filemaker/exports/L_T金券管理台帳_*.htm"
+```
+
+The importer processes matched files in sorted order and aborts if `出納No` overlaps across files, because the current application treats `出納No` as globally unique.
 
 Start development server:
 
@@ -132,6 +144,18 @@ Import and transform FileMaker HTML exports from `filemaker/exports/`:
 
 ```bash
 npm run docker:import
+```
+
+For split ledger exports in Docker, use the same quoted glob with the migrate service:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate all \
+  --branches filemaker/exports/M拠点L.htm \
+  --entry-types filemaker/exports/M入出区分.htm \
+  --transaction-categories filemaker/exports/M出納区分.htm \
+  --red-voucher-statuses filemaker/exports/M_赤伝票.htm \
+  --employees filemaker/exports/L_M社員.htm \
+  --ledger "filemaker/exports/L_T金券管理台帳_*.htm"
 ```
 
 The app is exposed at `http://localhost:${APP_PORT:-3000}`.
