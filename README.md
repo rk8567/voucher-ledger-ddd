@@ -117,7 +117,11 @@ PostgreSQL connections are bound to one database for their lifetime. To test aga
 
 ## Docker Deployment
 
-Create a Docker env file and password secret:
+Run all Docker commands from the repository root.
+
+### 1. Prepare Environment
+
+Create a Compose env file and password secret:
 
 ```bash
 cp deploy/.env.docker.example deploy/.env.docker
@@ -125,28 +129,53 @@ mkdir -p deploy/.secrets
 printf '%s' 'replace-with-a-strong-password' > deploy/.secrets/postgres_password
 ```
 
-Start PostgreSQL and the app:
+Edit `deploy/.env.docker` before first start:
 
 ```bash
-npm run docker:up
+POSTGRES_DB=voucher_ledger
+POSTGRES_USER=voucher
+POSTGRES_PASSWORD_FILE=.secrets/postgres_password
+POSTGRES_PORT=5432
+APP_PORT=3000
 ```
 
-Apply schema:
+`POSTGRES_PASSWORD_FILE` is resolved relative to `deploy/docker-compose.yml`, so `.secrets/postgres_password` means `deploy/.secrets/postgres_password`.
+
+The Dockerfile contains no credentials. Database credentials are supplied through `deploy/.env.docker` and the Docker secret file.
+
+### 2. Build And Start
+
+Build the app and start the bundled PostgreSQL plus Next.js app:
 
 ```bash
-npm run docker:schema
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml up -d --build db app
+```
+
+Check service status:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml ps
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml logs --tail=100 app
+```
+
+The app is exposed at `http://localhost:${APP_PORT:-3000}`.
+
+### 3. Apply Schema
+
+Run schema migrations through the Compose `migrate` tool service:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate schema
 ```
 
 `migrate schema` is safe to re-run against an existing migration database; it adds missing compatibility columns before recreating views and indexes.
 If PostgreSQL logs `column "processing_date" does not exist` after updating the code, rerun `migrate schema` and rebuild/restart the app container so both the database views and application queries are current.
 
-Import and transform FileMaker HTML exports from `filemaker/exports/`:
+### 4. Import FileMaker Data
 
-```bash
-npm run docker:import
-```
+Place FileMaker HTML exports under `filemaker/exports/`. The Compose `migrate` service mounts that directory read-only at `/app/filemaker/exports`.
 
-For split ledger exports in Docker, use the same quoted glob with the migrate service:
+Import master data, import the ledger export, and transform staging data:
 
 ```bash
 docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate all \
@@ -155,12 +184,97 @@ docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --prof
   --transaction-categories filemaker/exports/M出納区分.htm \
   --red-voucher-statuses filemaker/exports/M_赤伝票.htm \
   --employees filemaker/exports/L_M社員.htm \
+  --ledger filemaker/exports/L_T金券管理台帳.htm
+```
+
+For split ledger exports, pass a quoted filename glob:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate all \
+  --branches filemaker/exports/M拠点L.htm \
+  --entry-types filemaker/exports/M入出区分.htm \
+  --transaction-categories filemaker/exports/M出納区分.htm \
+  --red-voucher-statuses filemaker/exports/M_赤伝票.htm \
+  --employees filemaker/exports/L_M社員.htm \
+  --ledger filemaker/exports/L_T金券管理台帳_*.htm
+```
+
+The migration CLI expands `*` and `?` in the final filename segment, imports matched files in sorted order, and aborts if `出納No` overlaps across files.
+
+### 5. Verify Import
+
+Run migration status:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate status
+```
+
+Before cutover, confirm:
+
+- `legacy_filemaker_voucher_ledger_staging` and `voucher_ledger_entries` counts match expectations.
+- `legacy_running_balance_reconciliation.mismatches` is `0` when the export includes `残高合計`.
+- latest `legacy_import_audit_log.latest` rows are expected migration operations.
+
+### 6. Restart Or Update App
+
+After pulling a new commit or changing application code:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml up -d --build app
+```
+
+After schema-affecting updates, rerun schema first:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml --profile tools run --rm migrate schema
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml up -d --build app
+```
+
+Stop services:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml down
+```
+
+To stop containers but keep them defined:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml stop
+```
+
+The PostgreSQL data lives in the Docker named volume `voucher-ledger-ddd_postgres-data`. `down` keeps that volume unless `--volumes` is explicitly supplied.
+
+### 7. Run Migrations Against An External PostgreSQL Host
+
+The Compose file defaults to the bundled database hostname `db`. To target another PostgreSQL host from the migrate container, override `DATABASE_URL` and use `--no-deps` so Compose does not start the bundled `db` service:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml run --rm --no-deps \
+  -e DATABASE_URL='postgresql://db-host.example.com:5432/voucher_ledger' \
+  -e DATABASE_USER='voucher_user' \
+  -e DATABASE_PASSWORD='your-password' \
+  -e DATABASE_PASSWORD_FILE= \
+  migrate schema
+```
+
+Import against the same external database:
+
+```bash
+docker compose --env-file deploy/.env.docker -f deploy/docker-compose.yml run --rm --no-deps \
+  -e DATABASE_URL='postgresql://db-host.example.com:5432/voucher_ledger' \
+  -e DATABASE_USER='voucher_user' \
+  -e DATABASE_PASSWORD='your-password' \
+  -e DATABASE_PASSWORD_FILE= \
+  migrate all \
+  --branches filemaker/exports/M拠点L.htm \
+  --entry-types filemaker/exports/M入出区分.htm \
+  --transaction-categories filemaker/exports/M出納区分.htm \
+  --red-voucher-statuses filemaker/exports/M_赤伝票.htm \
+  --employees filemaker/exports/L_M社員.htm \
   --ledger "filemaker/exports/L_T金券管理台帳_*.htm"
 ```
 
-The app is exposed at `http://localhost:${APP_PORT:-3000}`.
-
-The Dockerfile contains no credentials. Database credentials are supplied through `deploy/.env.docker` and a Docker secret file referenced by `POSTGRES_PASSWORD_FILE`.
+If the database runs on the Docker host, Docker Desktop usually exposes it as `host.docker.internal`. On Linux Docker Engine, add `--add-host=host.docker.internal:host-gateway` to the `docker compose run` command if that name does not resolve.
 
 ## Production Backup, Restore, And Rollback
 
