@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 
@@ -60,6 +61,20 @@ const maxYear = 2035;
 const columns = ledgerColumns;
 const defaultColumnKeys = defaultLedgerColumnKeys;
 
+function storedColumnKeys(storageKey: string, fallback: readonly string[]): readonly string[] {
+  if (typeof window === 'undefined') return fallback;
+  const raw = window.localStorage.getItem(storageKey);
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return fallback;
+    const validKeys = parsed.filter((key) => columns.some((column) => column.key === key));
+    return validKeys.length > 0 ? validKeys : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function LedgerTable({
   entries,
   deletedEntries,
@@ -67,12 +82,13 @@ export function LedgerTable({
   params,
   filterOptions,
 }: LedgerTableProps) {
+  const router = useRouter();
   const [openColumnKey, setOpenColumnKey] = useState<string | null>(null);
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
   const [exportWindowOpen, setExportWindowOpen] = useState(false);
   const [deletedView, setDeletedView] = useState(false);
-  const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(defaultColumnKeys);
-  const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(defaultColumnKeys);
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(() => storedColumnKeys(columnStorageKey, defaultColumnKeys));
+  const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => storedColumnKeys(exportColumnStorageKey, defaultColumnKeys));
   const tableWrapRef = useRef<HTMLDivElement>(null);
   const columnChooserDrag = useDraggablePopup();
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -81,29 +97,11 @@ export function LedgerTable({
   const tableEntries = deletedView ? deletedEntries.items : entries;
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(columnStorageKey);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
-      const validKeys = parsed.filter((key) => columns.some((column) => column.key === key));
-      if (validKeys.length > 0) setVisibleColumnKeys(validKeys);
-    } catch {
-      return;
-    }
+    setVisibleColumnKeys(storedColumnKeys(columnStorageKey, defaultColumnKeys));
   }, []);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(exportColumnStorageKey);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
-      const validKeys = parsed.filter((key) => columns.some((column) => column.key === key));
-      if (validKeys.length > 0) setExportColumnKeys(validKeys);
-    } catch {
-      return;
-    }
+    setExportColumnKeys(storedColumnKeys(exportColumnStorageKey, defaultColumnKeys));
   }, []);
 
   const visibleColumns = useMemo(
@@ -292,10 +290,31 @@ export function LedgerTable({
                 const href = queryHref(params, entry.ledgerNo);
                 const isSelected = selectedLedgerNo === entry.ledgerNo;
                 return (
-                  <tr key={entry.id} className={isSelected ? 'selectedRow' : undefined}>
+                  <tr
+                    key={entry.id}
+                    className={isSelected ? 'clickableRow selectedRow' : 'clickableRow'}
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`出納No ${entry.ledgerNo} の明細を表示`}
+                    onClick={() => router.push(href, { scroll: false })}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      router.push(href, { scroll: false });
+                    }}
+                  >
                     {visibleColumns.map((column) => (
                       <td key={`${entry.id}-${column.key}`} className={cellClassName(column)}>
-                        {column.key === 'ledgerNo' ? <Link href={href}>#{entry.ledgerNo}</Link> : displayCell(entry, column)}
+                        {column.key === 'ledgerNo' ? (
+                          <Link
+                            href={detailWindowHref(params, entry.ledgerNo)}
+                            scroll={false}
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
+                          >
+                            #{entry.ledgerNo}
+                          </Link>
+                        ) : displayCell(entry, column)}
                       </td>
                     ))}
                   </tr>
@@ -905,8 +924,15 @@ function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string
 }
 
 function queryHref(params: Record<string, string | string[] | undefined>, ledgerNo: number): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'actionMessage', 'clearDraft'] });
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'detailWindow', 'actionMessage', 'clearDraft'] });
   next.set('ledgerNo', String(ledgerNo));
+  return `/?${next.toString()}`;
+}
+
+function detailWindowHref(params: Record<string, string | string[] | undefined>, ledgerNo: number): string {
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'detailWindow', 'actionMessage', 'clearDraft'] });
+  next.set('ledgerNo', String(ledgerNo));
+  next.set('detailWindow', '1');
   return `/?${next.toString()}`;
 }
 

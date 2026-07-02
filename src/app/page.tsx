@@ -9,7 +9,7 @@ import {
 } from '@/domain/denominations';
 import { EntryTypeCode } from '@/domain/entryTypes';
 import { RedVoucherStatus, type RedVoucherStatusCode } from '@/domain/redVoucherStatuses';
-import { DEFAULT_LEDGER_PAGE_SIZE, getLedgerDashboardData } from '@/server/ledger';
+import { DEFAULT_LEDGER_PAGE_SIZE, getLedgerDashboardData, type LedgerDashboardData } from '@/server/ledger';
 import { EntryActionModals } from './EntryActionModals';
 import { EntryWorkflowButtons } from './EntryWorkflowButtons';
 import { LedgerTable } from './LedgerTable';
@@ -17,6 +17,7 @@ import { ledgerColumns } from './ledgerColumns';
 import { dateOnly, dateTime, legacyRegistrationFlagText, yen } from './ledgerDisplayFormat';
 import { firstParam, paramsWithout, parseLedgerSearchParams } from './ledgerSearchParams';
 import { ReturnTopButton } from './ReturnTopButton';
+import { DetailWindowBackdrop } from './DetailWindowBackdrop';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +55,8 @@ export default async function Page({ searchParams }: PageProps) {
     const defaultActorEmployeeNo = selected?.filemakerLoginEmployeeNo ?? selected?.updatedByEmployeeNo ?? null;
     const actionMessage = firstParam(params.actionMessage);
     const clearDraft = firstParam(params.clearDraft);
+    const detailWindowOpen = firstParam(params.detailWindow) === '1';
+    const detailWindowCloseHref = detailWindowCloseHrefFromParams(params);
     const pageSize = input.limit ?? DEFAULT_LEDGER_PAGE_SIZE;
     const currentPage = input.page ?? 1;
     const totalPages = Math.max(Math.ceil(data.entries.totalCount / pageSize), 1);
@@ -149,77 +152,26 @@ export default async function Page({ searchParams }: PageProps) {
               selectedEntry={selected}
             />
             {selected ? (
-              <>
-                <DetailSection
-                  title="基本"
-                  rows={[
-                    ['出納No', selected.ledgerNo],
-                    ['摘要', selected.description],
-                    ['備考', selected.remarks],
-                    ['処理日', dateOnly(selected.processingDate)],
-                    ['申請処理日', dateOnly(selected.applicationDate)],
-                    ['対象年月', periodText(selected.periodYear, selected.periodMonth)],
-                    ['連番', selected.dailySequence],
-                    ['登録済', dateTime(selected.postedAt)],
-                  ]}
-                />
-                <DetailSection
-                  title="分類"
-                  rows={[
-                    ['入出区分', codeName(selected.entryTypeCode, selected.entryTypeName ?? entryTypeName(selected.entryTypeCode))],
-                    ['出納区分', codeName(selected.transactionCategoryCode, selected.transactionCategoryName)],
-                    ['状態CD', selected.statusCode],
-                    ['登録ボタン', legacyRegistrationFlagText(selected.legacyRegisteredButtonClicked)],
-                  ]}
-                />
-                <DetailSection
-                  title="担当/帰属"
-                  rows={[
-                    ['拠点', codeName(selected.branchCode, selected.branchName)],
-                    ['部門', codeName(selected.departmentCode, selected.departmentName)],
-                    ['会社', codeName(selected.companyCode, selected.companyName)],
-                    ['担当', codeName(selected.responsibleEmployeeNo, selected.responsibleEmployeeName)],
-                    ['入出拠点', codeName(selected.counterpartyBranchCode, selected.counterpartyBranchName)],
-                  ]}
-                />
-                <DetailSection
-                  title="金額"
-                  rows={[
-                    ['切手金額合計', yen(selected.stampAmountYen)],
-                    ['その他金額', yen(selected.otherAmountYen)],
-                    ['その他金額備考', selected.otherAmountNote],
-                    ['金額合計', yen(selected.totalAmountYen)],
-                    ['枚数合計', stampQuantityCount(selected.quantities)],
-                  ]}
-                />
-                <DenominationDetailGroup title="切手" denominations={displayStampDenominations(selected.quantities)} quantities={selected.quantities} />
-                <DenominationDetailGroup title="レターパック" denominations={displayLetterPackDenominations(selected.quantities)} quantities={selected.quantities} />
-                <DetailSection
-                  title="赤伝票/訂正"
-                  rows={[
-                    ['赤伝票状態', codeName(selected.redVoucherStatusCode, selected.redVoucherStatusName ?? redVoucherText(selected.redVoucherStatusCode))],
-                    ['元伝票No', selected.originalLedgerNo],
-                    ['赤伝票No', selected.reversalLedgerNo],
-                    ['訂正伝票No', selected.correctionLedgerNo],
-                  ]}
-                />
-                <DetailSection
-                  title="監査"
-                  rows={[
-                    ['登録日時', dateTime(selected.registeredAt)],
-                    ['登録担当', codeName(selected.registeredByEmployeeNo, selected.registeredByEmployeeName)],
-                    ['更新日時', dateTime(selected.updatedAt)],
-                    ['更新担当', codeName(selected.updatedByEmployeeNo, selected.updatedByEmployeeName)],
-                    ['作成日時', dateTime(selected.createdAt)],
-                  ]}
-                />
-              </>
+              <SelectedEntryDetails selected={selected} />
             ) : (
               <p className="emptyState">条件に一致する出納がありません。</p>
             )}
             </aside>
           </div>
         </div>
+        {detailWindowOpen && selected ? (
+          <DetailWindowBackdrop closeHref={detailWindowCloseHref}>
+            <section className="entryModal detailWindow" role="dialog" aria-modal="true" aria-labelledby="entry-detail-window-title">
+              <div className="modalHeader">
+                <h2 id="entry-detail-window-title">明細 出納No {selected.ledgerNo}</h2>
+                <Link className="toolbarButton secondaryButton" href={detailWindowCloseHref} scroll={false}>閉じる</Link>
+              </div>
+              <div className="detailWindowBody">
+                <SelectedEntryDetails selected={selected} layout="grid" />
+              </div>
+            </section>
+          </DetailWindowBackdrop>
+        ) : null}
         <ReturnTopButton />
       </main>
     );
@@ -246,6 +198,82 @@ function Metric({ label, value }: Readonly<{ label: string; value: string }>) {
     <div className="metric">
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+function SelectedEntryDetails({
+  selected,
+  layout = 'stack',
+}: Readonly<{
+  selected: NonNullable<LedgerDashboardData['selectedEntry']>;
+  layout?: 'stack' | 'grid';
+}>) {
+  return (
+    <div className={layout === 'grid' ? 'selectedEntryDetails detailWindowGrid' : 'selectedEntryDetails'}>
+      <DetailSection
+        title="基本"
+        rows={[
+          ['出納No', selected.ledgerNo],
+          ['摘要', selected.description],
+          ['備考', selected.remarks],
+          ['処理日', dateOnly(selected.processingDate)],
+          ['申請処理日', dateOnly(selected.applicationDate)],
+          ['対象年月', periodText(selected.periodYear, selected.periodMonth)],
+          ['連番', selected.dailySequence],
+          ['登録済', dateTime(selected.postedAt)],
+        ]}
+      />
+      <DetailSection
+        title="分類"
+        rows={[
+          ['入出区分', codeName(selected.entryTypeCode, selected.entryTypeName ?? entryTypeName(selected.entryTypeCode))],
+          ['出納区分', codeName(selected.transactionCategoryCode, selected.transactionCategoryName)],
+          ['状態CD', selected.statusCode],
+          ['登録ボタン', legacyRegistrationFlagText(selected.legacyRegisteredButtonClicked)],
+        ]}
+      />
+      <DetailSection
+        title="担当/帰属"
+        rows={[
+          ['拠点', codeName(selected.branchCode, selected.branchName)],
+          ['部門', codeName(selected.departmentCode, selected.departmentName)],
+          ['会社', codeName(selected.companyCode, selected.companyName)],
+          ['担当', codeName(selected.responsibleEmployeeNo, selected.responsibleEmployeeName)],
+          ['入出拠点', codeName(selected.counterpartyBranchCode, selected.counterpartyBranchName)],
+        ]}
+      />
+      <DetailSection
+        title="金額"
+        rows={[
+          ['切手金額合計', yen(selected.stampAmountYen)],
+          ['その他金額', yen(selected.otherAmountYen)],
+          ['その他金額備考', selected.otherAmountNote],
+          ['金額合計', yen(selected.totalAmountYen)],
+          ['枚数合計', stampQuantityCount(selected.quantities)],
+        ]}
+      />
+      <DenominationDetailGroup title="切手" denominations={displayStampDenominations(selected.quantities)} quantities={selected.quantities} />
+      <DenominationDetailGroup title="レターパック" denominations={displayLetterPackDenominations(selected.quantities)} quantities={selected.quantities} />
+      <DetailSection
+        title="赤伝票/訂正"
+        rows={[
+          ['赤伝票状態', codeName(selected.redVoucherStatusCode, selected.redVoucherStatusName ?? redVoucherText(selected.redVoucherStatusCode))],
+          ['元伝票No', selected.originalLedgerNo],
+          ['赤伝票No', selected.reversalLedgerNo],
+          ['訂正伝票No', selected.correctionLedgerNo],
+        ]}
+      />
+      <DetailSection
+        title="監査"
+        rows={[
+          ['登録日時', dateTime(selected.registeredAt)],
+          ['登録担当', codeName(selected.registeredByEmployeeNo, selected.registeredByEmployeeName)],
+          ['更新日時', dateTime(selected.updatedAt)],
+          ['更新担当', codeName(selected.updatedByEmployeeNo, selected.updatedByEmployeeName)],
+          ['作成日時', dateTime(selected.createdAt)],
+        ]}
+      />
     </div>
   );
 }
@@ -315,6 +343,12 @@ function displayDateRangeClearHref(
   preserved.set('displayDateFrom', processingDateFrom);
   preserved.set('displayDateTo', processingDateTo);
   const query = preserved.toString();
+  return query ? `/?${query}` : '/';
+}
+
+function detailWindowCloseHrefFromParams(params: Record<string, string | string[] | undefined>): string {
+  const next = paramsWithout(params, { keys: ['detailWindow', 'actionMessage', 'clearDraft'] });
+  const query = next.toString();
   return query ? `/?${query}` : '/';
 }
 

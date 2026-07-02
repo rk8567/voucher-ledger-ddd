@@ -442,6 +442,62 @@ button:disabled {
   width: min(640px, 100%);
 }
 
+.detailWindow {
+  width: min(1320px, calc(100vw - 32px));
+  overflow: auto;
+}
+
+.detailWindowBody {
+  max-height: calc(100vh - 130px);
+  overflow: auto;
+  padding: 12px;
+}
+
+.selectedEntryDetails {
+  min-width: 0;
+}
+
+.detailWindowGrid {
+  display: block;
+  column-width: 260px;
+  column-gap: 12px;
+}
+
+.detailWindowGrid .detailSection,
+.detailWindowGrid .denominationSection {
+  display: inline-block;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0 0 12px;
+  background: var(--surface);
+  break-inside: avoid;
+}
+
+.detailWindowGrid .detailSection {
+  padding: 12px;
+}
+
+.detailWindowGrid .detailSection:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.detailWindowGrid .detailList div {
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.detailWindowGrid .denominationSection h3 {
+  padding: 12px 12px 0;
+}
+
+.detailWindowGrid .denominationGrid {
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  padding: 8px 12px 12px;
+}
+
+
 .exportBody {
   display: grid;
   gap: 12px;
@@ -1080,6 +1136,14 @@ td {
 
 tr:last-child td {
   border-bottom: 0;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.clickableRow:hover td {
+  background: #f2f8f6;
 }
 
 .selectedRow td {
