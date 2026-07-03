@@ -74,12 +74,16 @@ export function EntryActionModals(props: EntryActionModalsProps) {
   useEffect(() => {
     function onOpenWorkflow(event: Event) {
       const workflow = (event as CustomEvent<Workflow>).detail;
-      if (workflow === 'movement' || workflow === 'inventory') setOpenWorkflow(workflow);
+      if (workflow === 'movement' || workflow === 'inventory') {
+        setOpenWorkflow(workflow);
+        return;
+      }
+      if (workflow === 'correction' && correctionAvailable) setOpenWorkflow(workflow);
     }
 
     window.addEventListener(openEntryWorkflowEvent, onOpenWorkflow);
     return () => window.removeEventListener(openEntryWorkflowEvent, onOpenWorkflow);
-  }, []);
+  }, [correctionAvailable]);
 
   return (
     <>

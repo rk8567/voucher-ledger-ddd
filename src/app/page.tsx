@@ -18,6 +18,7 @@ import { dateOnly, dateTime, legacyRegistrationFlagText, yen } from './ledgerDis
 import { firstParam, paramsWithout, parseLedgerSearchParams } from './ledgerSearchParams';
 import { ReturnTopButton } from './ReturnTopButton';
 import { DetailWindowBackdrop } from './DetailWindowBackdrop';
+import { DetailWindowCorrectionButton } from './DetailWindowCorrectionButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,18 @@ const ENTRY_TYPE_LABELS: Record<number, string> = {
 
 function entryTypeName(code: number): string {
   return ENTRY_TYPE_LABELS[code] ?? `入出区分 ${code}`;
+}
+
+function selectedEntryCanCorrect(entry: NonNullable<LedgerDashboardData['selectedEntry']>): boolean {
+  return !entry.isDeleted
+    && entry.redVoucherStatusCode === RedVoucherStatus.Normal
+    && entry.reversalLedgerNo === null
+    && [
+      EntryTypeCode.Incoming,
+      EntryTypeCode.Outgoing,
+      EntryTypeCode.IncomingAlt,
+      EntryTypeCode.OutgoingAlt,
+    ].includes(entry.entryTypeCode);
 }
 
 export default async function Page({ searchParams }: PageProps) {
@@ -166,6 +179,7 @@ export default async function Page({ searchParams }: PageProps) {
                 <h2 id="entry-detail-window-title">明細 出納No {selected.ledgerNo}</h2>
                 <Link className="toolbarButton secondaryButton" href={detailWindowCloseHref} scroll={false}>閉じる</Link>
               </div>
+              <DetailWindowCorrectionButton closeHref={detailWindowCloseHref} disabled={!selectedEntryCanCorrect(selected)} />
               <div className="detailWindowBody">
                 <SelectedEntryDetails selected={selected} layout="grid" />
               </div>
