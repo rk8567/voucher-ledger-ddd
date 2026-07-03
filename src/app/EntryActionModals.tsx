@@ -87,19 +87,6 @@ export function EntryActionModals(props: EntryActionModalsProps) {
 
   return (
     <>
-      {props.selectedEntry ? (
-        <div className="detailActions">
-          <button
-            type="button"
-            className="secondaryButton"
-            disabled={!correctionAvailable}
-            onClick={() => setOpenWorkflow('correction')}
-          >
-            赤伝票で訂正
-          </button>
-        </div>
-      ) : null}
-
       {openWorkflow === 'movement' ? (
         <EntryModal title="新規レコード" onClose={() => setOpenWorkflow(null)}>
           <PersistedEntryForm

@@ -70,6 +70,7 @@ export default async function Page({ searchParams }: PageProps) {
     const clearDraft = firstParam(params.clearDraft);
     const detailWindowOpen = firstParam(params.detailWindow) === '1';
     const detailWindowCloseHref = detailWindowCloseHrefFromParams(params);
+    const detailPanelHidden = firstParam(params.detailPanel) !== 'visible';
     const pageSize = input.limit ?? DEFAULT_LEDGER_PAGE_SIZE;
     const currentPage = input.page ?? 1;
     const totalPages = Math.max(Math.ceil(data.entries.totalCount / pageSize), 1);
@@ -89,20 +90,44 @@ export default async function Page({ searchParams }: PageProps) {
           <div className="headerStats">
             {loginGreeting ? <span>{loginGreeting}</span> : null}
             <span>{data.entries.totalCount} entries</span>
-            <span>{data.currentBalance ? `Branch ${data.currentBalance.branchCode}` : 'No balance'}</span>
           </div>
         </header>
 
-        <section className="summaryBand" aria-label="Current balance">
-          <Metric label="残高合計" value={data.currentBalance ? yen(data.currentBalance.runningTotalAmountYen) : '-'} />
-          <Metric label="切手金額" value={data.currentBalance ? yen(data.currentBalance.runningStampAmountYen) : '-'} />
-          <Metric label="その他金額" value={data.currentBalance ? yen(data.currentBalance.runningOtherAmountYen) : '-'} />
-          <Metric label="基準出納No" value={data.currentBalance?.asOfLedgerNo?.toString() ?? '-'} />
-        </section>
+        <div className="dashboardGrid">
+          <section className="summaryBand" aria-label="Current balance">
+            <Metric label="残高合計" value={data.currentBalance ? yen(data.currentBalance.runningTotalAmountYen) : '-'} />
+            <Metric label="切手金額" value={data.currentBalance ? yen(data.currentBalance.runningStampAmountYen) : '-'} />
+            <Metric label="その他金額" value={data.currentBalance ? yen(data.currentBalance.runningOtherAmountYen) : '-'} />
+            <Metric label="基準出納No" value={data.currentBalance?.asOfLedgerNo?.toString() ?? '-'} />
+          </section>
+          <div className="dashboardActions">
+            <div className="displayDateRangePanel">
+              <DisplayDateRangeForm
+                params={params}
+                processingDateFrom={displayDateRange.from}
+                processingDateTo={displayDateRange.to}
+              />
+            </div>
+            <div className="detailPrimaryActions" aria-label="Entry actions">
+              <EntryWorkflowButtons correctionDisabled={!selected || !selectedEntryCanCorrect(selected)} />
+            </div>
+          </div>
+        </div>
 
         {actionMessage ? <p className="notice successNotice">{actionMessage}</p> : null}
+        <EntryActionModals
+          defaultBranchCode={defaultBranchCode}
+          defaultProcessingDate={defaultProcessingDate}
+          defaultPeriodYear={defaultPeriodYear}
+          defaultPeriodMonth={defaultPeriodMonth}
+          defaultResponsibleEmployeeNo={defaultResponsibleEmployeeNo}
+          defaultActorEmployeeNo={defaultActorEmployeeNo}
+          clearDraft={clearDraft === 'movement' || clearDraft === 'inventory' || clearDraft === 'correction' ? clearDraft : null}
+          options={data.formOptions}
+          selectedEntry={selected}
+        />
 
-        <div className="contentGrid">
+        <div className={detailPanelHidden ? 'contentGrid detailPanelHidden' : 'contentGrid'}>
           <section id="ledger-entries" className="panel ledgerPanel" aria-label="Ledger entries">
             <div className="panelHeader">
               <h2>出納一覧</h2>
@@ -137,46 +162,39 @@ export default async function Page({ searchParams }: PageProps) {
             />
           </section>
 
-          <div className="detailColumn">
-            <div className="detailPrimaryActions" aria-label="Entry actions">
-              <EntryWorkflowButtons />
-            </div>
-            <div className="displayDateRangePanel">
-              <DisplayDateRangeForm
-                params={params}
-                processingDateFrom={displayDateRange.from}
-                processingDateTo={displayDateRange.to}
-              />
-            </div>
-            <aside className="panel detailPanel" aria-label="Selected entry detail">
+          {detailPanelHidden ? null : (
+          <aside className="panel detailPanel" aria-label="Selected entry detail">
             <div className="panelHeader">
               <h2>明細</h2>
-              <span>{selected ? `出納No ${selected.ledgerNo}` : '未選択'}</span>
             </div>
-            <EntryActionModals
-              defaultBranchCode={defaultBranchCode}
-              defaultProcessingDate={defaultProcessingDate}
-              defaultPeriodYear={defaultPeriodYear}
-              defaultPeriodMonth={defaultPeriodMonth}
-              defaultResponsibleEmployeeNo={defaultResponsibleEmployeeNo}
-              defaultActorEmployeeNo={defaultActorEmployeeNo}
-              clearDraft={clearDraft === 'movement' || clearDraft === 'inventory' || clearDraft === 'correction' ? clearDraft : null}
-              options={data.formOptions}
-              selectedEntry={selected}
-            />
             {selected ? (
               <SelectedEntryDetails selected={selected} />
             ) : (
               <p className="emptyState">条件に一致する出納がありません。</p>
             )}
-            </aside>
-          </div>
+          </aside>
+          )}
         </div>
+        <Link
+          className={detailPanelHidden ? 'detailPanelSlideToggle detailPanelSlideToggleHidden' : 'detailPanelSlideToggle'}
+          href={detailPanelHidden ? showDetailPanelHref(params) : hideDetailPanelHref(params)}
+          scroll={false}
+          aria-label={detailPanelHidden ? '明細を表示' : '明細を隠す'}
+        >
+          <svg
+            className="detailPanelSlideToggleArrow"
+            viewBox="0 0 8 14"
+            aria-hidden="true"
+          >
+            <path d={detailPanelHidden ? 'M6 1.5 2 7l4 5.5' : 'M2 1.5 6 7l-4 5.5'} />
+          </svg>
+          <span className="detailPanelSlideToggleLabel">明細</span>
+        </Link>
         {detailWindowOpen && selected ? (
           <DetailWindowBackdrop closeHref={detailWindowCloseHref}>
             <section className="entryModal detailWindow" role="dialog" aria-modal="true" aria-labelledby="entry-detail-window-title">
               <div className="modalHeader">
-                <h2 id="entry-detail-window-title">明細 出納No {selected.ledgerNo}</h2>
+                <h2 id="entry-detail-window-title">明細</h2>
                 <Link className="toolbarButton secondaryButton" href={detailWindowCloseHref} scroll={false}>閉じる</Link>
               </div>
               <DetailWindowCorrectionButton closeHref={detailWindowCloseHref} disabled={!selectedEntryCanCorrect(selected)} />
@@ -364,6 +382,18 @@ function detailWindowCloseHrefFromParams(params: Record<string, string | string[
   const next = paramsWithout(params, { keys: ['detailWindow', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/?${query}` : '/';
+}
+
+function hideDetailPanelHref(params: Record<string, string | string[] | undefined>): string {
+  const next = paramsWithout(params, { keys: ['detailPanel', 'detailWindow', 'actionMessage', 'clearDraft'] });
+  const query = next.toString();
+  return query ? `/?${query}` : '/';
+}
+
+function showDetailPanelHref(params: Record<string, string | string[] | undefined>): string {
+  const next = paramsWithout(params, { keys: ['detailPanel', 'actionMessage', 'clearDraft'] });
+  next.set('detailPanel', 'visible');
+  return `/?${next.toString()}`;
 }
 
 function displayDateRangeValues(

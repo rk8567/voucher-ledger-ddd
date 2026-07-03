@@ -309,6 +309,7 @@ export function LedgerTable({
                           <Link
                             href={detailWindowHref(params, entry.ledgerNo)}
                             scroll={false}
+                            title="明細ウィンドウを開く"
                             onClick={(event) => event.stopPropagation()}
                             onKeyDown={(event) => event.stopPropagation()}
                           >

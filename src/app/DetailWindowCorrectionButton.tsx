@@ -13,10 +13,10 @@ export function DetailWindowCorrectionButton({ closeHref, disabled }: DetailWind
   const router = useRouter();
 
   return (
-    <div className="detailActions">
+    <div className="detailWindowActions">
       <button
         type="button"
-        className="secondaryButton"
+        className="toolbarButton secondaryButton"
         disabled={disabled}
         onClick={() => {
           window.dispatchEvent(new CustomEvent(openEntryWorkflowEvent, { detail: 'correction' }));

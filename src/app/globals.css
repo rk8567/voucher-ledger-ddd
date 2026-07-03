@@ -240,9 +240,10 @@ button:disabled {
 
 .summaryBand {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 14px;
+  min-width: 0;
+  height: 100%;
 }
 
 .notice {
@@ -265,6 +266,10 @@ button:disabled {
 }
 
 .metric {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: center;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
@@ -284,6 +289,7 @@ button:disabled {
   line-height: 1.2;
 }
 
+.dashboardGrid,
 .contentGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.9fr) minmax(320px, 0.75fr);
@@ -291,15 +297,76 @@ button:disabled {
   align-items: start;
 }
 
-.ledgerPanel,
-.detailPanel,
-.detailColumn {
-  min-width: 0;
+.dashboardGrid {
+  align-items: stretch;
+  margin-bottom: 14px;
 }
 
-.detailColumn {
+.contentGrid.detailPanelHidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.detailPanelSlideToggle {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  z-index: 60;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+  padding: 8px 6px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: -2px 4px 14px rgba(37, 48, 54, 0.14);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.5;
+  text-align: center;
+  transform: translateY(-50%);
+  transition: transform 120ms ease, background 120ms ease, opacity 120ms ease;
+}
+
+.detailPanelSlideToggle:hover {
+  background: #f9faf8;
+  color: var(--accent-dark);
+  opacity: 1;
+  text-decoration: none;
+  transform: translate(-4px, -50%);
+}
+
+.detailPanelSlideToggleArrow {
+  display: block;
+  width: 8px;
+  height: 14px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.detailPanelSlideToggleLabel {
+  line-height: 1;
+  writing-mode: vertical-rl;
+}
+
+.dashboardActions {
   display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  min-width: 0;
   gap: 10px;
+  height: 100%;
+}
+
+.ledgerPanel,
+.detailPanel {
+  min-width: 0;
 }
 
 .panelHeader {
@@ -364,7 +431,7 @@ button:disabled {
   align-items: stretch;
   border: 1px solid var(--line);
   border-radius: 8px;
-  min-height: 94px;
+  min-height: 0;
   padding: 12px;
   background: var(--surface);
 }
@@ -379,10 +446,11 @@ button:disabled {
   flex: 1;
   align-self: stretch;
   min-height: 54px;
-  font-size: 14px;
 }
 
 .displayDateRangePanel {
+  display: grid;
+  align-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
@@ -445,6 +513,13 @@ button:disabled {
 .detailWindow {
   width: min(1320px, calc(100vw - 32px));
   overflow: auto;
+}
+
+.detailWindowActions {
+  display: flex;
+  justify-content: flex-end;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 16px;
 }
 
 .detailWindowBody {
@@ -1162,17 +1237,6 @@ tr:last-child td {
   text-align: left;
 }
 
-.detailActions {
-  display: flex;
-  justify-content: stretch;
-  border-bottom: 1px solid var(--line);
-  padding: 12px 16px;
-}
-
-.detailActions button {
-  width: 100%;
-}
-
 .detailSection {
   border-bottom: 1px solid var(--line);
   padding: 12px 16px;
@@ -1280,6 +1344,7 @@ dd {
 }
 
 @media (max-width: 1280px) {
+  .dashboardGrid,
   .contentGrid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1324,6 +1389,7 @@ dd {
 
   .filterGrid,
   .summaryBand,
+  .dashboardGrid,
   .contentGrid,
   .entryForm,
   .quantityInputs,
