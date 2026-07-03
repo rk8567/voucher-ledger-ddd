@@ -1,17 +1,12 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-
 import { openEntryWorkflowEvent } from './entryWorkflowEvents';
 
 type DetailWindowCorrectionButtonProps = Readonly<{
-  closeHref: string;
   disabled: boolean;
 }>;
 
-export function DetailWindowCorrectionButton({ closeHref, disabled }: DetailWindowCorrectionButtonProps) {
-  const router = useRouter();
-
+export function DetailWindowCorrectionButton({ disabled }: DetailWindowCorrectionButtonProps) {
   return (
     <div className="detailWindowActions">
       <button
@@ -20,7 +15,6 @@ export function DetailWindowCorrectionButton({ closeHref, disabled }: DetailWind
         disabled={disabled}
         onClick={() => {
           window.dispatchEvent(new CustomEvent(openEntryWorkflowEvent, { detail: 'correction' }));
-          router.push(closeHref, { scroll: false });
         }}
       >
         赤伝票で訂正

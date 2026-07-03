@@ -453,7 +453,7 @@ BEGIN
   entered_total_amount := entered_total_amount + NEW.other_amount;
 
   IF amount_required AND entered_total_amount <= 0 THEN
-    RAISE EXCEPTION 'Amount or denomination quantity is required for entry_type_code=%', NEW.entry_type_code;
+    RAISE EXCEPTION '切手の枚数またはその他金額を入力してください (entry_type_code=%)', NEW.entry_type_code;
   END IF;
 
   IF entry_effect IN ('incoming', 'outgoing', 'inventory_check') THEN

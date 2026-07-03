@@ -481,9 +481,16 @@ button:disabled {
   background: rgb(31 37 35 / 48%);
 }
 
+.entryModalBackdrop {
+  z-index: 110;
+}
+
 .entryModal {
+  display: flex;
+  flex-direction: column;
   width: min(980px, 100%);
   max-height: min(820px, calc(100vh - 48px));
+  max-height: min(820px, calc(100dvh - 48px));
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -629,8 +636,9 @@ button:disabled {
 }
 
 .modalEntryForm {
-  max-height: calc(100vh - 130px);
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   padding: 16px;
 }
 

@@ -45,6 +45,7 @@ function selectedEntryCanCorrect(entry: NonNullable<LedgerDashboardData['selecte
   return !entry.isDeleted
     && entry.redVoucherStatusCode === RedVoucherStatus.Normal
     && entry.reversalLedgerNo === null
+    && entry.totalAmountYen > 0
     && [
       EntryTypeCode.Incoming,
       EntryTypeCode.Outgoing,
@@ -77,7 +78,6 @@ export default async function Page({ searchParams }: PageProps) {
     const previousHref = currentPage > 1 ? pageHref(params, currentPage - 1) : null;
     const nextHref = currentPage < totalPages ? pageHref(params, currentPage + 1) : null;
     const pageNumbers = paginationItems(currentPage, totalPages);
-    const loginGreeting = selected ? loginEmployeeGreeting(selected.filemakerLoginEmployeeNo, selected.filemakerLoginEmployeeName) : null;
     const displayDateRange = displayDateRangeValues(params, input.processingDateFrom, input.processingDateTo);
 
     return (
@@ -88,7 +88,6 @@ export default async function Page({ searchParams }: PageProps) {
             <h1>金券管理台帳</h1>
           </div>
           <div className="headerStats">
-            {loginGreeting ? <span>{loginGreeting}</span> : null}
             <span>{data.entries.totalCount} entries</span>
           </div>
         </header>
@@ -197,7 +196,7 @@ export default async function Page({ searchParams }: PageProps) {
                 <h2 id="entry-detail-window-title">明細</h2>
                 <Link className="toolbarButton secondaryButton" href={detailWindowCloseHref} scroll={false}>閉じる</Link>
               </div>
-              <DetailWindowCorrectionButton closeHref={detailWindowCloseHref} disabled={!selectedEntryCanCorrect(selected)} />
+              <DetailWindowCorrectionButton disabled={!selectedEntryCanCorrect(selected)} />
               <div className="detailWindowBody">
                 <SelectedEntryDetails selected={selected} layout="grid" />
               </div>
@@ -607,12 +606,6 @@ function codeName(code: number | null | undefined, name: string | null | undefin
   if (code == null && !name) return '-';
   if (code == null) return name ?? '-';
   return name ? `${code} ${name}` : String(code);
-}
-
-function loginEmployeeGreeting(employeeNo: number | null | undefined, employeeName: string | null | undefined): string | null {
-  if (employeeName) return `こんにちは、${employeeName}さん`;
-  if (employeeNo != null) return `ログイン社員 ${employeeNo}`;
-  return null;
 }
 
 function periodText(year: number | null, month: number | null): string {

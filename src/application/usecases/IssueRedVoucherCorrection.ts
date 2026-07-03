@@ -28,6 +28,12 @@ export class IssueRedVoucherCorrectionUseCase {
         throw new DomainError('LEDGER_ENTRY_ALREADY_CORRECTED', 'この伝票は既に赤伝票処理済みです', { ledgerNo: original.ledgerNo });
       }
 
+      if (original.totalAmountYen <= 0) {
+        throw new DomainError('ORIGINAL_VALUE_REQUIRED', '元伝票に切手の枚数またはその他金額がないため、赤伝票を登録できません', {
+          ledgerNo: original.ledgerNo,
+        });
+      }
+
       const branch = await voucherLedger.lockBranch(original.branchCode);
       if (!branch) throw new DomainError('BRANCH_NOT_FOUND', '拠点が見つかりません', { branchCode: original.branchCode });
       if (!branch.active) throw new DomainError('BRANCH_INACTIVE', '無効な拠点には登録できません', { branchCode: original.branchCode });

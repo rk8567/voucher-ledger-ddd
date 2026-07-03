@@ -19,6 +19,7 @@ const movementEntryTypes = new Set<number>([
   EntryTypeCode.IncomingAlt,
   EntryTypeCode.OutgoingAlt,
 ]);
+const valueRequiredMessage = '切手の枚数またはその他金額を入力してください';
 
 export async function registerVoucherMovementAction(
   _previousState: EntryActionState,
@@ -139,6 +140,12 @@ export async function issueRedVoucherCorrectionAction(
     reversalLedgerNo = result.reversalLedgerNo;
     correctedLedgerNo = result.correctedLedgerNo;
   } catch (error) {
+    if (isDatabaseValueRequiredError(error)) {
+      return errorState(new DomainError(
+        'ORIGINAL_VALUE_REQUIRED',
+        '元伝票に切手の枚数またはその他金額がないため、赤伝票を登録できません',
+      ), formData);
+    }
     return errorState(error, formData);
   }
 
@@ -160,6 +167,7 @@ function errorMessage(error: unknown): string {
   if (error instanceof DomainError && error.code === 'OPENING_BALANCE_REQUIRED') {
     return 'この拠点は開始時残高が未登録です。新規レコードまたは現在高チェックの前に、開始時残高を登録してください。';
   }
+  if (isDatabaseValueRequiredError(error)) return valueRequiredMessage;
 
   return error instanceof DomainError || error instanceof Error
     ? error.message
@@ -175,6 +183,13 @@ function errorState(error: unknown, formData: FormData): EntryActionState {
 }
 
 function fieldErrors(error: unknown): Record<string, string> {
+  if (isDatabaseValueRequiredError(error)) {
+    return {
+      otherAmountYen: valueRequiredMessage,
+      quantities: valueRequiredMessage,
+    };
+  }
+
   if (!(error instanceof DomainError)) return {};
 
   if (error.code === 'VALUE_REQUIRED') {
@@ -221,7 +236,15 @@ function assertAnyEnteredValue(quantities: QuantityInput, otherAmountYen: number
   const hasQuantity = Object.values(quantities).some((quantity) => (quantity ?? 0) > 0);
   if (otherAmountYen > 0 || hasQuantity) return;
 
-  throw new DomainError('VALUE_REQUIRED', '切手の枚数またはその他金額を入力してください');
+  throw new DomainError('VALUE_REQUIRED', valueRequiredMessage);
+}
+
+function isDatabaseValueRequiredError(error: unknown): boolean {
+  return error instanceof Error
+    && (
+      error.message.includes('Amount or denomination quantity is required for entry_type_code=')
+      || error.message.includes('切手の枚数またはその他金額を入力してください (entry_type_code=')
+    );
 }
 
 function requiredDate(formData: FormData, name: string, label: string): string {

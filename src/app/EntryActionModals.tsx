@@ -167,7 +167,7 @@ function EntryModal({
   }, [onClose]);
 
   return (
-    <div className="modalBackdrop" role="presentation" onMouseDown={onClose}>
+    <div className="modalBackdrop entryModalBackdrop" role="presentation" onMouseDown={onClose}>
       <section
         className="entryModal"
         role="dialog"
@@ -586,12 +586,17 @@ function canCorrect(entry: CorrectionSelectedEntry): boolean {
   return !entry.isDeleted
     && entry.redVoucherStatusCode === RedVoucherStatus.Normal
     && entry.reversalLedgerNo === null
+    && entryHasAnyValue(entry)
     && [
       EntryTypeCode.Incoming,
       EntryTypeCode.Outgoing,
       EntryTypeCode.IncomingAlt,
       EntryTypeCode.OutgoingAlt,
     ].includes(entry.entryTypeCode);
+}
+
+function entryHasAnyValue(entry: CorrectionSelectedEntry): boolean {
+  return entry.otherAmountYen > 0 || Object.values(entry.quantities).some((quantity) => quantity > 0);
 }
 
 function zeroQuantityValues(): DraftValues {

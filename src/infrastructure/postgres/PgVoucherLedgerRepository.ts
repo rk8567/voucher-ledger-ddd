@@ -336,8 +336,8 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
   async replaceQuantities(entryId: string, quantities: QuantitySnapshot): Promise<void> {
     await this.db.query(`DELETE FROM voucher_ledger_entry_denominations WHERE entry_id = $1`, [entryId]);
 
-    for (const denominationYen of DENOMINATIONS) {
-      const quantity = quantities[denominationYen] ?? 0;
+    for (const [rawDenominationYen, quantity] of Object.entries(quantities)) {
+      const denominationYen = Number(rawDenominationYen);
       if (quantity <= 0) continue;
 
       await this.db.query(
