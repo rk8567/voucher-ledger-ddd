@@ -9,7 +9,19 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+try {
+  var theme = window.localStorage.getItem('voucher-ledger-theme');
+  if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
+} catch (_) {}
+`,
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

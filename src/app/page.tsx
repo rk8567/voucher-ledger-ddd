@@ -19,6 +19,7 @@ import { firstParam, paramsWithout, parseLedgerSearchParams } from './ledgerSear
 import { ReturnTopButton } from './ReturnTopButton';
 import { DetailWindowBackdrop } from './DetailWindowBackdrop';
 import { DetailWindowCorrectionButton } from './DetailWindowCorrectionButton';
+import { ThemeToggle } from './ThemeToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,6 +90,7 @@ export default async function Page({ searchParams }: PageProps) {
           </div>
           <div className="headerStats">
             <span>{data.entries.totalCount} entries</span>
+            <ThemeToggle />
           </div>
         </header>
 
@@ -196,9 +198,11 @@ export default async function Page({ searchParams }: PageProps) {
                 <h2 id="entry-detail-window-title">明細</h2>
                 <Link className="toolbarButton secondaryButton" href={detailWindowCloseHref} scroll={false}>閉じる</Link>
               </div>
-              <DetailWindowCorrectionButton disabled={!selectedEntryCanCorrect(selected)} />
               <div className="detailWindowBody">
                 <SelectedEntryDetails selected={selected} layout="grid" />
+              </div>
+              <div className="detailWindowFooter">
+                <DetailWindowCorrectionButton disabled={!selectedEntryCanCorrect(selected)} />
               </div>
             </section>
           </DetailWindowBackdrop>
