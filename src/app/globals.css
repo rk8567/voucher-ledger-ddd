@@ -180,6 +180,14 @@ h3 {
   line-height: 1;
 }
 
+.themeToggleIcon::before {
+  content: "☀";
+}
+
+:root[data-theme="dark"] .themeToggleIcon::before {
+  content: "☾";
+}
+
 .headerStats .branchSelector {
   width: auto;
   max-width: 100%;

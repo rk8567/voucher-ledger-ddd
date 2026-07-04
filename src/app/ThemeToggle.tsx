@@ -1,48 +1,42 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
 const STORAGE_KEY = 'voucher-ledger-theme';
+const THEME_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 type Theme = 'light' | 'dark';
 
 function applyTheme(theme: Theme) {
-  document.documentElement.dataset.theme = theme;
+  if (theme === 'dark') {
+    document.documentElement.dataset.theme = 'dark';
+  } else {
+    delete document.documentElement.dataset.theme;
+  }
 }
 
-function storedTheme(): Theme {
-  if (typeof window === 'undefined') return 'light';
-  return window.localStorage.getItem(STORAGE_KEY) === 'dark' ? 'dark' : 'light';
+function currentTheme(): Theme {
+  if (typeof document === 'undefined') return 'light';
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+function persistTheme(theme: Theme) {
+  window.localStorage.setItem(STORAGE_KEY, theme);
+  document.cookie = `${STORAGE_KEY}=${theme}; Path=/; Max-Age=${THEME_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>('light');
-
-  useEffect(() => {
-    const nextTheme = storedTheme();
-    setTheme(nextTheme);
-    applyTheme(nextTheme);
-  }, []);
-
-  const dark = theme === 'dark';
-
   return (
     <button
       type="button"
       className="themeToggle"
-      aria-pressed={dark}
-      aria-label={dark ? 'ライトテーマに切り替え' : 'ダークテーマに切り替え'}
-      title={dark ? 'ライトテーマに切り替え' : 'ダークテーマに切り替え'}
+      aria-label="テーマ切り替え"
+      title="テーマ切り替え"
       onClick={() => {
-        const nextTheme: Theme = dark ? 'light' : 'dark';
-        window.localStorage.setItem(STORAGE_KEY, nextTheme);
+        const nextTheme: Theme = currentTheme() === 'dark' ? 'light' : 'dark';
+        persistTheme(nextTheme);
         applyTheme(nextTheme);
-        setTheme(nextTheme);
       }}
     >
-      <span className="themeToggleIcon" aria-hidden="true">
-        {dark ? '☾' : '☀'}
-      </span>
+      <span className="themeToggleIcon" aria-hidden="true" />
     </button>
   );
 }
