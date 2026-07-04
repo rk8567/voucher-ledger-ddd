@@ -925,15 +925,21 @@ function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string
 }
 
 function queryHref(params: Record<string, string | string[] | undefined>, ledgerNo: number): string {
-  const next = paramsWithout(params, { keys: ['ledgerNo', 'detailWindow', 'actionMessage', 'clearDraft'] });
-  next.set('ledgerNo', String(ledgerNo));
-  return `/?${next.toString()}`;
+  return entryHref(params, ledgerNo);
 }
 
 function detailWindowHref(params: Record<string, string | string[] | undefined>, ledgerNo: number): string {
+  return entryHref(params, ledgerNo, { detailWindow: true });
+}
+
+function entryHref(
+  params: Record<string, string | string[] | undefined>,
+  ledgerNo: number,
+  options: Readonly<{ detailWindow?: boolean }> = {},
+): string {
   const next = paramsWithout(params, { keys: ['ledgerNo', 'detailWindow', 'actionMessage', 'clearDraft'] });
   next.set('ledgerNo', String(ledgerNo));
-  next.set('detailWindow', '1');
+  if (options.detailWindow) next.set('detailWindow', '1');
   return `/?${next.toString()}`;
 }
 

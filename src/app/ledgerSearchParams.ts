@@ -46,16 +46,7 @@ export function sortDirectionParam(value: SearchParamValue): SortDirection | nul
 }
 
 export function columnFiltersParam(params: Record<string, SearchParamValue>): Record<string, string> {
-  const filters: Record<string, string> = {};
-  const filterableKeys = new Set<string>(ledgerFilterableKeys);
-  for (const [key, value] of Object.entries(params)) {
-    if (!key.startsWith('filter_')) continue;
-    const columnKey = key.slice('filter_'.length);
-    if (!filterableKeys.has(columnKey)) continue;
-    const filterValue = textParam(value);
-    if (filterValue) filters[columnKey] = filterValue;
-  }
-  return filters;
+  return columnFiltersFromEntries(Object.entries(params));
 }
 
 export function paramsWithout(
@@ -81,9 +72,13 @@ export function urlParam(params: URLSearchParams, key: string): string | undefin
 }
 
 export function columnFiltersFromUrlParams(params: URLSearchParams): Record<string, string> {
+  return columnFiltersFromEntries(params.entries());
+}
+
+function columnFiltersFromEntries(entries: Iterable<readonly [string, SearchParamValue]>): Record<string, string> {
   const filters: Record<string, string> = {};
   const filterableKeys = new Set<string>(ledgerFilterableKeys);
-  for (const [key, value] of params.entries()) {
+  for (const [key, value] of entries) {
     if (!key.startsWith('filter_')) continue;
     const columnKey = key.slice('filter_'.length);
     if (!filterableKeys.has(columnKey)) continue;

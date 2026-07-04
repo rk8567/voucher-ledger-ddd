@@ -471,27 +471,27 @@ function DenominationDetailGroup({
 }
 
 function displayStampDenominations(quantities: Record<number, number>): number[] {
-  const active = new Set<number>(DENOMINATIONS);
-  const historical = Object.entries(quantities)
-    .filter(([denomination, quantity]) => {
-      const value = Number(denomination);
-      return !active.has(value) && !isLetterPackDenomination(value) && quantity !== 0;
-    })
-    .map(([denomination]) => Number(denomination))
-    .sort((a, b) => a - b);
-  return [...STAMP_DENOMINATIONS, ...historical];
+  return displayDenominations(STAMP_DENOMINATIONS, quantities, (denomination) => !isLetterPackDenomination(denomination));
 }
 
 function displayLetterPackDenominations(quantities: Record<number, number>): number[] {
+  return displayDenominations(LETTER_PACK_DENOMINATIONS, quantities, isLetterPackDenomination);
+}
+
+function displayDenominations(
+  baseDenominations: readonly number[],
+  quantities: Record<number, number>,
+  includeHistorical: (denomination: number) => boolean,
+): number[] {
   const active = new Set<number>(DENOMINATIONS);
   const historical = Object.entries(quantities)
     .filter(([denomination, quantity]) => {
       const value = Number(denomination);
-      return !active.has(value) && isLetterPackDenomination(value) && quantity !== 0;
+      return !active.has(value) && includeHistorical(value) && quantity !== 0;
     })
     .map(([denomination]) => Number(denomination))
     .sort((a, b) => a - b);
-  return [...LETTER_PACK_DENOMINATIONS, ...historical];
+  return [...baseDenominations, ...historical];
 }
 
 function PaginationControls({
