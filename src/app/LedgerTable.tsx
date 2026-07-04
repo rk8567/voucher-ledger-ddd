@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
+import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 
 import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
 import type { LedgerFormOptions } from '@/server/ledger';
@@ -302,17 +302,7 @@ export function LedgerTable({
                   >
                     {visibleColumns.map((column) => (
                       <td key={`${entry.id}-${column.key}`} className={cellClassName(column)}>
-                        {column.key === 'ledgerNo' ? (
-                          <Link
-                            href={detailWindowHref(params, entry.ledgerNo)}
-                            scroll={false}
-                            title="明細ウィンドウを開く"
-                            onClick={(event) => event.stopPropagation()}
-                            onKeyDown={(event) => event.stopPropagation()}
-                          >
-                            #{entry.ledgerNo}
-                          </Link>
-                        ) : displayCell(entry, column)}
+                        {renderTableCell(entry, column, params)}
                       </td>
                     ))}
                   </tr>
@@ -353,6 +343,66 @@ export function LedgerTable({
       ) : null}
     </>
   );
+}
+
+function renderTableCell(
+  entry: LedgerEntryRecord,
+  column: ColumnDefinition,
+  params: Record<string, string | string[] | undefined>,
+): ReactNode {
+  if (column.key === 'ledgerNo') {
+    return (
+      <LedgerEntryLink ledgerNo={entry.ledgerNo} params={params} title="明細ウィンドウを開く">
+        #{entry.ledgerNo}
+      </LedgerEntryLink>
+    );
+  }
+
+  const referenceLedgerNo = linkedLedgerNo(entry, column);
+  if (referenceLedgerNo == null) return displayCell(entry, column);
+
+  return (
+    <LedgerEntryLink ledgerNo={referenceLedgerNo} params={params} title="対応する伝票を開く">
+      {referenceLedgerNo}
+    </LedgerEntryLink>
+  );
+}
+
+function LedgerEntryLink({
+  ledgerNo,
+  params,
+  title,
+  children,
+}: Readonly<{
+  ledgerNo: number;
+  params: Record<string, string | string[] | undefined>;
+  title: string;
+  children: ReactNode;
+}>) {
+  return (
+    <Link
+      href={detailWindowHref(params, ledgerNo)}
+      scroll={false}
+      title={title}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function linkedLedgerNo(entry: LedgerEntryRecord, column: ColumnDefinition): number | null {
+  if (
+    column.key !== 'originalLedgerNo'
+    && column.key !== 'reversalLedgerNo'
+    && column.key !== 'correctionLedgerNo'
+  ) {
+    return null;
+  }
+
+  const value = entry[column.key];
+  return typeof value === 'number' ? value : null;
 }
 
 function persistColumnKeys(storageKey: string, cookieName: string, keys: readonly string[]) {
