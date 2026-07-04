@@ -1,11 +1,10 @@
 import { getLedgerExportEntries } from '@/server/ledger';
 import type { LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
-import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from '@/app/ledgerColumns';
+import { defaultLedgerColumnKeys, orderedLedgerColumns, type LedgerColumnDefinition } from '@/app/ledgerColumns';
 import { dateOnly, dateTime, delimitedText, htmlTable, tokyoTimestampForFileName, type LedgerExportFormat } from '@/app/ledgerExportFormat';
 import { parseLedgerExportSearchParams, urlParam } from '@/app/ledgerSearchParams';
 
 type ExportColumn = LedgerColumnDefinition;
-const defaultExportColumnKeys = new Set(defaultLedgerColumnKeys.map(String));
 
 function exportFormatParam(params: URLSearchParams): LedgerExportFormat {
   const raw = urlParam(params, 'format');
@@ -14,10 +13,7 @@ function exportFormatParam(params: URLSearchParams): LedgerExportFormat {
 
 function exportColumnsParam(params: URLSearchParams): readonly ExportColumn[] {
   const raw = urlParam(params, 'columns');
-  if (!raw) return ledgerColumns.filter((column) => defaultExportColumnKeys.has(String(column.key)));
-  const requested = new Set(raw.split(',').map((key) => key.trim()).filter(Boolean));
-  const selected = ledgerColumns.filter((column) => requested.has(String(column.key)));
-  return selected.length > 0 ? selected : ledgerColumns.filter((column) => defaultExportColumnKeys.has(String(column.key)));
+  return orderedLedgerColumns(raw?.split(',').map((key) => key.trim()).filter(Boolean), defaultLedgerColumnKeys);
 }
 
 function exportValue(entry: LedgerEntryRecord, column: ExportColumn): string | number | null {

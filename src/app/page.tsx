@@ -15,10 +15,12 @@ import { EntryActionModals } from './EntryActionModals';
 import { EntryWorkflowButtons } from './EntryWorkflowButtons';
 import { LedgerTable } from './LedgerTable';
 import {
+  columnOrderLedgerColumnCookieName,
   defaultLedgerColumnKeys,
   exportLedgerColumnCookieName,
   ledgerColumns,
   parseLedgerColumnCookie,
+  parseLedgerColumnOrderCookie,
   visibleLedgerColumnCookieName,
 } from './ledgerColumns';
 import { dateOnly, dateTime, legacyRegistrationFlagText, yen } from './ledgerDisplayFormat';
@@ -67,9 +69,14 @@ export default async function Page({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
   const input = parseLedgerSearchParams(params);
   const cookieStore = await cookies();
+  const visibleColumnCookie = cookieStore.get(visibleLedgerColumnCookieName)?.value;
+  const columnOrderCookie = cookieStore.get(columnOrderLedgerColumnCookieName)?.value;
   const initialVisibleColumnKeys = parseLedgerColumnCookie(
-    cookieStore.get(visibleLedgerColumnCookieName)?.value,
+    visibleColumnCookie,
     defaultLedgerColumnKeys,
+  );
+  const initialColumnOrderKeys = parseLedgerColumnOrderCookie(
+    columnOrderCookie ?? visibleColumnCookie,
   );
   const initialExportColumnKeys = parseLedgerColumnCookie(
     cookieStore.get(exportLedgerColumnCookieName)?.value,
@@ -170,6 +177,7 @@ export default async function Page({ searchParams }: PageProps) {
               params={params}
               filterOptions={data.formOptions}
               initialVisibleColumnKeys={initialVisibleColumnKeys}
+              initialColumnOrderKeys={initialColumnOrderKeys}
               initialExportColumnKeys={initialExportColumnKeys}
             />
             <PaginationControls

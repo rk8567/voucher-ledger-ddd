@@ -3,15 +3,19 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
+import type { DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 
 import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
 import type { LedgerFormOptions } from '@/server/ledger';
 import {
+  columnOrderLedgerColumnCookieName,
   defaultLedgerColumnKeys,
   exportLedgerColumnCookieName,
   ledgerColumns,
+  ledgerColumnKeys,
+  normalizeLedgerColumnOrder,
   normalizeLedgerColumnKeys,
+  orderedLedgerColumns,
   serializeLedgerColumnCookie,
   visibleLedgerColumnCookieName,
   type LedgerColumnDefinition,
@@ -27,6 +31,7 @@ type LedgerTableProps = Readonly<{
   params: Record<string, string | string[] | undefined>;
   filterOptions: LedgerFormOptions;
   initialVisibleColumnKeys: readonly string[];
+  initialColumnOrderKeys: readonly string[];
   initialExportColumnKeys: readonly string[];
 }>;
 
@@ -64,6 +69,7 @@ type NativeSaveWindow = Window & Readonly<{
 }>;
 
 const columnStorageKey = 'voucher-ledger:visible-columns';
+const columnOrderStorageKey = 'voucher-ledger:column-order';
 const exportColumnStorageKey = 'voucher-ledger:export-columns';
 const columnCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 const filterPrefix = 'filter_';
@@ -79,6 +85,7 @@ export function LedgerTable({
   params,
   filterOptions,
   initialVisibleColumnKeys,
+  initialColumnOrderKeys,
   initialExportColumnKeys,
 }: LedgerTableProps) {
   const router = useRouter();
@@ -87,7 +94,9 @@ export function LedgerTable({
   const [exportWindowOpen, setExportWindowOpen] = useState(false);
   const [deletedView, setDeletedView] = useState(false);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(() => normalizeLedgerColumnKeys(initialVisibleColumnKeys, defaultColumnKeys));
+  const [columnOrderKeys, setColumnOrderKeys] = useState<readonly string[]>(() => normalizeLedgerColumnOrder(initialColumnOrderKeys));
   const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => normalizeLedgerColumnKeys(initialExportColumnKeys, defaultColumnKeys));
+  const [draggedColumnKey, setDraggedColumnKey] = useState<string | null>(null);
   const tableWrapRef = useRef<HTMLDivElement>(null);
   const columnChooserDrag = useDraggablePopup();
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -95,9 +104,18 @@ export function LedgerTable({
   const [fadeFrame, setFadeFrame] = useState<FadeFrame | null>(null);
   const tableEntries = deletedView ? deletedEntries.items : entries;
 
+  const visibleKeySet = useMemo(() => new Set(visibleColumnKeys), [visibleColumnKeys]);
+  const orderedVisibleColumnKeys = useMemo(
+    () => columnOrderKeys.filter((key) => visibleKeySet.has(key)),
+    [columnOrderKeys, visibleKeySet],
+  );
   const visibleColumns = useMemo(
-    () => columns.filter((column) => visibleColumnKeys.includes(column.key)),
-    [visibleColumnKeys],
+    () => orderedLedgerColumns(orderedVisibleColumnKeys),
+    [orderedVisibleColumnKeys],
+  );
+  const columnChooserColumns = useMemo(
+    () => orderedLedgerColumns(columnOrderKeys, ledgerColumnKeys),
+    [columnOrderKeys],
   );
   const columnWidths = useMemo(() => {
     const widths = new Map<string, number>();
@@ -129,17 +147,72 @@ export function LedgerTable({
   }, [tableEntries, visibleColumns]);
 
   function setVisible(key: string, visible: boolean) {
-    const next = visible
-      ? [...visibleColumnKeys, key]
-      : visibleColumnKeys.filter((columnKey) => columnKey !== key);
-    const normalized = normalizeLedgerColumnKeys(next, [key]);
+    const current = new Set(visibleColumnKeys);
+    if (visible) current.add(key);
+    else current.delete(key);
+    setVisibleColumnSelection(columnOrderKeys.filter((columnKey) => current.has(columnKey)), [key]);
+  }
+
+  function startColumnDrag(event: ReactDragEvent<HTMLElement>, key: string) {
+    setDraggedColumnKey(key);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', key);
+  }
+
+  function previewColumnDrop(event: ReactDragEvent<HTMLDivElement>, targetKey: string) {
+    if (!draggedColumnKey || draggedColumnKey === targetKey) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    moveColumnInOrder(draggedColumnKey, targetKey, event.currentTarget, event.clientY);
+  }
+
+  function allowColumnListDrag(event: ReactDragEvent<HTMLDivElement>) {
+    if (!draggedColumnKey) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }
+
+  function dropColumn(event: ReactDragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDraggedColumnKey(null);
+  }
+
+  function moveColumnInOrder(sourceKey: string, targetKey: string, targetElement: HTMLElement, clientY: number) {
+    if (!sourceKey || sourceKey === targetKey) return;
+
+    const current = [...columnOrderKeys];
+    const sourceIndex = current.indexOf(sourceKey);
+    const targetIndex = current.indexOf(targetKey);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const [source] = current.splice(sourceIndex, 1);
+    if (source == null) return;
+
+    const targetIndexAfterRemoval = current.indexOf(targetKey);
+    const targetBounds = targetElement.getBoundingClientRect();
+    const shouldInsertAfter = clientY > targetBounds.top + targetBounds.height / 2;
+    current.splice(targetIndexAfterRemoval + (shouldInsertAfter ? 1 : 0), 0, source);
+    if (current.every((key, index) => key === columnOrderKeys[index])) return;
+    setColumnOrder(current);
+  }
+
+  function setVisibleColumnSelection(next: readonly string[], fallback: readonly string[]) {
+    const normalized = normalizeLedgerColumnKeys(next, fallback);
     setVisibleColumnKeys(normalized);
     persistColumnKeys(columnStorageKey, visibleLedgerColumnCookieName, normalized);
   }
 
+  function setColumnOrder(next: readonly string[]) {
+    const normalized = normalizeLedgerColumnOrder(next);
+    setColumnOrderKeys(normalized);
+    persistColumnKeys(columnOrderStorageKey, columnOrderLedgerColumnCookieName, normalized);
+  }
+
   function resetColumns() {
     setVisibleColumnKeys(defaultColumnKeys);
+    setColumnOrderKeys(normalizeLedgerColumnOrder(ledgerColumnKeys));
     clearColumnKeys(columnStorageKey, visibleLedgerColumnCookieName);
+    clearColumnKeys(columnOrderStorageKey, columnOrderLedgerColumnCookieName);
   }
 
   function setExportColumn(key: string, visible: boolean) {
@@ -217,17 +290,38 @@ export function LedgerTable({
               <strong>表示列</strong>
               <button type="button" className="toolbarIconButton" aria-label="閉じる" onClick={() => setColumnMenuOpen(false)}>×</button>
             </div>
-            <div className="columnChooserList">
-              {columns.map((column) => (
-                <label key={column.key} className="columnChoice">
-                  <input
-                    type="checkbox"
-                    checked={visibleColumnKeys.includes(column.key)}
-                    onChange={(event) => setVisible(column.key, event.target.checked)}
-                  />
-                  <span>{column.label}</span>
-                </label>
-              ))}
+            <div className="columnChooserList" onDragOver={allowColumnListDrag}>
+              {columnChooserColumns.map((column) => {
+                const columnKey = String(column.key);
+                const visible = visibleKeySet.has(columnKey);
+                return (
+                  <div
+                    key={column.key}
+                    className={[
+                      visible ? 'columnChoiceRow' : 'columnChoiceRow columnChoiceRowHidden',
+                      draggedColumnKey === columnKey ? 'columnChoiceRowDragging' : '',
+                    ].filter(Boolean).join(' ')}
+                    draggable
+                    onDragStart={(event) => startColumnDrag(event, columnKey)}
+                    onDragOver={(event) => previewColumnDrop(event, columnKey)}
+                    onDrop={dropColumn}
+                    onDragEnd={() => setDraggedColumnKey(null)}
+                  >
+                    <span className="columnDragHandle" aria-hidden="true">
+                      ☰
+                    </span>
+                    <label className="columnChoice">
+                      <input
+                        type="checkbox"
+                        checked={visible}
+                        draggable={false}
+                        onChange={(event) => setVisible(columnKey, event.target.checked)}
+                      />
+                      <span>{column.label}</span>
+                    </label>
+                  </div>
+                );
+              })}
             </div>
             <button type="button" className="filterButton secondaryButton" onClick={resetColumns}>標準に戻す</button>
           </div>
@@ -335,7 +429,7 @@ export function LedgerTable({
           exportHref={exportHref}
           entries={tableEntries}
           selectedColumnKeys={exportColumnKeys}
-          visibleColumnKeys={visibleColumnKeys}
+          visibleColumnKeys={orderedVisibleColumnKeys}
           onColumnChange={setExportColumn}
           onSetColumns={setExportColumns}
           onClose={() => setExportWindowOpen(false)}
@@ -500,7 +594,7 @@ function unsortHref(params: Record<string, string | string[] | undefined>): stri
 }
 
 function saveCurrentTable(entries: LedgerEntryListRecord['items'], visibleColumnKeys: readonly string[], format: LedgerExportFormat) {
-  const visibleColumns = columns.filter((column) => visibleColumnKeys.includes(column.key));
+  const visibleColumns = orderedLedgerColumns(visibleColumnKeys);
   const header = visibleColumns.map((column) => column.label);
   const rows = entries.map((entry) => visibleColumns.map((column) => displayCell(entry, column)));
   const content = format === 'html'

@@ -52,16 +52,49 @@ export const defaultLedgerColumnKeys = ledgerColumns
 
 export const visibleLedgerColumnCookieName = 'voucher-ledger-visible-columns';
 export const exportLedgerColumnCookieName = 'voucher-ledger-export-columns';
+export const columnOrderLedgerColumnCookieName = 'voucher-ledger-column-order';
 
 export const ledgerColumnKeys = ledgerColumns.map((column) => column.key);
+const ledgerColumnByKey = new Map<string, LedgerColumnDefinition>(ledgerColumns.map((column) => [String(column.key), column]));
 
 export function normalizeLedgerColumnKeys(
   keys: readonly string[] | null | undefined,
   fallback: readonly string[] = defaultLedgerColumnKeys,
 ): readonly string[] {
-  const requested = new Set(keys ?? []);
-  const normalized = ledgerColumnKeys.filter((key) => requested.has(key));
-  return normalized.length > 0 ? normalized : fallback;
+  const normalized = orderedValidColumnKeys(keys ?? []);
+  return normalized.length > 0 ? normalized : orderedValidColumnKeys(fallback);
+}
+
+export function orderedLedgerColumns(
+  keys: readonly string[] | null | undefined,
+  fallback: readonly string[] = defaultLedgerColumnKeys,
+): readonly LedgerColumnDefinition[] {
+  return normalizeLedgerColumnKeys(keys, fallback)
+    .map((key) => ledgerColumnByKey.get(key))
+    .filter((column): column is LedgerColumnDefinition => column != null);
+}
+
+export function normalizeLedgerColumnOrder(keys: readonly string[] | null | undefined): readonly string[] {
+  const ordered = [...orderedValidColumnKeys(keys ?? [])];
+  const seen = new Set(ordered);
+  for (const key of ledgerColumnKeys.map(String)) {
+    if (seen.has(key)) continue;
+    ordered.push(key);
+    seen.add(key);
+  }
+  return ordered;
+}
+
+function orderedValidColumnKeys(keys: readonly string[]): readonly string[] {
+  const validKeys = new Set(ledgerColumnKeys.map(String));
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const key of keys) {
+    if (!validKeys.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    ordered.push(key);
+  }
+  return ordered;
 }
 
 export function parseLedgerColumnCookie(value: string | undefined, fallback: readonly string[] = defaultLedgerColumnKeys): readonly string[] {
@@ -70,6 +103,15 @@ export function parseLedgerColumnCookie(value: string | undefined, fallback: rea
     return normalizeLedgerColumnKeys(value.split(',').map((key) => decodeURIComponent(key)), fallback);
   } catch {
     return fallback;
+  }
+}
+
+export function parseLedgerColumnOrderCookie(value: string | undefined): readonly string[] {
+  if (!value) return normalizeLedgerColumnOrder(ledgerColumnKeys);
+  try {
+    return normalizeLedgerColumnOrder(value.split(',').map((key) => decodeURIComponent(key)));
+  } catch {
+    return normalizeLedgerColumnOrder(ledgerColumnKeys);
   }
 }
 
