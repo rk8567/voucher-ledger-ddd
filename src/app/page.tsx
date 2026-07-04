@@ -175,8 +175,11 @@ export default async function Page({ searchParams }: PageProps) {
               entries={data.entries.items}
               deletedEntries={data.deletedEntries}
               selectedLedgerNo={selected?.ledgerNo ?? null}
+              selectedEntry={selected}
               params={params}
               filterOptions={data.formOptions}
+              effectiveBranchCode={defaultBranchCode}
+              displayDateRange={displayDateRange}
               initialVisibleColumnKeys={initialVisibleColumnKeys}
               initialColumnOrderKeys={initialColumnOrderKeys}
               initialExportColumnKeys={initialExportColumnKeys}

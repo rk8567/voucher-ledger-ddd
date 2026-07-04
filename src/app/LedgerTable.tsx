@@ -13,6 +13,7 @@ import {
   exportLedgerColumnCookieName,
   ledgerColumns,
   ledgerColumnKeys,
+  ledgerFilterableKeys,
   normalizeLedgerColumnOrder,
   normalizeLedgerColumnKeys,
   orderedLedgerColumns,
@@ -28,14 +29,31 @@ type LedgerTableProps = Readonly<{
   entries: LedgerEntryListRecord['items'];
   deletedEntries: LedgerEntryListRecord;
   selectedLedgerNo: number | null;
+  selectedEntry: LedgerEntryRecord | null;
   params: Record<string, string | string[] | undefined>;
   filterOptions: LedgerFormOptions;
+  effectiveBranchCode: number | null;
+  displayDateRange: DisplayDateRange;
   initialVisibleColumnKeys: readonly string[];
   initialColumnOrderKeys: readonly string[];
   initialExportColumnKeys: readonly string[];
 }>;
 
 type ColumnDefinition = LedgerColumnDefinition;
+
+type DisplayDateRange = Readonly<{
+  from: string;
+  to: string;
+}>;
+
+type TablePreset = Readonly<{
+  id: string;
+  name: string;
+  visibleColumnKeys: readonly string[];
+  columnOrderKeys: readonly string[];
+  params: Record<string, string>;
+  updatedAt: string;
+}>;
 
 type FadeFrame = Readonly<{
   top: number;
@@ -71,19 +89,36 @@ type NativeSaveWindow = Window & Readonly<{
 const columnStorageKey = 'voucher-ledger:visible-columns';
 const columnOrderStorageKey = 'voucher-ledger:column-order';
 const exportColumnStorageKey = 'voucher-ledger:export-columns';
+const tablePresetStorageKey = 'voucher-ledger:table-presets';
 const columnCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 const filterPrefix = 'filter_';
 const minYear = 1990;
 const maxYear = 2035;
 const columns = ledgerColumns;
 const defaultColumnKeys = defaultLedgerColumnKeys;
+const tablePresetParamKeys = [
+  'branchCode',
+  'periodYear',
+  'periodMonth',
+  'entryTypeCode',
+  'processingDateFrom',
+  'processingDateTo',
+  'displayDateFrom',
+  'displayDateTo',
+  'sort',
+  'dir',
+  'limit',
+] as const;
 
 export function LedgerTable({
   entries,
   deletedEntries,
   selectedLedgerNo,
+  selectedEntry,
   params,
   filterOptions,
+  effectiveBranchCode,
+  displayDateRange,
   initialVisibleColumnKeys,
   initialColumnOrderKeys,
   initialExportColumnKeys,
@@ -91,12 +126,16 @@ export function LedgerTable({
   const router = useRouter();
   const [openColumnKey, setOpenColumnKey] = useState<string | null>(null);
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
+  const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   const [exportWindowOpen, setExportWindowOpen] = useState(false);
   const [deletedView, setDeletedView] = useState(false);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(() => normalizeLedgerColumnKeys(initialVisibleColumnKeys, defaultColumnKeys));
   const [columnOrderKeys, setColumnOrderKeys] = useState<readonly string[]>(() => normalizeLedgerColumnOrder(initialColumnOrderKeys));
   const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => normalizeLedgerColumnKeys(initialExportColumnKeys, defaultColumnKeys));
   const [draggedColumnKey, setDraggedColumnKey] = useState<string | null>(null);
+  const [tablePresets, setTablePresets] = useState<readonly TablePreset[]>([]);
+  const [presetName, setPresetName] = useState('');
+  const [presetError, setPresetError] = useState<string | null>(null);
   const tableWrapRef = useRef<HTMLDivElement>(null);
   const columnChooserDrag = useDraggablePopup();
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -126,6 +165,10 @@ export function LedgerTable({
     () => visibleColumns.reduce((total, column) => total + (columnWidths.get(String(column.key)) ?? 150), 0),
     [columnWidths, visibleColumns],
   );
+
+  useEffect(() => {
+    setTablePresets(readTablePresets());
+  }, []);
 
   useEffect(() => {
     updateTableUiState(tableWrapRef.current, setScrollLeft, setMaxScrollLeft, setFadeFrame);
@@ -215,6 +258,10 @@ export function LedgerTable({
     clearColumnKeys(columnOrderStorageKey, columnOrderLedgerColumnCookieName);
   }
 
+  function enableAllColumns() {
+    setVisibleColumnSelection(columnOrderKeys, ledgerColumnKeys);
+  }
+
   function setExportColumn(key: string, visible: boolean) {
     const next = visible
       ? [...exportColumnKeys, key]
@@ -222,6 +269,48 @@ export function LedgerTable({
     const normalized = normalizeLedgerColumnKeys(next, [key]);
     setExportColumnKeys(normalized);
     persistColumnKeys(exportColumnStorageKey, exportLedgerColumnCookieName, normalized);
+  }
+
+  function saveTablePreset() {
+    const name = presetName.trim();
+    if (!name) {
+      setPresetError('プリセット名を入力してください。');
+      return;
+    }
+
+    const existing = tablePresets.find((preset) => preset.name === name);
+    const preset: TablePreset = {
+      id: existing?.id ?? createPresetId(),
+      name,
+      visibleColumnKeys: [...visibleColumnKeys],
+      columnOrderKeys: [...columnOrderKeys],
+      params: currentTablePresetParams(params, effectiveBranchCode, displayDateRange),
+      updatedAt: new Date().toISOString(),
+    };
+    const next = [
+      preset,
+      ...tablePresets.filter((candidate) => candidate.id !== preset.id),
+    ];
+    setTablePresets(next);
+    persistTablePresets(next);
+    setPresetName('');
+    setPresetError(null);
+  }
+
+  function applyTablePreset(preset: TablePreset) {
+    setOpenColumnKey(null);
+    setColumnMenuOpen(false);
+    setPresetMenuOpen(false);
+    setExportWindowOpen(false);
+    setVisibleColumnSelection(preset.visibleColumnKeys, defaultColumnKeys);
+    setColumnOrder(preset.columnOrderKeys);
+    router.push(tablePresetHref(preset, params), { scroll: false });
+  }
+
+  function deleteTablePreset(presetId: string) {
+    const next = tablePresets.filter((preset) => preset.id !== presetId);
+    setTablePresets(next);
+    persistTablePresets(next);
   }
 
   function setExportColumns(next: readonly string[]) {
@@ -253,6 +342,7 @@ export function LedgerTable({
   function openExportWindow() {
     setOpenColumnKey(null);
     setColumnMenuOpen(false);
+    setPresetMenuOpen(false);
     setExportWindowOpen(true);
   }
 
@@ -268,6 +358,7 @@ export function LedgerTable({
             onClick={() => {
               setOpenColumnKey(null);
               setColumnMenuOpen(false);
+              setPresetMenuOpen(false);
               setExportWindowOpen(false);
               setDeletedView((current) => !current);
             }}
@@ -276,9 +367,45 @@ export function LedgerTable({
           </button>
           <a className="toolbarButton" href={unsortHref(params)}>標準ソート</a>
         </div>
-        <button type="button" className="toolbarButton" onClick={() => setColumnMenuOpen((open) => !open)}>表示列</button>
+        <div className="tableViewTools">
+          <button
+            type="button"
+            className={presetMenuOpen ? 'toolbarButton activeToggle' : 'toolbarButton'}
+            onClick={() => {
+              setOpenColumnKey(null);
+              setColumnMenuOpen(false);
+              setExportWindowOpen(false);
+              setPresetMenuOpen((open) => !open);
+            }}
+          >
+            プリセット
+          </button>
+          <button
+            type="button"
+            className="toolbarButton"
+            onClick={() => {
+              setOpenColumnKey(null);
+              setPresetMenuOpen(false);
+              setColumnMenuOpen((open) => !open);
+            }}
+          >
+            表示列
+          </button>
+        </div>
       </div>
       <div className="tableViewport">
+        {presetMenuOpen ? (
+          <TablePresetPopover
+            presets={tablePresets}
+            presetName={presetName}
+            presetError={presetError}
+            onPresetNameChange={setPresetName}
+            onSave={saveTablePreset}
+            onApply={applyTablePreset}
+            onDelete={deleteTablePreset}
+            onClose={() => setPresetMenuOpen(false)}
+          />
+        ) : null}
         {columnMenuOpen ? (
           <div
             className="columnChooser"
@@ -323,7 +450,10 @@ export function LedgerTable({
                 );
               })}
             </div>
-            <button type="button" className="filterButton secondaryButton" onClick={resetColumns}>標準に戻す</button>
+            <div className="columnChooserActions">
+              <button type="button" className="filterButton secondaryButton" onClick={resetColumns}>標準に戻す</button>
+              <button type="button" className="filterButton secondaryButton" onClick={enableAllColumns}>全列表示</button>
+            </div>
           </div>
         ) : null}
         <div className="tableWrap" ref={tableWrapRef}>
@@ -370,6 +500,7 @@ export function LedgerTable({
                         onClose={() => setOpenColumnKey(null)}
                         tableWrapRef={tableWrapRef}
                         options={columnFilterOptions(column, filterOptions)}
+                        selectedValue={selectedEntry == null ? null : filterValueFromEntry(selectedEntry, column)}
                       />
                     ) : null}
                   </th>
@@ -507,6 +638,184 @@ function persistColumnKeys(storageKey: string, cookieName: string, keys: readonl
 function clearColumnKeys(storageKey: string, cookieName: string) {
   window.localStorage.removeItem(storageKey);
   document.cookie = `${cookieName}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
+function TablePresetPopover({
+  presets,
+  presetName,
+  presetError,
+  onPresetNameChange,
+  onSave,
+  onApply,
+  onDelete,
+  onClose,
+}: Readonly<{
+  presets: readonly TablePreset[];
+  presetName: string;
+  presetError: string | null;
+  onPresetNameChange: (value: string) => void;
+  onSave: () => void;
+  onApply: (preset: TablePreset) => void;
+  onDelete: (presetId: string) => void;
+  onClose: () => void;
+}>) {
+  return (
+    <div className="tablePresetPopover" role="menu" aria-label="表プリセット">
+      <div className="columnChooserHeader">
+        <strong>プリセット</strong>
+        <button type="button" className="toolbarIconButton" aria-label="閉じる" onClick={onClose}>×</button>
+      </div>
+      <form
+        className="tablePresetForm"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave();
+        }}
+      >
+        <label>
+          <span>名前</span>
+          <input
+            value={presetName}
+            onChange={(event) => onPresetNameChange(event.target.value)}
+            maxLength={40}
+            placeholder="例: 月次確認"
+          />
+        </label>
+        <button type="submit" className="filterButton">保存</button>
+      </form>
+      {presetError ? <p className="tablePresetError" role="alert">{presetError}</p> : null}
+      <div className="tablePresetList">
+        {presets.length === 0 ? (
+          <p className="emptyState compactEmptyState">保存済みプリセットはありません。</p>
+        ) : (
+          presets.map((preset) => (
+            <div key={preset.id} className="tablePresetRow">
+              <div className="tablePresetSummary">
+                <strong>{preset.name}</strong>
+                <span>{formatPresetUpdatedAt(preset.updatedAt)}</span>
+              </div>
+              <div className="tablePresetActions">
+                <button type="button" className="secondaryButton" onClick={() => onApply(preset)}>適用</button>
+                <button type="button" className="secondaryButton dangerButton" onClick={() => onDelete(preset.id)}>削除</button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function currentTablePresetParams(
+  params: Record<string, string | string[] | undefined>,
+  effectiveBranchCode: number | null,
+  displayDateRange: DisplayDateRange,
+): Record<string, string> {
+  const next = new URLSearchParams();
+  for (const key of tablePresetParamKeys) {
+    appendPresetParam(next, key, firstParam(params[key]));
+  }
+  for (const [key, value] of Object.entries(params)) {
+    if (!key.startsWith(filterPrefix)) continue;
+    appendPresetParam(next, key, firstParam(value));
+  }
+  if (!next.has('branchCode') && effectiveBranchCode != null) {
+    next.set('branchCode', String(effectiveBranchCode));
+  }
+  if (!next.has('processingDateFrom') && !next.has('displayDateFrom')) {
+    next.set('displayDateFrom', displayDateRange.from);
+  }
+  if (!next.has('processingDateTo') && !next.has('displayDateTo')) {
+    next.set('displayDateTo', displayDateRange.to);
+  }
+  return Object.fromEntries(next.entries());
+}
+
+function appendPresetParam(params: URLSearchParams, key: string, value: string | undefined) {
+  const trimmed = value?.trim();
+  if (trimmed) params.set(key, trimmed);
+}
+
+function tablePresetHref(preset: TablePreset, params: Record<string, string | string[] | undefined>): string {
+  const next = new URLSearchParams();
+  for (const [key, value] of Object.entries(preset.params)) {
+    appendPresetParam(next, key, value);
+  }
+  appendPresetParam(next, 'detailPanel', firstParam(params.detailPanel));
+  const query = next.toString();
+  return query ? `/?${query}` : '/';
+}
+
+function readTablePresets(): readonly TablePreset[] {
+  try {
+    const raw = window.localStorage.getItem(tablePresetStorageKey);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(tablePresetFromUnknown)
+      .filter((preset): preset is TablePreset => preset != null);
+  } catch {
+    return [];
+  }
+}
+
+function persistTablePresets(presets: readonly TablePreset[]) {
+  try {
+    window.localStorage.setItem(tablePresetStorageKey, JSON.stringify(presets));
+  } catch {
+    // Browser storage may be disabled; the active UI state still remains usable.
+  }
+}
+
+function tablePresetFromUnknown(value: unknown): TablePreset | null {
+  if (!isRecord(value)) return null;
+  const name = typeof value.name === 'string' ? value.name.trim() : '';
+  if (!name) return null;
+  return {
+    id: typeof value.id === 'string' && value.id ? value.id : createPresetId(),
+    name,
+    visibleColumnKeys: normalizeLedgerColumnKeys(stringArray(value.visibleColumnKeys), defaultColumnKeys),
+    columnOrderKeys: normalizeLedgerColumnOrder(stringArray(value.columnOrderKeys)),
+    params: sanitizePresetParams(value.params),
+    updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date(0).toISOString(),
+  };
+}
+
+function sanitizePresetParams(value: unknown): Record<string, string> {
+  if (!isRecord(value)) return {};
+  const allowedKeys = new Set<string>(tablePresetParamKeys);
+  const allowedFilterKeys = new Set(ledgerFilterableKeys.map((key) => filterName(key)));
+  const params: Record<string, string> = {};
+  for (const [key, rawValue] of Object.entries(value)) {
+    if (!allowedKeys.has(key) && !allowedFilterKeys.has(key)) continue;
+    if (typeof rawValue !== 'string') continue;
+    const trimmed = rawValue.trim();
+    if (trimmed) params[key] = trimmed;
+  }
+  return params;
+}
+
+function createPresetId(): string {
+  return window.crypto.randomUUID();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringArray(value: unknown): readonly string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
+function formatPresetUpdatedAt(value: string): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return '';
+  return new Intl.DateTimeFormat('ja-JP', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(timestamp));
 }
 
 function ExportWindow({
@@ -670,6 +979,7 @@ function ColumnFilterPopover({
   onClose,
   tableWrapRef,
   options,
+  selectedValue,
 }: Readonly<{
   column: ColumnDefinition;
   params: Record<string, string | string[] | undefined>;
@@ -678,6 +988,7 @@ function ColumnFilterPopover({
   onClose: () => void;
   tableWrapRef: RefObject<HTMLDivElement | null>;
   options: readonly FilterOption[];
+  selectedValue: string | null;
 }>) {
   const [value, setValue] = useState(() => initialFilterValue(column, currentFilter));
   const popupBounds = useCallback(() => visibleTableBounds(tableWrapRef.current), [tableWrapRef]);
@@ -722,6 +1033,7 @@ function ColumnFilterPopover({
       />
       <div className="columnFilterActions">
         <a className="filterButton" href={applyFilterHref(params, column, effectiveValue)}>絞込</a>
+        {selectedValue ? <a className="filterButton secondaryButton" href={applyFilterHref(params, column, selectedValue)}>選択値</a> : null}
         {currentFilter ? <a className="filterButton secondaryButton" href={clearFilterHref(params, column.key)}>解除</a> : null}
       </div>
     </div>
@@ -740,13 +1052,23 @@ function FilterControl({
   onValueChange: (value: string) => void;
 }>) {
   if (options.length > 0) {
+    const optionListId = `filter-options-${column.key}`;
     return (
-      <select value={value} onChange={(event) => onValueChange(event.target.value)} aria-label={column.label}>
-        <option value="">すべて</option>
-        {options.map((option) => (
-          <option key={`${column.key}-${option.value}`} value={String(option.value)}>{option.label}</option>
-        ))}
-      </select>
+      <label>
+        <input
+          type="search"
+          list={optionListId}
+          value={value}
+          onChange={(event) => onValueChange(event.target.value)}
+          aria-label={column.label}
+          placeholder="入力または選択"
+        />
+        <datalist id={optionListId}>
+          {options.map((option) => (
+            <option key={`${column.key}-${option.value}`} value={String(option.value)} label={option.label} />
+          ))}
+        </datalist>
+      </label>
     );
   }
 
@@ -1073,6 +1395,17 @@ function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string
   if (value == null || value === '') return '-';
   const text = String(value);
   return column.kind === 'text' ? limitText(text, 10) : text;
+}
+
+function filterValueFromEntry(entry: LedgerEntryRecord, column: ColumnDefinition): string | null {
+  const value = column.key === 'otherAmountYen'
+    ? entry.otherAmountYen
+    : entry[column.key as keyof LedgerEntryRecord];
+  if (value == null || value === '') return null;
+  if (column.kind === 'date' || column.kind === 'datetime') {
+    return typeof value === 'string' ? dateOnly(value) : null;
+  }
+  return String(value);
 }
 
 function queryHref(params: Record<string, string | string[] | undefined>, ledgerNo: number): string {

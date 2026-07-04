@@ -574,6 +574,15 @@ button:disabled {
   background: var(--surface-hover);
 }
 
+.dangerButton {
+  color: #a83f32;
+}
+
+.dangerButton:hover {
+  border-color: #a83f32;
+  color: #8f3127;
+}
+
 .modalOpen {
   overflow: hidden;
 }
@@ -972,8 +981,16 @@ button:disabled {
   gap: 6px;
 }
 
+.tableViewTools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .columnChooser,
-.columnFilterPopover {
+.columnFilterPopover,
+.tablePresetPopover {
   position: absolute;
   z-index: 12;
   border: 1px solid var(--line);
@@ -988,6 +1005,95 @@ button:disabled {
   right: 16px;
   width: min(360px, calc(100vw - 48px));
   padding: 12px;
+}
+
+.tablePresetPopover {
+  top: 8px;
+  right: 16px;
+  width: min(420px, calc(100vw - 48px));
+  padding: 12px;
+}
+
+.tablePresetForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tablePresetForm label {
+  min-width: 0;
+}
+
+.tablePresetForm label span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tablePresetForm input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 9px;
+  background: var(--control-bg);
+  color: var(--ink);
+}
+
+.tablePresetError {
+  margin: 0 0 8px;
+  color: #a83f32;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tablePresetList {
+  display: grid;
+  gap: 8px;
+  max-height: 300px;
+  overflow: auto;
+}
+
+.tablePresetRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--surface-subtle);
+}
+
+.tablePresetSummary {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tablePresetSummary strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tablePresetSummary span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.tablePresetActions {
+  display: flex;
+  gap: 6px;
+}
+
+.compactEmptyState {
+  margin: 0;
+  padding: 10px;
 }
 
 .columnChooserHeader {
@@ -1021,6 +1127,12 @@ button:disabled {
   max-height: 320px;
   overflow: auto;
   margin-bottom: 10px;
+}
+
+.columnChooserActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 .columnChoiceRow {
@@ -1148,7 +1260,7 @@ button:disabled {
 
 .columnFilterActions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 6px;
 }
 
