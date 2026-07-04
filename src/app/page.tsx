@@ -20,6 +20,7 @@ import { ReturnTopButton } from './ReturnTopButton';
 import { DetailWindowBackdrop } from './DetailWindowBackdrop';
 import { DetailWindowCorrectionButton } from './DetailWindowCorrectionButton';
 import { ThemeToggle } from './ThemeToggle';
+import { BranchSelector, type BranchSelectorOption } from './BranchSelector';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,6 +91,7 @@ export default async function Page({ searchParams }: PageProps) {
           </div>
           <div className="headerStats">
             <span>{data.entries.totalCount} entries</span>
+            <BranchSelectionForm params={params} branchCode={defaultBranchCode} branches={data.formOptions.branches} />
             <ThemeToggle />
           </div>
         </header>
@@ -99,7 +101,7 @@ export default async function Page({ searchParams }: PageProps) {
             <Metric label="残高合計" value={data.currentBalance ? yen(data.currentBalance.runningTotalAmountYen) : '-'} />
             <Metric label="切手金額" value={data.currentBalance ? yen(data.currentBalance.runningStampAmountYen) : '-'} />
             <Metric label="その他金額" value={data.currentBalance ? yen(data.currentBalance.runningOtherAmountYen) : '-'} />
-            <Metric label="基準出納No" value={data.currentBalance?.asOfLedgerNo?.toString() ?? '-'} />
+            <Metric label="最終出納No" value={data.currentBalance?.asOfLedgerNo?.toString() ?? '-'} />
           </section>
           <div className="dashboardActions">
             <div className="displayDateRangePanel">
@@ -169,7 +171,7 @@ export default async function Page({ searchParams }: PageProps) {
               <h2>明細</h2>
             </div>
             {selected ? (
-              <SelectedEntryDetails selected={selected} />
+              <SelectedEntryDetails selected={selected} correctionTrail={data.correctionTrail} params={params} />
             ) : (
               <p className="emptyState">条件に一致する出納がありません。</p>
             )}
@@ -199,7 +201,13 @@ export default async function Page({ searchParams }: PageProps) {
                 <Link className="toolbarButton secondaryButton" href={detailWindowCloseHref} scroll={false}>閉じる</Link>
               </div>
               <div className="detailWindowBody">
-                <SelectedEntryDetails selected={selected} layout="grid" />
+                <SelectedEntryDetails
+                  selected={selected}
+                  correctionTrail={data.correctionTrail}
+                  params={params}
+                  layout="grid"
+                  detailWindow
+                />
               </div>
               <div className="detailWindowFooter">
                 <DetailWindowCorrectionButton disabled={!selectedEntryCanCorrect(selected)} />
@@ -237,12 +245,38 @@ function Metric({ label, value }: Readonly<{ label: string; value: string }>) {
   );
 }
 
+function BranchSelectionForm({
+  params,
+  branchCode,
+  branches,
+}: Readonly<{
+  params: Record<string, string | string[] | undefined>;
+  branchCode: number | null;
+  branches: LedgerDashboardData['formOptions']['branches'];
+}>) {
+  const options: BranchSelectorOption[] = branches.map((branch) => ({
+    value: String(branch.value),
+    label: branch.label,
+    href: branchSelectionHref(params, branch.value),
+  }));
+  const selectedValue = branchCode == null ? options[0]?.value ?? '' : String(branchCode);
+  if (options.length === 0) return null;
+
+  return <BranchSelector selectedValue={selectedValue} options={options} />;
+}
+
 function SelectedEntryDetails({
   selected,
+  correctionTrail,
+  params,
   layout = 'stack',
+  detailWindow = false,
 }: Readonly<{
   selected: NonNullable<LedgerDashboardData['selectedEntry']>;
+  correctionTrail: LedgerDashboardData['correctionTrail'];
+  params: Record<string, string | string[] | undefined>;
   layout?: 'stack' | 'grid';
+  detailWindow?: boolean;
 }>) {
   return (
     <div className={layout === 'grid' ? 'selectedEntryDetails detailWindowGrid' : 'selectedEntryDetails'}>
@@ -299,6 +333,12 @@ function SelectedEntryDetails({
           ['訂正伝票No', selected.correctionLedgerNo],
         ]}
       />
+      <CorrectionTrailSection
+        trail={correctionTrail}
+        currentLedgerNo={selected.ledgerNo}
+        params={params}
+        detailWindow={detailWindow}
+      />
       <DetailSection
         title="監査"
         rows={[
@@ -310,6 +350,57 @@ function SelectedEntryDetails({
         ]}
       />
     </div>
+  );
+}
+
+function CorrectionTrailSection({
+  trail,
+  currentLedgerNo,
+  params,
+  detailWindow,
+}: Readonly<{
+  trail: LedgerDashboardData['correctionTrail'];
+  currentLedgerNo: number;
+  params: Record<string, string | string[] | undefined>;
+  detailWindow: boolean;
+}>) {
+  if (!trail) return null;
+
+  const items = [
+    { label: '元伝票', ledgerNo: trail.originalLedgerNo },
+    { label: '赤伝票', ledgerNo: trail.reversalLedgerNo },
+    { label: '訂正伝票', ledgerNo: trail.correctionLedgerNo },
+  ];
+
+  return (
+    <section className="detailSection correctionTrailSection">
+      <h3>訂正履歴</h3>
+      <div className="correctionTrail" aria-label="訂正履歴">
+        {items.map((item, index) => (
+          <div key={item.label} className="correctionTrailStep">
+            {index > 0 ? <span className="correctionTrailSeparator" aria-hidden="true">→</span> : null}
+            <span className="correctionTrailLabel">{item.label}</span>
+            {correctionTrailNode(item.ledgerNo, currentLedgerNo, params, detailWindow)}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function correctionTrailNode(
+  ledgerNo: number | null,
+  currentLedgerNo: number,
+  params: Record<string, string | string[] | undefined>,
+  detailWindow: boolean,
+) {
+  if (ledgerNo == null) return <span className="correctionTrailEmpty">-</span>;
+  const text = `#${ledgerNo}`;
+  if (ledgerNo === currentLedgerNo) return <span className="correctionTrailCurrent">{text}</span>;
+  return (
+    <Link className="correctionTrailLink" href={ledgerEntryHref(params, ledgerNo, detailWindow)} scroll={false}>
+      {text}
+    </Link>
   );
 }
 
@@ -381,10 +472,27 @@ function displayDateRangeClearHref(
   return query ? `/?${query}` : '/';
 }
 
+function branchSelectionHref(params: Record<string, string | string[] | undefined>, branchCode: number): string {
+  const next = paramsWithout(params, {
+    keys: ['branchCode', 'filter_branchName', 'ledgerNo', 'page', 'actionMessage', 'clearDraft'],
+  });
+  next.set('branchCode', String(branchCode));
+  const query = next.toString();
+  return query ? `/?${query}` : '/';
+}
+
 function detailWindowCloseHrefFromParams(params: Record<string, string | string[] | undefined>): string {
   const next = paramsWithout(params, { keys: ['detailWindow', 'actionMessage', 'clearDraft'] });
   const query = next.toString();
   return query ? `/?${query}` : '/';
+}
+
+function ledgerEntryHref(params: Record<string, string | string[] | undefined>, ledgerNo: number, detailWindow: boolean): string {
+  const omittedKeys = ['ledgerNo', 'actionMessage', 'clearDraft'];
+  const next = paramsWithout(params, { keys: detailWindow ? omittedKeys : [...omittedKeys, 'detailWindow'] });
+  next.set('ledgerNo', String(ledgerNo));
+  if (detailWindow) next.set('detailWindow', '1');
+  return `/?${next.toString()}`;
 }
 
 function hideDetailPanelHref(params: Record<string, string | string[] | undefined>): string {

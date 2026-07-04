@@ -15,6 +15,7 @@ import type {
   SortDirection,
 } from '@/application/repositories/VoucherLedgerRepository';
 import { EntryTypeCode } from '@/domain/entryTypes';
+import { RedVoucherStatus } from '@/domain/redVoucherStatuses';
 
 export const LEDGER_DATA_CACHE_TAG = 'ledger-data';
 export const LEDGER_REFERENCE_CACHE_TAG = 'ledger-reference-data';
@@ -39,8 +40,15 @@ export type LedgerDashboardData = Readonly<{
   entries: LedgerEntryListRecord;
   deletedEntries: LedgerEntryListRecord;
   selectedEntry: PostedLedgerEntryWithAmounts | null;
+  correctionTrail: LedgerCorrectionTrail | null;
   currentBalance: CurrentBalanceRecord | null;
   formOptions: LedgerFormOptions;
+}>;
+
+export type LedgerCorrectionTrail = Readonly<{
+  originalLedgerNo: number | null;
+  reversalLedgerNo: number | null;
+  correctionLedgerNo: number | null;
 }>;
 
 export type LedgerSelectOption = Readonly<{
@@ -108,6 +116,7 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
   ]);
   const selectedLedgerNo = input.ledgerNo ?? entries.items[0]?.ledgerNo ?? null;
   const selectedEntry = selectedLedgerNo == null ? null : await getCachedLedgerEntry(selectedLedgerNo);
+  const correctionTrail = selectedEntry == null ? null : await getCorrectionTrail(selectedEntry);
   const balanceBranchCode = input.branchCode ?? selectedEntry?.branchCode ?? entries.items[0]?.branchCode ?? null;
   const [currentBalance, formOptions] = await Promise.all([
     balanceBranchCode == null ? null : getCachedBranchCurrentBalance(balanceBranchCode),
@@ -118,8 +127,34 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
     entries,
     deletedEntries,
     selectedEntry,
+    correctionTrail,
     currentBalance,
     formOptions,
+  };
+}
+
+async function getCorrectionTrail(selectedEntry: PostedLedgerEntryWithAmounts): Promise<LedgerCorrectionTrail | null> {
+  const hasCorrectionLink = selectedEntry.redVoucherStatusCode !== RedVoucherStatus.Normal
+    || selectedEntry.originalLedgerNo != null
+    || selectedEntry.reversalLedgerNo != null
+    || selectedEntry.correctionLedgerNo != null;
+
+  if (!hasCorrectionLink) return null;
+
+  const originalEntry = selectedEntry.originalLedgerNo == null
+    ? selectedEntry
+    : await getCachedLedgerEntry(selectedEntry.originalLedgerNo) ?? selectedEntry;
+
+  return {
+    originalLedgerNo: selectedEntry.redVoucherStatusCode === RedVoucherStatus.Original
+      ? selectedEntry.ledgerNo
+      : selectedEntry.originalLedgerNo ?? originalEntry.ledgerNo,
+    reversalLedgerNo: selectedEntry.redVoucherStatusCode === RedVoucherStatus.Reversal
+      ? selectedEntry.ledgerNo
+      : originalEntry.reversalLedgerNo ?? selectedEntry.reversalLedgerNo,
+    correctionLedgerNo: selectedEntry.redVoucherStatusCode === RedVoucherStatus.Correction
+      ? selectedEntry.ledgerNo
+      : originalEntry.correctionLedgerNo ?? selectedEntry.correctionLedgerNo,
   };
 }
 

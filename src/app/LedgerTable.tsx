@@ -253,13 +253,19 @@ export function LedgerTable({
                 {visibleColumns.map((column, index) => (
                   <th key={column.key} className={isNumeric(column) ? 'number' : undefined}>
                     <div className="columnHeaderControls">
-                      <button
-                        type="button"
-                        className={firstParam(params[filterName(column.key)]) ? 'columnTitleButton filteredColumn' : 'columnTitleButton'}
-                        onClick={() => setOpenColumnKey(openColumnKey === column.key ? null : String(column.key))}
-                      >
-                        <span>{column.label}</span>
-                      </button>
+                      {column.filterable === false ? (
+                        <span className="columnTitleButton columnTitleStatic">
+                          <span>{column.label}</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className={firstParam(params[filterName(column.key)]) ? 'columnTitleButton filteredColumn' : 'columnTitleButton'}
+                          onClick={() => setOpenColumnKey(openColumnKey === column.key ? null : String(column.key))}
+                        >
+                          <span>{column.label}</span>
+                        </button>
+                      )}
                       {column.sortable ? (
                         <Link
                           className={currentSortKey === column.key ? 'columnSortButton activeSort' : 'columnSortButton'}
@@ -270,7 +276,7 @@ export function LedgerTable({
                         </Link>
                       ) : null}
                     </div>
-                    {openColumnKey === column.key ? (
+                    {column.filterable !== false && openColumnKey === column.key ? (
                       <ColumnFilterPopover
                         column={column}
                         params={params}

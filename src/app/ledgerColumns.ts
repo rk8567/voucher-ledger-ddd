@@ -8,6 +8,7 @@ type LedgerColumnBase = Readonly<{
   kind: 'text' | 'integer' | 'money' | 'date' | 'year' | 'month' | 'datetime';
   optionsKey?: keyof LedgerFormOptions;
   defaultVisible?: boolean;
+  filterable?: boolean;
 }>;
 
 export type LedgerColumnDefinition = LedgerColumnBase & (
@@ -20,7 +21,7 @@ type SortableLedgerColumn = Extract<LedgerColumnDefinition, Readonly<{ sortable:
 export const ledgerColumns: readonly LedgerColumnDefinition[] = [
   { key: 'ledgerNo', label: '出納No', kind: 'integer', defaultVisible: true, sortable: true },
   { key: 'processingDate', label: '処理日', kind: 'date', defaultVisible: true, sortable: true },
-  { key: 'branchName', label: '拠点', kind: 'text', optionsKey: 'branches', defaultVisible: true, sortable: true },
+  { key: 'branchName', label: '拠点', kind: 'text', optionsKey: 'branches', defaultVisible: true, filterable: false, sortable: true },
   { key: 'entryTypeName', label: '区分', kind: 'text', optionsKey: 'entryTypes', defaultVisible: true, sortable: true },
   { key: 'responsibleEmployeeName', label: '担当', kind: 'text', optionsKey: 'employees', defaultVisible: true, sortable: true },
   { key: 'description', label: '摘要', kind: 'text', defaultVisible: true, sortable: true },
@@ -50,7 +51,9 @@ export const defaultLedgerColumnKeys = ledgerColumns
   .filter((column) => column.defaultVisible)
   .map((column) => column.key);
 
-export const ledgerFilterableKeys = ledgerColumns.map((column) => column.key);
+export const ledgerFilterableKeys = ledgerColumns
+  .filter((column) => column.filterable !== false)
+  .map((column) => column.key);
 
 export const ledgerSortableKeys = ledgerColumns
   .filter((column): column is SortableLedgerColumn => column.sortable === true)

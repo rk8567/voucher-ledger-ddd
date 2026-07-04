@@ -161,6 +161,10 @@ h3 {
   font-size: 12px;
 }
 
+.headerStats .themeToggle {
+  margin-left: 6px;
+}
+
 .themeToggle:hover {
   background: var(--surface-hover);
   color: var(--accent-dark);
@@ -174,6 +178,15 @@ h3 {
   color: var(--accent-dark);
   font-size: 16px;
   line-height: 1;
+}
+
+.headerStats .branchSelector {
+  width: auto;
+  max-width: 100%;
+  min-height: 31px;
+  padding: 5px 8px;
+  background: var(--surface);
+  font-size: 12px;
 }
 
 .toolbar,
@@ -318,6 +331,12 @@ button:disabled {
   gap: 10px;
   min-width: 0;
   height: 100%;
+}
+
+.branchSelector {
+  width: max-content;
+  max-width: 100%;
+  min-height: 38px;
 }
 
 .notice {
@@ -1031,6 +1050,10 @@ button:disabled {
   white-space: nowrap;
 }
 
+.columnTitleStatic {
+  cursor: default;
+}
+
 .columnHeaderControls {
   display: flex;
   align-items: center;
@@ -1377,6 +1400,58 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.correctionTrail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.correctionTrailStep {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.correctionTrailLabel,
+.correctionTrailSeparator {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.correctionTrailLink,
+.correctionTrailCurrent,
+.correctionTrailEmpty {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: var(--surface-subtle);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.correctionTrailLink {
+  color: var(--accent-dark);
+}
+
+.correctionTrailLink:hover {
+  background: var(--surface-hover);
+  text-decoration: none;
+}
+
+.correctionTrailCurrent {
+  border-color: var(--accent);
+  background: var(--surface-active);
+  color: var(--accent-dark);
+}
+
+.correctionTrailEmpty {
+  color: var(--muted);
+}
+
 .denominationGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1487,6 +1562,10 @@ dd {
   .toolbarGroup:last-of-type {
     border-bottom: 0;
     padding-bottom: 0;
+  }
+
+  .headerStats .themeToggle {
+    margin-left: 0;
   }
 
   .filterGrid,
