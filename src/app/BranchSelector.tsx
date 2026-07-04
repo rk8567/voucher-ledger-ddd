@@ -7,6 +7,7 @@ export type BranchSelectorOption = Readonly<{
   value: string;
   label: string;
   href: string;
+  disabled?: boolean;
 }>;
 
 export function BranchSelector({
@@ -32,13 +33,13 @@ export function BranchSelector({
       onChange={(event) => {
         const nextValue = event.target.value;
         const option = options.find((candidate) => candidate.value === nextValue);
-        if (!option) return;
+        if (!option || option.disabled) return;
         setValue(nextValue);
         router.push(option.href, { scroll: false });
       }}
     >
       {options.map((option) => (
-        <option key={option.value} value={option.value}>{option.label}</option>
+        <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>
       ))}
     </select>
   );

@@ -89,16 +89,18 @@ function createQueries(unitOfWork: UnitOfWork) {
 }
 
 export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<LedgerDashboardData> {
+  const formOptions = await getCachedLedgerFormOptions();
+  const effectiveInput = withDefaultBranch(input, formOptions);
   const limit = input.limit ?? DEFAULT_LEDGER_PAGE_SIZE;
   const page = Math.max(input.page ?? 1, 1);
   const filter: LedgerEntryListFilter = {
-    ...ledgerFilterFromInput(input),
+    ...ledgerFilterFromInput(effectiveInput),
     limit,
     offset: (page - 1) * limit,
   };
 
   const deletedFilter: LedgerEntryListFilter = {
-    ...ledgerFilterFromInput(input),
+    ...ledgerFilterFromInput(effectiveInput),
     columnFilters: {
       ...(input.columnFilters ?? {}),
       isDeleted: 'true',
@@ -117,11 +119,8 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
   const selectedLedgerNo = input.ledgerNo ?? entries.items[0]?.ledgerNo ?? null;
   const selectedEntry = selectedLedgerNo == null ? null : await getCachedLedgerEntry(selectedLedgerNo);
   const correctionTrail = selectedEntry == null ? null : await getCorrectionTrail(selectedEntry);
-  const balanceBranchCode = input.branchCode ?? selectedEntry?.branchCode ?? entries.items[0]?.branchCode ?? null;
-  const [currentBalance, formOptions] = await Promise.all([
-    balanceBranchCode == null ? null : getCachedBranchCurrentBalance(balanceBranchCode),
-    getCachedLedgerFormOptions(),
-  ]);
+  const balanceBranchCode = effectiveInput.branchCode ?? selectedEntry?.branchCode ?? entries.items[0]?.branchCode ?? null;
+  const currentBalance = balanceBranchCode == null ? null : await getCachedBranchCurrentBalance(balanceBranchCode);
 
   return {
     entries,
@@ -160,13 +159,14 @@ async function getCorrectionTrail(selectedEntry: PostedLedgerEntryWithAmounts): 
 
 export async function getLedgerExportEntries(input: LedgerSearchInput): Promise<readonly LedgerEntryListRecord['items'][number][]> {
   const { listLedgerEntriesQuery } = await getQueries();
+  const effectiveInput = withDefaultBranch(input, await getCachedLedgerFormOptions());
   const pageSize = 200;
   const maxRows = 50_000;
   const items: LedgerEntryListRecord['items'][number][] = [];
 
   for (let offset = 0; offset < maxRows; offset += pageSize) {
     const result = await listLedgerEntriesQuery.execute({
-      ...ledgerFilterFromInput(input),
+      ...ledgerFilterFromInput(effectiveInput),
       limit: pageSize,
       offset,
     });
@@ -176,6 +176,12 @@ export async function getLedgerExportEntries(input: LedgerSearchInput): Promise<
   }
 
   return items;
+}
+
+function withDefaultBranch(input: LedgerSearchInput, formOptions: LedgerFormOptions): LedgerSearchInput {
+  if (input.branchCode != null) return input;
+  const firstBranchCode = formOptions.branches[0]?.value ?? null;
+  return firstBranchCode == null ? input : { ...input, branchCode: firstBranchCode };
 }
 
 function ledgerFilterFromInput(input: LedgerSearchInput): LedgerEntryListFilter {

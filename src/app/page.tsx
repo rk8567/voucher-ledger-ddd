@@ -89,7 +89,8 @@ export default async function Page({ searchParams }: PageProps) {
     const defaultProcessingDate = selected?.processingDate ?? input.processingDateTo ?? todayInTokyo();
     const defaultPeriodYear = input.periodYear ?? selected?.periodYear ?? Number(defaultProcessingDate.slice(0, 4));
     const defaultPeriodMonth = input.periodMonth ?? selected?.periodMonth ?? Number(defaultProcessingDate.slice(5, 7));
-    const defaultBranchCode = input.branchCode ?? selected?.branchCode ?? data.currentBalance?.branchCode ?? null;
+    const firstBranchCode = data.formOptions.branches[0]?.value ?? null;
+    const defaultBranchCode = input.branchCode ?? data.currentBalance?.branchCode ?? selected?.branchCode ?? firstBranchCode;
     const defaultResponsibleEmployeeNo = selected?.responsibleEmployeeNo ?? null;
     const defaultActorEmployeeNo = selected?.filemakerLoginEmployeeNo ?? selected?.updatedByEmployeeNo ?? null;
     const actionMessage = firstParam(params.actionMessage);
@@ -285,8 +286,10 @@ function BranchSelectionForm({
     label: branch.label,
     href: branchSelectionHref(params, branch.value),
   }));
+  if (options.length === 0) {
+    return <BranchSelector selectedValue="" options={[{ value: '', label: '-', href: '', disabled: true }]} />;
+  }
   const selectedValue = branchCode == null ? options[0]?.value ?? '' : String(branchCode);
-  if (options.length === 0) return null;
 
   return <BranchSelector selectedValue={selectedValue} options={options} />;
 }
