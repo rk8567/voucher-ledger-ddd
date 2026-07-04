@@ -7,7 +7,15 @@ import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 
 import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
 import type { LedgerFormOptions } from '@/server/ledger';
-import { defaultLedgerColumnKeys, ledgerColumns, type LedgerColumnDefinition } from './ledgerColumns';
+import {
+  defaultLedgerColumnKeys,
+  exportLedgerColumnCookieName,
+  ledgerColumns,
+  normalizeLedgerColumnKeys,
+  serializeLedgerColumnCookie,
+  visibleLedgerColumnCookieName,
+  type LedgerColumnDefinition,
+} from './ledgerColumns';
 import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
 import { delimitedText, htmlTable, tokyoTimestampForFileName, type LedgerExportFormat } from './ledgerExportFormat';
 import { firstParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
@@ -18,6 +26,8 @@ type LedgerTableProps = Readonly<{
   selectedLedgerNo: number | null;
   params: Record<string, string | string[] | undefined>;
   filterOptions: LedgerFormOptions;
+  initialVisibleColumnKeys: readonly string[];
+  initialExportColumnKeys: readonly string[];
 }>;
 
 type ColumnDefinition = LedgerColumnDefinition;
@@ -55,25 +65,12 @@ type NativeSaveWindow = Window & Readonly<{
 
 const columnStorageKey = 'voucher-ledger:visible-columns';
 const exportColumnStorageKey = 'voucher-ledger:export-columns';
+const columnCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 const filterPrefix = 'filter_';
 const minYear = 1990;
 const maxYear = 2035;
 const columns = ledgerColumns;
 const defaultColumnKeys = defaultLedgerColumnKeys;
-
-function storedColumnKeys(storageKey: string, fallback: readonly string[]): readonly string[] {
-  if (typeof window === 'undefined') return fallback;
-  const raw = window.localStorage.getItem(storageKey);
-  if (!raw) return fallback;
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return fallback;
-    const validKeys = parsed.filter((key) => columns.some((column) => column.key === key));
-    return validKeys.length > 0 ? validKeys : fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 export function LedgerTable({
   entries,
@@ -81,28 +78,22 @@ export function LedgerTable({
   selectedLedgerNo,
   params,
   filterOptions,
+  initialVisibleColumnKeys,
+  initialExportColumnKeys,
 }: LedgerTableProps) {
   const router = useRouter();
   const [openColumnKey, setOpenColumnKey] = useState<string | null>(null);
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
   const [exportWindowOpen, setExportWindowOpen] = useState(false);
   const [deletedView, setDeletedView] = useState(false);
-  const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(() => storedColumnKeys(columnStorageKey, defaultColumnKeys));
-  const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => storedColumnKeys(exportColumnStorageKey, defaultColumnKeys));
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(() => normalizeLedgerColumnKeys(initialVisibleColumnKeys, defaultColumnKeys));
+  const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => normalizeLedgerColumnKeys(initialExportColumnKeys, defaultColumnKeys));
   const tableWrapRef = useRef<HTMLDivElement>(null);
   const columnChooserDrag = useDraggablePopup();
   const [scrollLeft, setScrollLeft] = useState(0);
   const [maxScrollLeft, setMaxScrollLeft] = useState(0);
   const [fadeFrame, setFadeFrame] = useState<FadeFrame | null>(null);
   const tableEntries = deletedView ? deletedEntries.items : entries;
-
-  useEffect(() => {
-    setVisibleColumnKeys(storedColumnKeys(columnStorageKey, defaultColumnKeys));
-  }, []);
-
-  useEffect(() => {
-    setExportColumnKeys(storedColumnKeys(exportColumnStorageKey, defaultColumnKeys));
-  }, []);
 
   const visibleColumns = useMemo(
     () => columns.filter((column) => visibleColumnKeys.includes(column.key)),
@@ -141,29 +132,29 @@ export function LedgerTable({
     const next = visible
       ? [...visibleColumnKeys, key]
       : visibleColumnKeys.filter((columnKey) => columnKey !== key);
-    const normalized = next.length > 0 ? columns.map((column) => column.key).filter((columnKey) => next.includes(columnKey)) : [key];
+    const normalized = normalizeLedgerColumnKeys(next, [key]);
     setVisibleColumnKeys(normalized);
-    window.localStorage.setItem(columnStorageKey, JSON.stringify(normalized));
+    persistColumnKeys(columnStorageKey, visibleLedgerColumnCookieName, normalized);
   }
 
   function resetColumns() {
     setVisibleColumnKeys(defaultColumnKeys);
-    window.localStorage.removeItem(columnStorageKey);
+    clearColumnKeys(columnStorageKey, visibleLedgerColumnCookieName);
   }
 
   function setExportColumn(key: string, visible: boolean) {
     const next = visible
       ? [...exportColumnKeys, key]
       : exportColumnKeys.filter((columnKey) => columnKey !== key);
-    const normalized = next.length > 0 ? columns.map((column) => column.key).filter((columnKey) => next.includes(columnKey)) : [key];
+    const normalized = normalizeLedgerColumnKeys(next, [key]);
     setExportColumnKeys(normalized);
-    window.localStorage.setItem(exportColumnStorageKey, JSON.stringify(normalized));
+    persistColumnKeys(exportColumnStorageKey, exportLedgerColumnCookieName, normalized);
   }
 
   function setExportColumns(next: readonly string[]) {
-    const normalized = next.length > 0 ? columns.map((column) => column.key).filter((columnKey) => next.includes(columnKey)) : defaultColumnKeys;
+    const normalized = normalizeLedgerColumnKeys(next, defaultColumnKeys);
     setExportColumnKeys(normalized);
-    window.localStorage.setItem(exportColumnStorageKey, JSON.stringify(normalized));
+    persistColumnKeys(exportColumnStorageKey, exportLedgerColumnCookieName, normalized);
   }
 
   function setTableScroll(value: number) {
@@ -362,6 +353,16 @@ export function LedgerTable({
       ) : null}
     </>
   );
+}
+
+function persistColumnKeys(storageKey: string, cookieName: string, keys: readonly string[]) {
+  window.localStorage.setItem(storageKey, JSON.stringify(keys));
+  document.cookie = `${cookieName}=${serializeLedgerColumnCookie(keys)}; Path=/; Max-Age=${columnCookieMaxAgeSeconds}; SameSite=Lax`;
+}
+
+function clearColumnKeys(storageKey: string, cookieName: string) {
+  window.localStorage.removeItem(storageKey);
+  document.cookie = `${cookieName}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
 function ExportWindow({

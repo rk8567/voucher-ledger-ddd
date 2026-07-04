@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import {
   DENOMINATIONS,
   isLetterPackDenomination,
@@ -13,7 +14,13 @@ import { DEFAULT_LEDGER_PAGE_SIZE, getLedgerDashboardData, type LedgerDashboardD
 import { EntryActionModals } from './EntryActionModals';
 import { EntryWorkflowButtons } from './EntryWorkflowButtons';
 import { LedgerTable } from './LedgerTable';
-import { ledgerColumns } from './ledgerColumns';
+import {
+  defaultLedgerColumnKeys,
+  exportLedgerColumnCookieName,
+  ledgerColumns,
+  parseLedgerColumnCookie,
+  visibleLedgerColumnCookieName,
+} from './ledgerColumns';
 import { dateOnly, dateTime, legacyRegistrationFlagText, yen } from './ledgerDisplayFormat';
 import { firstParam, paramsWithout, parseLedgerSearchParams } from './ledgerSearchParams';
 import { ReturnTopButton } from './ReturnTopButton';
@@ -59,6 +66,15 @@ function selectedEntryCanCorrect(entry: NonNullable<LedgerDashboardData['selecte
 export default async function Page({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
   const input = parseLedgerSearchParams(params);
+  const cookieStore = await cookies();
+  const initialVisibleColumnKeys = parseLedgerColumnCookie(
+    cookieStore.get(visibleLedgerColumnCookieName)?.value,
+    defaultLedgerColumnKeys,
+  );
+  const initialExportColumnKeys = parseLedgerColumnCookie(
+    cookieStore.get(exportLedgerColumnCookieName)?.value,
+    defaultLedgerColumnKeys,
+  );
 
   try {
     const data = await getLedgerDashboardData(input);
@@ -153,6 +169,8 @@ export default async function Page({ searchParams }: PageProps) {
               selectedLedgerNo={selected?.ledgerNo ?? null}
               params={params}
               filterOptions={data.formOptions}
+              initialVisibleColumnKeys={initialVisibleColumnKeys}
+              initialExportColumnKeys={initialExportColumnKeys}
             />
             <PaginationControls
               previousHref={previousHref}

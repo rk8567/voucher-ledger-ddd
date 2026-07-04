@@ -1,7 +1,7 @@
 import type { LedgerEntryRecord, LedgerEntrySortKey } from '@/application/repositories/VoucherLedgerRepository';
 import type { LedgerFormOptions } from '@/server/ledger';
 
-type LedgerColumnKey = keyof LedgerEntryRecord | 'otherAmountYen';
+export type LedgerColumnKey = keyof LedgerEntryRecord | 'otherAmountYen';
 type LedgerColumnBase = Readonly<{
   key: LedgerColumnKey;
   label: string;
@@ -49,6 +49,33 @@ export const ledgerColumns: readonly LedgerColumnDefinition[] = [
 export const defaultLedgerColumnKeys = ledgerColumns
   .filter((column) => column.defaultVisible)
   .map((column) => column.key);
+
+export const visibleLedgerColumnCookieName = 'voucher-ledger-visible-columns';
+export const exportLedgerColumnCookieName = 'voucher-ledger-export-columns';
+
+export const ledgerColumnKeys = ledgerColumns.map((column) => column.key);
+
+export function normalizeLedgerColumnKeys(
+  keys: readonly string[] | null | undefined,
+  fallback: readonly string[] = defaultLedgerColumnKeys,
+): readonly string[] {
+  const requested = new Set(keys ?? []);
+  const normalized = ledgerColumnKeys.filter((key) => requested.has(key));
+  return normalized.length > 0 ? normalized : fallback;
+}
+
+export function parseLedgerColumnCookie(value: string | undefined, fallback: readonly string[] = defaultLedgerColumnKeys): readonly string[] {
+  if (!value) return fallback;
+  try {
+    return normalizeLedgerColumnKeys(value.split(',').map((key) => decodeURIComponent(key)), fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+export function serializeLedgerColumnCookie(keys: readonly string[]): string {
+  return keys.map((key) => encodeURIComponent(key)).join(',');
+}
 
 export const ledgerFilterableKeys = ledgerColumns
   .filter((column) => column.filterable !== false)
