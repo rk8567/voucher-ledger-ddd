@@ -13,6 +13,9 @@
   --line: #d8ded9;
   --accent: #0f766e;
   --accent-dark: #115e59;
+  --branch-selector-bg: #dff8f0;
+  --branch-selector-hover-bg: #c8f0e5;
+  --branch-selector-border: #62b9a8;
   --danger: #b42318;
   --success-line: #a7d7c8;
   --danger-line: #efb4ae;
@@ -41,6 +44,9 @@
   --line: #4a5550;
   --accent: #4fb7ab;
   --accent-dark: #9ad7cf;
+  --branch-selector-bg: #385f58;
+  --branch-selector-hover-bg: #447369;
+  --branch-selector-border: #65c5b8;
   --danger: #f0a29b;
   --success-line: #4b8d82;
   --danger-line: #9a625d;
@@ -192,9 +198,26 @@ h3 {
   width: auto;
   max-width: 100%;
   min-height: 31px;
-  padding: 5px 8px;
-  background: var(--surface);
+  border-color: var(--branch-selector-border);
+  padding: 5px 30px 5px 10px;
+  background: var(--branch-selector-bg);
+  color: var(--accent-dark);
   font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 42%) inset;
+}
+
+.headerStats .branchSelector:hover {
+  background: var(--branch-selector-hover-bg);
+}
+
+.headerStats .branchSelector:focus {
+  outline: none;
+}
+
+.headerStats .branchSelector:focus-visible {
+  outline: 2px solid var(--branch-selector-border);
+  outline-offset: 2px;
 }
 
 .toolbar,
