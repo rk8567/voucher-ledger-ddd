@@ -82,11 +82,17 @@ type FileSystemFileHandle = Readonly<{
 type NativeSaveWindow = Window & Readonly<{
   showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<FileSystemFileHandle>;
 }>;
+type SortScrollPosition = Readonly<{
+  windowX: number;
+  windowY: number;
+  tableScrollLeft: number;
+}>;
 
 const columnStorageKey = 'voucher-ledger:visible-columns';
 const columnOrderStorageKey = 'voucher-ledger:column-order';
 const exportColumnStorageKey = 'voucher-ledger:export-columns';
 const tablePresetStorageKey = 'voucher-ledger:table-presets';
+const tableSortScrollStorageKey = 'voucher-ledger:sort-scroll';
 const columnCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 const filterPrefix = 'filter_';
 const minYear = 1990;
@@ -165,6 +171,19 @@ export function LedgerTable({
   useEffect(() => {
     setTablePresets(readTablePresets());
   }, []);
+
+  useLayoutEffect(() => {
+    const restore = readSortScrollPosition();
+    if (restore == null) return;
+    window.requestAnimationFrame(() => {
+      window.scrollTo(restore.windowX, restore.windowY);
+      const tableWrap = tableWrapRef.current;
+      if (tableWrap) {
+        tableWrap.scrollLeft = restore.tableScrollLeft;
+        updateTableUiState(tableWrap, setScrollLeft, setMaxScrollLeft, setFadeFrame);
+      }
+    });
+  }, [entries]);
 
   useEffect(() => {
     updateTableUiState(tableWrapRef.current, setScrollLeft, setMaxScrollLeft, setFadeFrame);
@@ -342,6 +361,16 @@ export function LedgerTable({
     setExportWindowOpen(true);
   }
 
+  function navigatePreservingSortScroll(href: string) {
+    setOpenColumnKey(null);
+    writeSortScrollPosition({
+      windowX: window.scrollX,
+      windowY: window.scrollY,
+      tableScrollLeft: tableWrapRef.current?.scrollLeft ?? 0,
+    });
+    router.push(href, { scroll: false });
+  }
+
   return (
     <>
       <div className="tableTools">
@@ -478,13 +507,23 @@ export function LedgerTable({
                         </button>
                       )}
                       {column.sortable ? (
+                        (() => {
+                          const sortHref = nextSortHref(params, String(column.key), currentSortKey, currentSortDirection);
+                          return (
                         <Link
                           className={currentSortKey === column.key ? 'columnSortButton activeSort' : 'columnSortButton'}
-                          href={nextSortHref(params, String(column.key), currentSortKey, currentSortDirection)}
+                          href={sortHref}
+                          scroll={false}
                           aria-label={`${column.label}の並び順を変更`}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            navigatePreservingSortScroll(sortHref);
+                          }}
                         >
                           {sortIcon(String(column.key), currentSortKey, currentSortDirection)}
                         </Link>
+                          );
+                        })()
                       ) : null}
                     </div>
                     {column.filterable !== false && openColumnKey === column.key ? (
@@ -642,6 +681,36 @@ function persistColumnKeys(storageKey: string, cookieName: string, keys: readonl
 function clearColumnKeys(storageKey: string, cookieName: string) {
   window.localStorage.removeItem(storageKey);
   document.cookie = `${cookieName}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
+function writeSortScrollPosition(position: SortScrollPosition) {
+  try {
+    window.sessionStorage.setItem(tableSortScrollStorageKey, JSON.stringify(position));
+  } catch {
+    // Sorting remains usable if transient browser storage is unavailable.
+  }
+}
+
+function readSortScrollPosition(): SortScrollPosition | null {
+  try {
+    const raw = window.sessionStorage.getItem(tableSortScrollStorageKey);
+    if (!raw) return null;
+    window.sessionStorage.removeItem(tableSortScrollStorageKey);
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return null;
+    return {
+      windowX: numericValue(String(parsed.windowX), 0),
+      windowY: numericValue(String(parsed.windowY), 0),
+      tableScrollLeft: numericValue(String(parsed.tableScrollLeft), 0),
+    };
+  } catch {
+    try {
+      window.sessionStorage.removeItem(tableSortScrollStorageKey);
+    } catch {
+      // Ignore cleanup failures.
+    }
+    return null;
+  }
 }
 
 function TablePresetPopover({

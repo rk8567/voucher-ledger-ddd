@@ -106,11 +106,30 @@ export type LedgerEntryListFilter = Readonly<{
 export type LedgerEntrySortKey =
   | 'ledgerNo'
   | 'processingDate'
+  | 'applicationDate'
   | 'branchName'
+  | 'departmentName'
+  | 'periodYear'
+  | 'periodMonth'
   | 'entryTypeName'
+  | 'transactionCategoryName'
+  | 'counterpartyBranchName'
+  | 'companyName'
   | 'responsibleEmployeeName'
   | 'description'
-  | 'otherAmountYen';
+  | 'remarks'
+  | 'otherAmountYen'
+  | 'otherAmountNote'
+  | 'redVoucherStatusName'
+  | 'originalLedgerNo'
+  | 'reversalLedgerNo'
+  | 'correctionLedgerNo'
+  | 'registeredAt'
+  | 'registeredByEmployeeName'
+  | 'updatedAt'
+  | 'updatedByEmployeeName'
+  | 'postedAt'
+  | 'createdAt';
 
 export type SortDirection = 'asc' | 'desc';
 
