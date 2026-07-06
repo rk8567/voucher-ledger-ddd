@@ -22,7 +22,7 @@ import {
   type LedgerColumnDefinition,
 } from './ledgerColumns';
 import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
-import { delimitedText, htmlTable, tokyoTimestampForFileName, type LedgerExportFormat } from './ledgerExportFormat';
+import { tokyoTimestampForFileName, type LedgerExportFormat } from './ledgerExportFormat';
 import { firstParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
 
 type LedgerTableProps = Readonly<{
@@ -565,7 +565,6 @@ export function LedgerTable({
       {exportWindowOpen ? (
         <ExportWindow
           exportHref={exportHref}
-          entries={tableEntries}
           selectedColumnKeys={exportColumnKeys}
           visibleColumnKeys={orderedVisibleColumnKeys}
           onColumnChange={setExportColumn}
@@ -828,7 +827,6 @@ function formatPresetUpdatedAt(value: string): string {
 
 function ExportWindow({
   exportHref,
-  entries,
   selectedColumnKeys,
   visibleColumnKeys,
   onColumnChange,
@@ -836,7 +834,6 @@ function ExportWindow({
   onClose,
 }: Readonly<{
   exportHref: string;
-  entries: LedgerEntryListRecord['items'];
   selectedColumnKeys: readonly string[];
   visibleColumnKeys: readonly string[];
   onColumnChange: (key: string, visible: boolean) => void;
@@ -880,7 +877,7 @@ function ExportWindow({
               </select>
             </label>
             <div className="exportSaveActions">
-              <button type="button" className="secondaryButton" onClick={() => saveCurrentTable(entries, visibleColumnKeys, saveFormat)}>現在の表を保存</button>
+              <button type="button" className="secondaryButton" onClick={() => saveCurrentTable(exportHref, visibleColumnKeys, saveFormat)}>現在の表を保存</button>
               <button type="button" className="secondaryButton" onClick={() => saveSearchResults(exportHref, selectedColumnKeys, saveFormat)}>検索結果を保存</button>
             </div>
           </div>
@@ -910,22 +907,19 @@ function unsortHref(params: Record<string, string | string[] | undefined>): stri
   return query ? `/?${query}` : '/';
 }
 
-function saveCurrentTable(entries: LedgerEntryListRecord['items'], visibleColumnKeys: readonly string[], format: LedgerExportFormat) {
-  const visibleColumns = orderedLedgerColumns(visibleColumnKeys);
-  const header = visibleColumns.map((column) => column.label);
-  const rows = entries.map((entry) => visibleColumns.map((column) => displayCell(entry, column)));
-  const content = format === 'html'
-    ? htmlTable(header, rows)
-    : `\uFEFF${delimitedText(header, rows, format === 'csv-tab' ? '\t' : ',')}\r\n`;
-  const blob = new Blob([content], { type: mimeTypeForFormat(format) });
-  void saveBlob(blob, `voucher-ledger-table-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`, format);
+async function saveCurrentTable(exportHref: string, visibleColumnKeys: readonly string[], format: LedgerExportFormat) {
+  await saveExportedLedger(exportHref, visibleColumnKeys, format, `voucher-ledger-table-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`);
 }
 
 async function saveSearchResults(exportHref: string, selectedColumnKeys: readonly string[], format: LedgerExportFormat) {
+  await saveExportedLedger(exportHref, selectedColumnKeys, format, `voucher-ledger-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`);
+}
+
+async function saveExportedLedger(exportHref: string, selectedColumnKeys: readonly string[], format: LedgerExportFormat, suggestedName: string) {
   const response = await fetch(exportFormatHref(exportHref, format, selectedColumnKeys), { cache: 'no-store' });
   if (!response.ok) throw new Error('Export failed');
   const blob = await response.blob();
-  await saveBlob(blob, `voucher-ledger-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`, format);
+  await saveBlob(blob, suggestedName, format);
 }
 
 async function saveBlob(blob: Blob, suggestedName: string, format: LedgerExportFormat) {
