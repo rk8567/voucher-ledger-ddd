@@ -518,7 +518,14 @@ export function LedgerTable({
                     role="link"
                     tabIndex={0}
                     aria-label={`出納No ${entry.ledgerNo} の明細を表示`}
+                    onMouseDown={(event) => {
+                      if (event.detail > 1) event.preventDefault();
+                    }}
                     onClick={() => router.push(href, { scroll: false })}
+                    onDoubleClick={(event) => {
+                      event.preventDefault();
+                      router.push(detailWindowHref(params, entry.ledgerNo), { scroll: false });
+                    }}
                     onKeyDown={(event) => {
                       if (event.key !== 'Enter' && event.key !== ' ') return;
                       event.preventDefault();
@@ -610,6 +617,7 @@ function LedgerEntryLink({
       scroll={false}
       title={title}
       onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
       {children}
