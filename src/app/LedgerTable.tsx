@@ -849,8 +849,14 @@ function ExportWindow({
   const [saveFormat, setSaveFormat] = useState<LedgerExportFormat>('csv-comma');
 
   return (
-    <div className="modalBackdrop exportBackdrop" role="presentation">
-      <section className="entryModal exportWindow" role="dialog" aria-modal="true" aria-labelledby="export-title">
+    <div className="modalBackdrop exportBackdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="entryModal exportWindow"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="export-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <div className="modalHeader">
           <h2 id="export-title">出力</h2>
           <button type="button" className="secondaryButton" onClick={onClose}>閉じる</button>
