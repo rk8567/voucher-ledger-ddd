@@ -87,16 +87,29 @@ type SortScrollPosition = Readonly<{
   windowY: number;
   tableScrollLeft: number;
 }>;
+type ColumnResizeDrag = Readonly<{
+  pointerId: number;
+  key: string;
+  startX: number;
+  startWidth: number;
+  minWidth: number;
+}>;
 
 const columnStorageKey = 'voucher-ledger:visible-columns';
 const columnOrderStorageKey = 'voucher-ledger:column-order';
 const exportColumnStorageKey = 'voucher-ledger:export-columns';
+const columnWidthStorageKey = 'voucher-ledger:column-widths';
 const tablePresetStorageKey = 'voucher-ledger:table-presets';
 const tableSortScrollStorageKey = 'voucher-ledger:sort-scroll';
 const columnCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 const filterPrefix = 'filter_';
 const minYear = 1990;
 const maxYear = 2035;
+const minTableWidthPx = 680;
+const headerHorizontalPaddingPx = 20;
+const headerControlGapPx = 6;
+const headerSortButtonWidthPx = 28;
+const resizeHandleReservePx = 12;
 const columns = ledgerColumns;
 const exportColumns = ledgerExportColumns;
 const defaultColumnKeys = defaultLedgerColumnKeys;
@@ -135,10 +148,13 @@ export function LedgerTable({
   const [columnOrderKeys, setColumnOrderKeys] = useState<readonly string[]>(() => normalizeLedgerColumnOrder(initialColumnOrderKeys));
   const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => normalizeLedgerExportColumnKeys(initialExportColumnKeys, defaultExportColumnKeys));
   const [draggedColumnKey, setDraggedColumnKey] = useState<string | null>(null);
+  const [columnWidthOverrides, setColumnWidthOverrides] = useState<Readonly<Record<string, number>>>(() => readColumnWidthOverrides());
   const [tablePresets, setTablePresets] = useState<readonly TablePreset[]>([]);
   const [presetName, setPresetName] = useState('');
   const [presetError, setPresetError] = useState<string | null>(null);
   const tableWrapRef = useRef<HTMLDivElement>(null);
+  const columnResizeDragRef = useRef<ColumnResizeDrag | null>(null);
+  const columnWidthsRef = useRef<ReadonlyMap<string, number>>(new Map());
   const columnChooserDrag = useDraggablePopup();
   const [scrollLeft, setScrollLeft] = useState(0);
   const [maxScrollLeft, setMaxScrollLeft] = useState(0);
@@ -160,13 +176,22 @@ export function LedgerTable({
   );
   const columnWidths = useMemo(() => {
     const widths = new Map<string, number>();
-    for (const column of visibleColumns) widths.set(String(column.key), columnWidth(column, tableEntries));
+    for (const column of visibleColumns) {
+      const key = String(column.key);
+      const minWidth = minimumColumnWidth(column);
+      const width = columnWidthOverrides[key] ?? columnWidth(column, tableEntries);
+      widths.set(key, Math.max(width, minWidth));
+    }
     return widths;
-  }, [tableEntries, visibleColumns]);
+  }, [columnWidthOverrides, tableEntries, visibleColumns]);
   const tableMinWidth = useMemo(
     () => visibleColumns.reduce((total, column) => total + (columnWidths.get(String(column.key)) ?? 150), 0),
     [columnWidths, visibleColumns],
   );
+
+  useEffect(() => {
+    columnWidthsRef.current = columnWidths;
+  }, [columnWidths]);
 
   useEffect(() => {
     setTablePresets(readTablePresets());
@@ -202,7 +227,7 @@ export function LedgerTable({
       window.removeEventListener('scroll', handleLayoutChange);
       window.removeEventListener('resize', handleLayoutChange);
     };
-  }, [tableEntries, visibleColumns]);
+  }, [tableEntries, tableMinWidth, visibleColumns]);
 
   function setVisible(key: string, visible: boolean) {
     const current = new Set(visibleColumnKeys);
@@ -264,6 +289,49 @@ export function LedgerTable({
     const normalized = normalizeLedgerColumnOrder(next);
     setColumnOrderKeys(normalized);
     persistColumnKeys(columnOrderStorageKey, columnOrderLedgerColumnCookieName, normalized);
+  }
+
+  function startColumnResize(event: ReactPointerEvent<HTMLButtonElement>, column: ColumnDefinition) {
+    const key = String(column.key);
+    const renderedWidth = event.currentTarget.closest('th')?.getBoundingClientRect().width;
+    const startWidth = renderedWidth && Number.isFinite(renderedWidth)
+      ? Math.round(renderedWidth)
+      : columnWidthsRef.current.get(key) ?? columnWidth(column, tableEntries);
+    columnResizeDragRef.current = {
+      pointerId: event.pointerId,
+      key,
+      startX: event.clientX,
+      startWidth,
+      minWidth: minimumColumnWidth(column),
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function moveColumnResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = columnResizeDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const nextWidth = Math.max(drag.minWidth, Math.round(drag.startWidth + event.clientX - drag.startX));
+    setColumnWidthOverrides((current) => ({
+      ...current,
+      [drag.key]: nextWidth,
+    }));
+  }
+
+  function endColumnResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = columnResizeDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const nextWidth = Math.max(drag.minWidth, Math.round(drag.startWidth + event.clientX - drag.startX));
+    columnResizeDragRef.current = null;
+    setColumnWidthOverrides((current) => {
+      const next = {
+        ...current,
+        [drag.key]: nextWidth,
+      };
+      persistColumnWidthOverrides(next);
+      return next;
+    });
   }
 
   function resetColumns() {
@@ -482,7 +550,7 @@ export function LedgerTable({
           </div>
         ) : null}
         <div className="tableWrap" ref={tableWrapRef}>
-          <table style={{ minWidth: `${Math.max(tableMinWidth, 680)}px` }}>
+          <table style={{ minWidth: `${Math.max(tableMinWidth, minTableWidthPx)}px` }}>
             <colgroup>
               {visibleColumns.map((column) => (
                 <col key={column.key} style={{ width: `${columnWidths.get(String(column.key)) ?? 150}px` }} />
@@ -526,6 +594,16 @@ export function LedgerTable({
                         })()
                       ) : null}
                     </div>
+                    <button
+                      type="button"
+                      className="columnResizeHandle"
+                      aria-label={`${column.label}の列幅を変更`}
+                      onClick={(event) => event.stopPropagation()}
+                      onPointerDown={(event) => startColumnResize(event, column)}
+                      onPointerMove={moveColumnResize}
+                      onPointerUp={endColumnResize}
+                      onPointerCancel={endColumnResize}
+                    />
                     {column.filterable !== false && openColumnKey === column.key ? (
                       <ColumnFilterPopover
                         column={column}
@@ -681,6 +759,32 @@ function persistColumnKeys(storageKey: string, cookieName: string, keys: readonl
 function clearColumnKeys(storageKey: string, cookieName: string) {
   window.localStorage.removeItem(storageKey);
   document.cookie = `${cookieName}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
+function readColumnWidthOverrides(): Readonly<Record<string, number>> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(columnWidthStorageKey);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (!isRecord(parsed)) return {};
+    const widths: Record<string, number> = {};
+    for (const key of ledgerColumnKeys.map(String)) {
+      const value = parsed[key];
+      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) continue;
+      widths[key] = Math.round(value);
+    }
+    return widths;
+  } catch {
+    return {};
+  }
+}
+
+function persistColumnWidthOverrides(widths: Readonly<Record<string, number>>) {
+  try {
+    window.localStorage.setItem(columnWidthStorageKey, JSON.stringify(widths));
+  } catch {
+    // Column resizing remains usable for the current session if storage is unavailable.
+  }
 }
 
 function writeSortScrollPosition(position: SortScrollPosition) {
@@ -1404,9 +1508,32 @@ function columnWidth(column: ColumnDefinition, entries: LedgerEntryListRecord['i
     return Math.max(maxLength, cellLength);
   }, column.label.length);
   const contentCharWidth = isNumeric(column) ? 9 : 12;
-  const headerWidth = column.label.length * 14 + (column.sortable ? 66 : 28);
+  const headerWidth = minimumColumnWidth(column);
   const contentWidth = currentPageMax * contentCharWidth + (column.sortable ? 52 : 24);
   return clampNumber(Math.max(headerWidth, contentWidth), 96, 260);
+}
+
+function minimumColumnWidth(column: ColumnDefinition): number {
+  const sortControlWidth = column.sortable ? headerControlGapPx + headerSortButtonWidthPx : 0;
+  return Math.ceil(
+    headerTextWidth(column.label)
+    + headerHorizontalPaddingPx
+    + sortControlWidth
+    + resizeHandleReservePx,
+  );
+}
+
+let headerMeasureContext: CanvasRenderingContext2D | null | undefined;
+
+function headerTextWidth(value: string): number {
+  if (typeof document === 'undefined') return value.length * 14;
+  if (headerMeasureContext === undefined) {
+    const canvas = document.createElement('canvas');
+    headerMeasureContext = canvas.getContext('2d');
+  }
+  if (!headerMeasureContext) return value.length * 14;
+  headerMeasureContext.font = '700 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  return headerMeasureContext.measureText(value).width + 2;
 }
 
 function isNumeric(column: ColumnDefinition): boolean {
