@@ -20,6 +20,7 @@ import {
   exportLedgerColumnCookieName,
   ledgerColumns,
   parseLedgerColumnCookie,
+  parseLedgerExportColumnCookie,
   parseLedgerColumnOrderCookie,
   visibleLedgerColumnCookieName,
 } from './ledgerColumns';
@@ -78,7 +79,7 @@ export default async function Page({ searchParams }: PageProps) {
   const initialColumnOrderKeys = parseLedgerColumnOrderCookie(
     columnOrderCookie ?? visibleColumnCookie,
   );
-  const initialExportColumnKeys = parseLedgerColumnCookie(
+  const initialExportColumnKeys = parseLedgerExportColumnCookie(
     cookieStore.get(exportLedgerColumnCookieName)?.value,
     defaultLedgerColumnKeys,
   );

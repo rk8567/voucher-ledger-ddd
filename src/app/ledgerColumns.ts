@@ -50,19 +50,27 @@ export const defaultLedgerColumnKeys = ledgerColumns
   .filter((column) => column.defaultVisible)
   .map((column) => column.key);
 
+export const ledgerExportColumns: readonly LedgerColumnDefinition[] = [
+  { key: 'branchCode', label: '拠点CD', kind: 'integer' },
+  { key: 'branchName', label: '拠点', kind: 'text' },
+  ...ledgerColumns,
+];
+
 export const visibleLedgerColumnCookieName = 'voucher-ledger-visible-columns';
 export const exportLedgerColumnCookieName = 'voucher-ledger-export-columns';
 export const columnOrderLedgerColumnCookieName = 'voucher-ledger-column-order';
 
 export const ledgerColumnKeys = ledgerColumns.map((column) => column.key);
+export const ledgerExportColumnKeys = ledgerExportColumns.map((column) => column.key);
 const ledgerColumnByKey = new Map<string, LedgerColumnDefinition>(ledgerColumns.map((column) => [String(column.key), column]));
+const ledgerExportColumnByKey = new Map<string, LedgerColumnDefinition>(ledgerExportColumns.map((column) => [String(column.key), column]));
 
 export function normalizeLedgerColumnKeys(
   keys: readonly string[] | null | undefined,
   fallback: readonly string[] = defaultLedgerColumnKeys,
 ): readonly string[] {
-  const normalized = orderedValidColumnKeys(keys ?? []);
-  return normalized.length > 0 ? normalized : orderedValidColumnKeys(fallback);
+  const normalized = orderedValidColumnKeys(keys ?? [], ledgerColumnKeys);
+  return normalized.length > 0 ? normalized : orderedValidColumnKeys(fallback, ledgerColumnKeys);
 }
 
 export function orderedLedgerColumns(
@@ -74,8 +82,25 @@ export function orderedLedgerColumns(
     .filter((column): column is LedgerColumnDefinition => column != null);
 }
 
+export function normalizeLedgerExportColumnKeys(
+  keys: readonly string[] | null | undefined,
+  fallback: readonly string[] = defaultLedgerColumnKeys,
+): readonly string[] {
+  const normalized = orderedValidColumnKeys(keys ?? [], ledgerExportColumnKeys);
+  return normalized.length > 0 ? normalized : orderedValidColumnKeys(fallback, ledgerExportColumnKeys);
+}
+
+export function orderedLedgerExportColumns(
+  keys: readonly string[] | null | undefined,
+  fallback: readonly string[] = defaultLedgerColumnKeys,
+): readonly LedgerColumnDefinition[] {
+  return normalizeLedgerExportColumnKeys(keys, fallback)
+    .map((key) => ledgerExportColumnByKey.get(key))
+    .filter((column): column is LedgerColumnDefinition => column != null);
+}
+
 export function normalizeLedgerColumnOrder(keys: readonly string[] | null | undefined): readonly string[] {
-  const ordered = [...orderedValidColumnKeys(keys ?? [])];
+  const ordered = [...orderedValidColumnKeys(keys ?? [], ledgerColumnKeys)];
   const seen = new Set(ordered);
   for (const key of ledgerColumnKeys.map(String)) {
     if (seen.has(key)) continue;
@@ -85,8 +110,8 @@ export function normalizeLedgerColumnOrder(keys: readonly string[] | null | unde
   return ordered;
 }
 
-function orderedValidColumnKeys(keys: readonly string[]): readonly string[] {
-  const validKeys = new Set(ledgerColumnKeys.map(String));
+function orderedValidColumnKeys(keys: readonly string[], validColumnKeys: readonly string[]): readonly string[] {
+  const validKeys = new Set(validColumnKeys.map(String));
   const seen = new Set<string>();
   const ordered: string[] = [];
   for (const key of keys) {
@@ -101,6 +126,15 @@ export function parseLedgerColumnCookie(value: string | undefined, fallback: rea
   if (!value) return fallback;
   try {
     return normalizeLedgerColumnKeys(value.split(',').map((key) => decodeURIComponent(key)), fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+export function parseLedgerExportColumnCookie(value: string | undefined, fallback: readonly string[] = defaultLedgerColumnKeys): readonly string[] {
+  if (!value) return fallback;
+  try {
+    return normalizeLedgerExportColumnKeys(value.split(',').map((key) => decodeURIComponent(key)), fallback);
   } catch {
     return fallback;
   }

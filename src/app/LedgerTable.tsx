@@ -13,9 +13,11 @@ import {
   exportLedgerColumnCookieName,
   ledgerColumns,
   ledgerColumnKeys,
+  ledgerExportColumns,
   ledgerFilterableKeys,
   normalizeLedgerColumnOrder,
   normalizeLedgerColumnKeys,
+  normalizeLedgerExportColumnKeys,
   orderedLedgerColumns,
   serializeLedgerColumnCookie,
   visibleLedgerColumnCookieName,
@@ -95,6 +97,7 @@ const filterPrefix = 'filter_';
 const minYear = 1990;
 const maxYear = 2035;
 const columns = ledgerColumns;
+const exportColumns = ledgerExportColumns;
 const defaultColumnKeys = defaultLedgerColumnKeys;
 const tablePresetParamKeys = [
   'branchCode',
@@ -131,7 +134,7 @@ export function LedgerTable({
   const [deletedView, setDeletedView] = useState(false);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(() => normalizeLedgerColumnKeys(initialVisibleColumnKeys, defaultColumnKeys));
   const [columnOrderKeys, setColumnOrderKeys] = useState<readonly string[]>(() => normalizeLedgerColumnOrder(initialColumnOrderKeys));
-  const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => normalizeLedgerColumnKeys(initialExportColumnKeys, defaultColumnKeys));
+  const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => normalizeLedgerExportColumnKeys(initialExportColumnKeys, defaultColumnKeys));
   const [draggedColumnKey, setDraggedColumnKey] = useState<string | null>(null);
   const [tablePresets, setTablePresets] = useState<readonly TablePreset[]>([]);
   const [presetName, setPresetName] = useState('');
@@ -266,7 +269,7 @@ export function LedgerTable({
     const next = visible
       ? [...exportColumnKeys, key]
       : exportColumnKeys.filter((columnKey) => columnKey !== key);
-    const normalized = normalizeLedgerColumnKeys(next, [key]);
+    const normalized = normalizeLedgerExportColumnKeys(next, [key]);
     setExportColumnKeys(normalized);
     persistColumnKeys(exportColumnStorageKey, exportLedgerColumnCookieName, normalized);
   }
@@ -314,7 +317,7 @@ export function LedgerTable({
   }
 
   function setExportColumns(next: readonly string[]) {
-    const normalized = normalizeLedgerColumnKeys(next, defaultColumnKeys);
+    const normalized = normalizeLedgerExportColumnKeys(next, defaultColumnKeys);
     setExportColumnKeys(normalized);
     persistColumnKeys(exportColumnStorageKey, exportLedgerColumnCookieName, normalized);
   }
@@ -567,6 +570,7 @@ export function LedgerTable({
           exportHref={exportHref}
           selectedColumnKeys={exportColumnKeys}
           visibleColumnKeys={orderedVisibleColumnKeys}
+          branchFileLabel={branchFileLabel(effectiveBranchCode, filterOptions)}
           onColumnChange={setExportColumn}
           onSetColumns={setExportColumns}
           onClose={() => setExportWindowOpen(false)}
@@ -829,6 +833,7 @@ function ExportWindow({
   exportHref,
   selectedColumnKeys,
   visibleColumnKeys,
+  branchFileLabel,
   onColumnChange,
   onSetColumns,
   onClose,
@@ -836,6 +841,7 @@ function ExportWindow({
   exportHref: string;
   selectedColumnKeys: readonly string[];
   visibleColumnKeys: readonly string[];
+  branchFileLabel: string;
   onColumnChange: (key: string, visible: boolean) => void;
   onSetColumns: (keys: readonly string[]) => void;
   onClose: () => void;
@@ -852,11 +858,11 @@ function ExportWindow({
         <div className="exportBody">
           <div className="exportColumnActions">
             <button type="button" className="secondaryButton" onClick={() => onSetColumns(visibleColumnKeys)}>表示列</button>
-            <button type="button" className="secondaryButton" onClick={() => onSetColumns(columns.map((column) => column.key))}>全選択</button>
+            <button type="button" className="secondaryButton" onClick={() => onSetColumns(exportColumns.map((column) => column.key))}>全選択</button>
             <button type="button" className="secondaryButton" onClick={() => onSetColumns(defaultColumnKeys)}>標準</button>
           </div>
           <div className="exportColumnList" aria-label="出力列">
-            {columns.map((column) => (
+            {exportColumns.map((column) => (
               <label key={column.key} className="columnChoice">
                 <input
                   type="checkbox"
@@ -877,7 +883,7 @@ function ExportWindow({
               </select>
             </label>
             <div className="exportSaveActions">
-              <button type="button" className="secondaryButton" onClick={() => saveCurrentTable(exportHref, visibleColumnKeys, saveFormat)}>現在の表を保存</button>
+              <button type="button" className="secondaryButton" onClick={() => saveCurrentTable(exportHref, visibleColumnKeys, saveFormat, branchFileLabel)}>現在の表を保存</button>
               <button type="button" className="secondaryButton" onClick={() => saveSearchResults(exportHref, selectedColumnKeys, saveFormat)}>検索結果を保存</button>
             </div>
           </div>
@@ -907,12 +913,22 @@ function unsortHref(params: Record<string, string | string[] | undefined>): stri
   return query ? `/?${query}` : '/';
 }
 
-async function saveCurrentTable(exportHref: string, visibleColumnKeys: readonly string[], format: LedgerExportFormat) {
-  await saveExportedLedger(exportHref, visibleColumnKeys, format, `voucher-ledger-table-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`);
+async function saveCurrentTable(exportHref: string, visibleColumnKeys: readonly string[], format: LedgerExportFormat, branchFileLabel: string) {
+  await saveExportedLedger(exportHref, visibleColumnKeys, format, `voucher-ledger-table-${branchFileLabel}-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`);
 }
 
 async function saveSearchResults(exportHref: string, selectedColumnKeys: readonly string[], format: LedgerExportFormat) {
   await saveExportedLedger(exportHref, selectedColumnKeys, format, `voucher-ledger-${tokyoTimestampForFileName()}.${extensionForFormat(format)}`);
+}
+
+function branchFileLabel(branchCode: number | null, filterOptions: LedgerFormOptions): string {
+  if (branchCode == null) return 'branch-none';
+  const branchName = filterOptions.branches.find((branch) => branch.value === branchCode)?.label ?? 'branch';
+  return safeFileNamePart(`${branchCode}-${branchName}`);
+}
+
+function safeFileNamePart(value: string): string {
+  return value.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').trim().replace(/\s+/g, '_') || 'branch';
 }
 
 async function saveExportedLedger(exportHref: string, selectedColumnKeys: readonly string[], format: LedgerExportFormat, suggestedName: string) {

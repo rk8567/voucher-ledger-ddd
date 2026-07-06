@@ -1,6 +1,6 @@
 import { getLedgerExportEntries } from '@/server/ledger';
 import type { LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
-import { defaultLedgerColumnKeys, orderedLedgerColumns, type LedgerColumnDefinition } from '@/app/ledgerColumns';
+import { defaultLedgerColumnKeys, orderedLedgerExportColumns, type LedgerColumnDefinition } from '@/app/ledgerColumns';
 import { dateOnly, dateTime, delimitedText, htmlTable, tokyoTimestampForFileName, type LedgerExportFormat } from '@/app/ledgerExportFormat';
 import { parseLedgerExportSearchParams, urlParam } from '@/app/ledgerSearchParams';
 
@@ -13,7 +13,7 @@ function exportFormatParam(params: URLSearchParams): LedgerExportFormat {
 
 function exportColumnsParam(params: URLSearchParams): readonly ExportColumn[] {
   const raw = urlParam(params, 'columns');
-  return orderedLedgerColumns(raw?.split(',').map((key) => key.trim()).filter(Boolean), defaultLedgerColumnKeys);
+  return orderedLedgerExportColumns(raw?.split(',').map((key) => key.trim()).filter(Boolean), defaultLedgerColumnKeys);
 }
 
 function exportValue(entry: LedgerEntryRecord, column: ExportColumn): string | number | null {
