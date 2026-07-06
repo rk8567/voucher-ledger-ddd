@@ -130,15 +130,15 @@ export default async function Page({ searchParams }: PageProps) {
             <Metric label="最終出納No" value={data.currentBalance?.asOfLedgerNo?.toString() ?? '-'} />
           </section>
           <div className="dashboardActions">
+            <div className="detailPrimaryActions" aria-label="Entry actions">
+              <EntryWorkflowButtons correctionDisabled={!selected || !selectedEntryCanCorrect(selected)} />
+            </div>
             <div className="displayDateRangePanel">
               <DisplayDateRangeForm
                 params={params}
                 processingDateFrom={displayDateRange.from}
                 processingDateTo={displayDateRange.to}
               />
-            </div>
-            <div className="detailPrimaryActions" aria-label="Entry actions">
-              <EntryWorkflowButtons correctionDisabled={!selected || !selectedEntryCanCorrect(selected)} />
             </div>
           </div>
         </div>
@@ -464,11 +464,11 @@ function DisplayDateRangeForm({
       {Array.from(preserved.entries()).map(([key, value]) => (
         <input key={key} type="hidden" name={key} value={value} />
       ))}
-      <label>
-        <span>表示開始日付</span>
+      <label className="displayDateRangeField">
+        <span>開始日付</span>
         <input type="date" name="processingDateFrom" defaultValue={processingDateFrom} />
       </label>
-      <label>
+      <label className="displayDateRangeField">
         <span>終了日付</span>
         <input type="date" name="processingDateTo" defaultValue={processingDateTo} />
       </label>
