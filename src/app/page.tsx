@@ -181,7 +181,6 @@ export default async function Page({ searchParams }: PageProps) {
               params={params}
               filterOptions={data.formOptions}
               effectiveBranchCode={defaultBranchCode}
-              displayDateRange={displayDateRange}
               initialVisibleColumnKeys={initialVisibleColumnKeys}
               initialColumnOrderKeys={initialColumnOrderKeys}
               initialExportColumnKeys={initialExportColumnKeys}
@@ -449,11 +448,8 @@ function DisplayDateRangeForm({
 }>) {
   const preserved = paramsWithout(params, {
     keys: [
-      'dateRange',
       'processingDateFrom',
       'processingDateTo',
-      'displayDateFrom',
-      'displayDateTo',
       'page',
       'ledgerNo',
       'actionMessage',
@@ -461,7 +457,7 @@ function DisplayDateRangeForm({
       ...dateColumnFilterKeys(),
     ],
   });
-  const clearHref = displayDateRangeClearHref(params, processingDateFrom, processingDateTo);
+  const clearHref = displayDateRangeClearHref(params);
 
   return (
     <form className="displayDateRangeForm" method="get">
@@ -484,24 +480,17 @@ function DisplayDateRangeForm({
 
 function displayDateRangeClearHref(
   params: Record<string, string | string[] | undefined>,
-  processingDateFrom: string,
-  processingDateTo: string,
 ): string {
   const preserved = paramsWithout(params, {
     keys: [
-      'dateRange',
       'processingDateFrom',
       'processingDateTo',
-      'displayDateFrom',
-      'displayDateTo',
       'page',
       'ledgerNo',
       'actionMessage',
       'clearDraft',
     ],
   });
-  preserved.set('displayDateFrom', processingDateFrom);
-  preserved.set('displayDateTo', processingDateTo);
   const query = preserved.toString();
   return query ? `/?${query}` : '/';
 }
@@ -548,13 +537,9 @@ function displayDateRangeValues(
 ): { from: string; to: string } {
   const defaults = defaultDisplayDateRange();
   return {
-    from: processingDateFrom ?? displayOnlyDate(params, 'displayDateFrom') ?? defaults.from,
-    to: processingDateTo ?? displayOnlyDate(params, 'displayDateTo') ?? defaults.to,
+    from: processingDateFrom ?? defaults.from,
+    to: processingDateTo ?? defaults.to,
   };
-}
-
-function displayOnlyDate(params: Record<string, string | string[] | undefined>, key: string): string | null {
-  return Object.prototype.hasOwnProperty.call(params, key) ? firstParam(params[key]) ?? '' : null;
 }
 
 function defaultDisplayDateRange(): { from: string; to: string } {

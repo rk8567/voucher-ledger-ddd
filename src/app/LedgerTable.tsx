@@ -36,18 +36,12 @@ type LedgerTableProps = Readonly<{
   params: Record<string, string | string[] | undefined>;
   filterOptions: LedgerFormOptions;
   effectiveBranchCode: number | null;
-  displayDateRange: DisplayDateRange;
   initialVisibleColumnKeys: readonly string[];
   initialColumnOrderKeys: readonly string[];
   initialExportColumnKeys: readonly string[];
 }>;
 
 type ColumnDefinition = LedgerColumnDefinition;
-
-type DisplayDateRange = Readonly<{
-  from: string;
-  to: string;
-}>;
 
 type TablePreset = Readonly<{
   id: string;
@@ -108,8 +102,6 @@ const tablePresetParamKeys = [
   'entryTypeCode',
   'processingDateFrom',
   'processingDateTo',
-  'displayDateFrom',
-  'displayDateTo',
   'sort',
   'dir',
   'limit',
@@ -123,7 +115,6 @@ export function LedgerTable({
   params,
   filterOptions,
   effectiveBranchCode,
-  displayDateRange,
   initialVisibleColumnKeys,
   initialColumnOrderKeys,
   initialExportColumnKeys,
@@ -289,7 +280,7 @@ export function LedgerTable({
       name,
       visibleColumnKeys: [...visibleColumnKeys],
       columnOrderKeys: [...columnOrderKeys],
-      params: currentTablePresetParams(params, effectiveBranchCode, displayDateRange),
+      params: currentTablePresetParams(params, effectiveBranchCode),
       updatedAt: new Date().toISOString(),
     };
     const next = [
@@ -722,7 +713,6 @@ function TablePresetPopover({
 function currentTablePresetParams(
   params: Record<string, string | string[] | undefined>,
   effectiveBranchCode: number | null,
-  displayDateRange: DisplayDateRange,
 ): Record<string, string> {
   const next = new URLSearchParams();
   for (const key of tablePresetParamKeys) {
@@ -734,12 +724,6 @@ function currentTablePresetParams(
   }
   if (!next.has('branchCode') && effectiveBranchCode != null) {
     next.set('branchCode', String(effectiveBranchCode));
-  }
-  if (!next.has('processingDateFrom') && !next.has('displayDateFrom')) {
-    next.set('displayDateFrom', displayDateRange.from);
-  }
-  if (!next.has('processingDateTo') && !next.has('displayDateTo')) {
-    next.set('displayDateTo', displayDateRange.to);
   }
   return Object.fromEntries(next.entries());
 }
@@ -1460,32 +1444,13 @@ function clearFilterHref(params: Record<string, string | string[] | undefined>, 
 }
 
 function showAllHref(params: Record<string, string | string[] | undefined>): string {
-  const preserved = new URLSearchParams();
-  preserveDisplayDate(params, preserved, 'processingDateFrom', 'displayDateFrom');
-  preserveDisplayDate(params, preserved, 'processingDateTo', 'displayDateTo');
-  const query = preserved.toString();
-  return query ? `/?${query}` : '/';
-}
-
-function preserveDisplayDate(
-  params: Record<string, string | string[] | undefined>,
-  preserved: URLSearchParams,
-  filterKey: string,
-  displayKey: string,
-) {
-  if (Object.prototype.hasOwnProperty.call(params, filterKey)) {
-    preserved.set(displayKey, firstParam(params[filterKey]) ?? '');
-    return;
-  }
-  if (Object.prototype.hasOwnProperty.call(params, displayKey)) {
-    preserved.set(displayKey, firstParam(params[displayKey]) ?? '');
-  }
+  return '/';
 }
 
 function applyFilterHref(params: Record<string, string | string[] | undefined>, column: ColumnDefinition, value: string): string {
   const keys = [filterName(column.key), 'ledgerNo', 'page', 'actionMessage', 'clearDraft'];
   if (column.kind === 'date' || column.kind === 'datetime') {
-    keys.push('dateRange', 'processingDateFrom', 'processingDateTo', 'displayDateFrom', 'displayDateTo');
+    keys.push('processingDateFrom', 'processingDateTo');
   }
   const next = paramsWithout(params, { keys });
   if (value.trim()) next.set(filterName(column.key), value.trim());
