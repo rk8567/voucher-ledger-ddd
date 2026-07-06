@@ -16,6 +16,7 @@ import { EntryWorkflowButtons } from './EntryWorkflowButtons';
 import { LedgerTable } from './LedgerTable';
 import {
   columnOrderLedgerColumnCookieName,
+  defaultLedgerExportColumnKeys,
   defaultLedgerColumnKeys,
   exportLedgerColumnCookieName,
   ledgerColumns,
@@ -81,7 +82,7 @@ export default async function Page({ searchParams }: PageProps) {
   );
   const initialExportColumnKeys = parseLedgerExportColumnCookie(
     cookieStore.get(exportLedgerColumnCookieName)?.value,
-    defaultLedgerColumnKeys,
+    defaultLedgerExportColumnKeys,
   );
 
   try {

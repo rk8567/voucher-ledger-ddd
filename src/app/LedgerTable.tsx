@@ -9,6 +9,7 @@ import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/rep
 import type { LedgerFormOptions } from '@/server/ledger';
 import {
   columnOrderLedgerColumnCookieName,
+  defaultLedgerExportColumnKeys,
   defaultLedgerColumnKeys,
   exportLedgerColumnCookieName,
   ledgerColumns,
@@ -99,6 +100,7 @@ const maxYear = 2035;
 const columns = ledgerColumns;
 const exportColumns = ledgerExportColumns;
 const defaultColumnKeys = defaultLedgerColumnKeys;
+const defaultExportColumnKeys = defaultLedgerExportColumnKeys;
 const tablePresetParamKeys = [
   'branchCode',
   'periodYear',
@@ -134,7 +136,7 @@ export function LedgerTable({
   const [deletedView, setDeletedView] = useState(false);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(() => normalizeLedgerColumnKeys(initialVisibleColumnKeys, defaultColumnKeys));
   const [columnOrderKeys, setColumnOrderKeys] = useState<readonly string[]>(() => normalizeLedgerColumnOrder(initialColumnOrderKeys));
-  const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => normalizeLedgerExportColumnKeys(initialExportColumnKeys, defaultColumnKeys));
+  const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => normalizeLedgerExportColumnKeys(initialExportColumnKeys, defaultExportColumnKeys));
   const [draggedColumnKey, setDraggedColumnKey] = useState<string | null>(null);
   const [tablePresets, setTablePresets] = useState<readonly TablePreset[]>([]);
   const [presetName, setPresetName] = useState('');
@@ -317,7 +319,7 @@ export function LedgerTable({
   }
 
   function setExportColumns(next: readonly string[]) {
-    const normalized = normalizeLedgerExportColumnKeys(next, defaultColumnKeys);
+    const normalized = normalizeLedgerExportColumnKeys(next, defaultExportColumnKeys);
     setExportColumnKeys(normalized);
     persistColumnKeys(exportColumnStorageKey, exportLedgerColumnCookieName, normalized);
   }
@@ -865,7 +867,7 @@ function ExportWindow({
           <div className="exportColumnActions">
             <button type="button" className="secondaryButton" onClick={() => onSetColumns(visibleColumnKeys)}>表示列</button>
             <button type="button" className="secondaryButton" onClick={() => onSetColumns(exportColumns.map((column) => column.key))}>全選択</button>
-            <button type="button" className="secondaryButton" onClick={() => onSetColumns(defaultColumnKeys)}>標準</button>
+            <button type="button" className="secondaryButton" onClick={() => onSetColumns(defaultExportColumnKeys)}>標準</button>
           </div>
           <div className="exportColumnList" aria-label="出力列">
             {exportColumns.map((column) => (
