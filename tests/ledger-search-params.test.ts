@@ -13,3 +13,14 @@ test('ledger export params preserve deleted table mode', () => {
 
   assert.equal(parseLedgerExportSearchParams(params).deletedOnly, true);
 });
+
+test('ledger search params parse all-date range mode', () => {
+  assert.equal(parseLedgerSearchParams({ dateRange: 'all' }).dateRangeAll, true);
+  assert.equal(parseLedgerSearchParams({ dateRange: 'default' }).dateRangeAll, false);
+});
+
+test('ledger export params preserve all-date range mode', () => {
+  const params = new URLSearchParams({ dateRange: 'all' });
+
+  assert.equal(parseLedgerExportSearchParams(params).dateRangeAll, true);
+});

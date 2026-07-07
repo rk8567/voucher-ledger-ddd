@@ -5,6 +5,7 @@ import { GetBranchCurrentBalanceQuery } from '@/application/queries/GetBranchCur
 import { GetLedgerEntryQuery } from '@/application/queries/GetLedgerEntry';
 import { ListLedgerEntriesQuery } from '@/application/queries/ListLedgerEntries';
 import type { DbClient } from '@/application/db/postgres';
+import { defaultProcessingDateRange } from '@/application/ledgerDateRange';
 import type { UnitOfWork } from '@/application/db/UnitOfWork';
 import type {
   CurrentBalanceRecord,
@@ -35,6 +36,7 @@ export type LedgerSearchInput = Readonly<{
   sortKey?: LedgerEntrySortKey | null;
   sortDirection?: SortDirection | null;
   deletedOnly?: boolean | null;
+  dateRangeAll?: boolean | null;
 }>;
 
 export type LedgerDashboardData = Readonly<{
@@ -90,7 +92,7 @@ function createQueries(unitOfWork: UnitOfWork) {
 
 export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<LedgerDashboardData> {
   const formOptions = await getCachedLedgerFormOptions();
-  const effectiveInput = withDefaultBranch(input, formOptions);
+  const effectiveInput = withDefaultBranch(withDefaultProcessingDateRange(input), formOptions);
   const limit = input.limit ?? DEFAULT_LEDGER_PAGE_SIZE;
   const page = Math.max(input.page ?? 1, 1);
   const filter: LedgerEntryListFilter = {
@@ -142,7 +144,7 @@ async function getCorrectionTrail(selectedEntry: PostedLedgerEntryWithAmounts): 
 
 export async function getLedgerExportEntries(input: LedgerSearchInput): Promise<readonly LedgerEntryListRecord['items'][number][]> {
   const { listLedgerEntriesQuery } = await getQueries();
-  const effectiveInput = withDefaultBranch(input, await getCachedLedgerFormOptions());
+  const effectiveInput = withDefaultBranch(withDefaultProcessingDateRange(input), await getCachedLedgerFormOptions());
   const pageSize = 200;
   const maxRows = 50_000;
   const items: LedgerEntryListRecord['items'][number][] = [];
@@ -165,6 +167,22 @@ function withDefaultBranch(input: LedgerSearchInput, formOptions: LedgerFormOpti
   if (input.branchCode != null) return input;
   const firstBranchCode = formOptions.branches[0]?.value ?? null;
   return firstBranchCode == null ? input : { ...input, branchCode: firstBranchCode };
+}
+
+function withDefaultProcessingDateRange(input: LedgerSearchInput): LedgerSearchInput {
+  if (input.dateRangeAll === true) {
+    return {
+      ...input,
+      processingDateFrom: null,
+      processingDateTo: null,
+    };
+  }
+  const defaults = defaultProcessingDateRange();
+  return {
+    ...input,
+    processingDateFrom: input.processingDateFrom ?? defaults.from,
+    processingDateTo: input.processingDateTo ?? defaults.to,
+  };
 }
 
 function ledgerFilterFromInput(input: LedgerSearchInput): LedgerEntryListFilter {

@@ -124,6 +124,7 @@ const tablePresetParamKeys = [
   'periodYear',
   'periodMonth',
   'entryTypeCode',
+  'dateRange',
   'processingDateFrom',
   'processingDateTo',
   'deleted',
@@ -1705,7 +1706,7 @@ function clearFilterHref(params: Record<string, string | string[] | undefined>, 
 }
 
 function showAllHref(params: Record<string, string | string[] | undefined>): string {
-  return '/';
+  return '/?dateRange=all';
 }
 
 function deletedEntriesHref(params: Record<string, string | string[] | undefined>): string {
@@ -1723,7 +1724,7 @@ function normalEntriesHref(params: Record<string, string | string[] | undefined>
 function applyFilterHref(params: Record<string, string | string[] | undefined>, column: ColumnDefinition, value: string): string {
   const keys = [filterName(column.key), 'ledgerNo', 'page', 'actionMessage', 'clearDraft'];
   if (column.kind === 'date' || column.kind === 'datetime') {
-    keys.push('processingDateFrom', 'processingDateTo');
+    keys.push('dateRange', 'processingDateFrom', 'processingDateTo');
   }
   const next = paramsWithout(params, { keys });
   if (value.trim()) next.set(filterName(column.key), value.trim());

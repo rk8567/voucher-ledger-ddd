@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { defaultProcessingDateRange } from '@/application/ledgerDateRange';
 import {
   DENOMINATIONS,
   isLetterPackDenomination,
@@ -70,6 +72,9 @@ function selectedEntryCanCorrect(entry: NonNullable<LedgerDashboardData['selecte
 export default async function Page({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
   const input = parseLedgerSearchParams(params);
+  const defaultDateRangeHref = defaultDateRangeRedirectHref(params, input);
+  if (defaultDateRangeHref) redirect(defaultDateRangeHref);
+
   const cookieStore = await cookies();
   const visibleColumnCookie = cookieStore.get(visibleLedgerColumnCookieName)?.value;
   const columnOrderCookie = cookieStore.get(columnOrderLedgerColumnCookieName)?.value;
@@ -86,9 +91,10 @@ export default async function Page({ searchParams }: PageProps) {
   );
 
   try {
+    const displayDateRange = displayDateRangeValues(input.processingDateFrom, input.processingDateTo);
     const data = await getLedgerDashboardData(input);
     const selected = data.selectedEntry;
-    const defaultProcessingDate = selected?.processingDate ?? input.processingDateTo ?? todayInTokyo();
+    const defaultProcessingDate = selected?.processingDate ?? displayDateRange.to;
     const defaultPeriodYear = input.periodYear ?? selected?.periodYear ?? Number(defaultProcessingDate.slice(0, 4));
     const defaultPeriodMonth = input.periodMonth ?? selected?.periodMonth ?? Number(defaultProcessingDate.slice(5, 7));
     const firstBranchCode = data.formOptions.branches[0]?.value ?? null;
@@ -107,15 +113,14 @@ export default async function Page({ searchParams }: PageProps) {
     const previousHref = currentPage > 1 ? pageHref(params, currentPage - 1) : null;
     const nextHref = currentPage < totalPages ? pageHref(params, currentPage + 1) : null;
     const pageNumbers = paginationItems(currentPage, totalPages);
-    const displayDateRange = displayDateRangeValues(params, input.processingDateFrom, input.processingDateTo);
 
     return (
       <main id="top" className="shell">
         <header className="pageHeader">
-          <div>
+          <Link className="headerTitleLink" href="/">
             <p className="eyebrow">Voucher Ledger</p>
             <h1>金券管理台帳</h1>
-          </div>
+          </Link>
           <div className="headerStats">
             <span>{data.entries.totalCount} entries</span>
             <BranchSelectionForm params={params} branchCode={defaultBranchCode} branches={data.formOptions.branches} />
@@ -254,10 +259,10 @@ export default async function Page({ searchParams }: PageProps) {
     return (
       <main className="shell">
         <header className="pageHeader">
-          <div>
+          <Link className="headerTitleLink" href="/">
             <p className="eyebrow">Voucher Ledger</p>
             <h1>金券管理台帳</h1>
-          </div>
+          </Link>
         </header>
         <section className="errorPanel">
           <h2>データベースに接続できません</h2>
@@ -451,6 +456,7 @@ function DisplayDateRangeForm({
     keys: [
       'processingDateFrom',
       'processingDateTo',
+      'dateRange',
       'page',
       'ledgerNo',
       'actionMessage',
@@ -484,6 +490,7 @@ function displayDateRangeClearHref(
 ): string {
   const preserved = paramsWithout(params, {
     keys: [
+      'dateRange',
       'processingDateFrom',
       'processingDateTo',
       'page',
@@ -492,6 +499,7 @@ function displayDateRangeClearHref(
       'clearDraft',
     ],
   });
+  preserved.set('dateRange', 'all');
   const query = preserved.toString();
   return query ? `/?${query}` : '/';
 }
@@ -532,40 +540,30 @@ function showDetailPanelHref(params: Record<string, string | string[] | undefine
 }
 
 function displayDateRangeValues(
-  params: Record<string, string | string[] | undefined>,
   processingDateFrom: string | null | undefined,
   processingDateTo: string | null | undefined,
 ): { from: string; to: string } {
-  const defaults = defaultDisplayDateRange();
+  const defaults = defaultProcessingDateRange();
   return {
     from: processingDateFrom ?? defaults.from,
     to: processingDateTo ?? defaults.to,
   };
 }
 
-function defaultDisplayDateRange(): { from: string; to: string } {
-  const today = todayInTokyo();
-  return {
-    from: subtractMonths(today, 1),
-    to: today,
-  };
-}
+function defaultDateRangeRedirectHref(
+  params: Record<string, string | string[] | undefined>,
+  input: ReturnType<typeof parseLedgerSearchParams>,
+): string | null {
+  if (input.dateRangeAll === true) return null;
+  if (input.processingDateFrom != null && input.processingDateTo != null) return null;
 
-function subtractMonths(dateText: string, months: number): string {
-  const [year, month, day] = dateText.split('-').map(Number);
-  const targetMonthIndex = (month ?? 1) - 1 - months;
-  const targetYear = (year ?? 1970) + Math.floor(targetMonthIndex / 12);
-  const normalizedMonthIndex = ((targetMonthIndex % 12) + 12) % 12;
-  const targetDay = Math.min(day ?? 1, daysInMonth(targetYear, normalizedMonthIndex));
-  return formatDate(targetYear, normalizedMonthIndex + 1, targetDay);
-}
-
-function daysInMonth(year: number, monthIndex: number): number {
-  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
-}
-
-function formatDate(year: number, month: number, day: number): string {
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const defaults = defaultProcessingDateRange();
+  const next = paramsWithout(params, {
+    keys: ['dateRange', 'processingDateFrom', 'processingDateTo'],
+  });
+  next.set('processingDateFrom', input.processingDateFrom ?? defaults.from);
+  next.set('processingDateTo', input.processingDateTo ?? defaults.to);
+  return `/?${next.toString()}`;
 }
 
 function dateColumnFilterKeys(): string[] {
@@ -721,17 +719,6 @@ function DetailSection({
 function displayValue(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined || value === '') return '-';
   return String(value);
-}
-
-function todayInTokyo(): string {
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${byType.year}-${byType.month}-${byType.day}`;
 }
 
 function codeName(code: number | null | undefined, name: string | null | undefined): string {

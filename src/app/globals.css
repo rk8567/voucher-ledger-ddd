@@ -105,6 +105,11 @@ a:hover {
   margin-bottom: 20px;
 }
 
+.headerTitleLink {
+  color: inherit;
+  text-decoration: none;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: var(--accent-dark);
