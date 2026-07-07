@@ -34,11 +34,11 @@ export type LedgerSearchInput = Readonly<{
   page?: number | null;
   sortKey?: LedgerEntrySortKey | null;
   sortDirection?: SortDirection | null;
+  deletedOnly?: boolean | null;
 }>;
 
 export type LedgerDashboardData = Readonly<{
   entries: LedgerEntryListRecord;
-  deletedEntries: LedgerEntryListRecord;
   selectedEntry: PostedLedgerEntryWithAmounts | null;
   correctionTrail: LedgerCorrectionTrail | null;
   currentBalance: CurrentBalanceRecord | null;
@@ -99,23 +99,7 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
     offset: (page - 1) * limit,
   };
 
-  const deletedFilter: LedgerEntryListFilter = {
-    ...ledgerFilterFromInput(effectiveInput),
-    columnFilters: {
-      ...(input.columnFilters ?? {}),
-      isDeleted: 'true',
-    },
-    includeDeleted: true,
-    limit: 50,
-    offset: 0,
-    sortKey: input.sortKey ?? 'ledgerNo',
-    sortDirection: input.sortDirection ?? 'desc',
-  };
-
-  const [entries, deletedEntries] = await Promise.all([
-    getCachedLedgerEntries(filter),
-    getCachedLedgerEntries(deletedFilter),
-  ]);
+  const entries = await getCachedLedgerEntries(filter);
   const selectedLedgerNo = input.ledgerNo ?? entries.items[0]?.ledgerNo ?? null;
   const selectedEntry = selectedLedgerNo == null ? null : await getCachedLedgerEntry(selectedLedgerNo);
   const correctionTrail = selectedEntry == null ? null : await getCorrectionTrail(selectedEntry);
@@ -124,7 +108,6 @@ export async function getLedgerDashboardData(input: LedgerSearchInput): Promise<
 
   return {
     entries,
-    deletedEntries,
     selectedEntry,
     correctionTrail,
     currentBalance,
@@ -193,6 +176,8 @@ function ledgerFilterFromInput(input: LedgerSearchInput): LedgerEntryListFilter 
     processingDateTo: input.processingDateTo,
     entryTypeCode: input.entryTypeCode,
     columnFilters: input.columnFilters,
+    includeDeleted: input.deletedOnly === true,
+    deletedOnly: input.deletedOnly === true,
     sortKey: input.sortKey,
     sortDirection: input.sortDirection,
   };

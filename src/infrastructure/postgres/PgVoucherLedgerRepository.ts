@@ -522,7 +522,8 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
       }
       where.push(`${filterColumn.expression} ILIKE ${add(likePattern(trimmed))}`);
     }
-    if (!filter.includeDeleted) where.push('e.is_deleted = false');
+    if (filter.deletedOnly) where.push('e.is_deleted = true');
+    else if (!filter.includeDeleted) where.push('e.is_deleted = false');
 
     const whereSql = where.length === 0 ? '' : `WHERE ${where.join(' AND ')}`;
     const countValues = [...values];

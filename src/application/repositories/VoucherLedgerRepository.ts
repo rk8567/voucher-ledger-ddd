@@ -97,6 +97,7 @@ export type LedgerEntryListFilter = Readonly<{
   entryTypeCode?: EntryTypeCode | null;
   columnFilters?: Readonly<Record<string, string | null | undefined>> | null;
   includeDeleted?: boolean;
+  deletedOnly?: boolean;
   limit?: number | null;
   offset?: number | null;
   sortKey?: LedgerEntrySortKey | null;

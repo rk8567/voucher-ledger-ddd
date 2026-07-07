@@ -60,3 +60,25 @@ test('list-backed text filters match exact option labels', async () => {
   assert.match(queries[0]?.sql ?? '', /responsible\.employee_name ILIKE \$1/);
   assert.match(queries[0]?.sql ?? '', /e\.description ILIKE \$2/);
 });
+
+test('deleted-only list filter uses the normal paginated query path', async () => {
+  const queries: { sql: string; values: readonly unknown[] }[] = [];
+  const db = {
+    async query(sql: string, values: readonly unknown[] = []) {
+      queries.push({ sql, values });
+      return { rows: [], rowCount: 0 };
+    },
+  } as unknown as DbClient;
+
+  const repository = new PgVoucherLedgerRepository(db);
+  await repository.listLedgerEntries({
+    deletedOnly: true,
+    includeDeleted: true,
+    limit: 50,
+    offset: 0,
+  });
+
+  assert.equal(queries.length, 2);
+  assert.match(queries[0]?.sql ?? '', /e\.is_deleted = true/);
+  assert.doesNotMatch(queries[0]?.sql ?? '', /e\.is_deleted = false/);
+});

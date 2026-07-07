@@ -104,6 +104,7 @@ export function parseLedgerSearchParams(
     page: positiveNumberParam(params.page),
     sortKey: sortKeyParam(params.sort),
     sortDirection: sortDirectionParam(params.dir),
+    deletedOnly: firstParam(params.deleted) === '1',
   };
 }
 
@@ -119,5 +120,6 @@ export function parseLedgerExportSearchParams(params: URLSearchParams): LedgerSe
     columnFilters: columnFiltersFromUrlParams(params),
     sortKey: sortKeyParam(urlParam(params, 'sort')),
     sortDirection: sortDirectionParam(urlParam(params, 'dir')),
+    deletedOnly: urlParam(params, 'deleted') === '1',
   };
 }

@@ -100,6 +100,7 @@ export default async function Page({ searchParams }: PageProps) {
     const detailWindowOpen = firstParam(params.detailWindow) === '1';
     const detailWindowCloseHref = detailWindowCloseHrefFromParams(params);
     const detailPanelHidden = firstParam(params.detailPanel) !== 'visible';
+    const deletedOnly = input.deletedOnly === true;
     const pageSize = input.limit ?? DEFAULT_LEDGER_PAGE_SIZE;
     const currentPage = input.page ?? 1;
     const totalPages = Math.max(Math.ceil(data.entries.totalCount / pageSize), 1);
@@ -175,12 +176,12 @@ export default async function Page({ searchParams }: PageProps) {
             />
             <LedgerTable
               entries={data.entries.items}
-              deletedEntries={data.deletedEntries}
               selectedLedgerNo={selected?.ledgerNo ?? null}
               selectedEntry={selected}
               params={params}
               filterOptions={data.formOptions}
               effectiveBranchCode={defaultBranchCode}
+              deletedOnly={deletedOnly}
               initialVisibleColumnKeys={initialVisibleColumnKeys}
               initialColumnOrderKeys={initialColumnOrderKeys}
               initialExportColumnKeys={initialExportColumnKeys}

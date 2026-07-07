@@ -30,12 +30,12 @@ import { firstParam, paramsWithout, sortDirectionParam, sortKeyParam } from './l
 
 type LedgerTableProps = Readonly<{
   entries: LedgerEntryListRecord['items'];
-  deletedEntries: LedgerEntryListRecord;
   selectedLedgerNo: number | null;
   selectedEntry: LedgerEntryRecord | null;
   params: Record<string, string | string[] | undefined>;
   filterOptions: LedgerFormOptions;
   effectiveBranchCode: number | null;
+  deletedOnly: boolean;
   initialVisibleColumnKeys: readonly string[];
   initialColumnOrderKeys: readonly string[];
   initialExportColumnKeys: readonly string[];
@@ -126,6 +126,7 @@ const tablePresetParamKeys = [
   'entryTypeCode',
   'processingDateFrom',
   'processingDateTo',
+  'deleted',
   'sort',
   'dir',
   'limit',
@@ -133,12 +134,12 @@ const tablePresetParamKeys = [
 
 export function LedgerTable({
   entries,
-  deletedEntries,
   selectedLedgerNo,
   selectedEntry,
   params,
   filterOptions,
   effectiveBranchCode,
+  deletedOnly,
   initialVisibleColumnKeys,
   initialColumnOrderKeys,
   initialExportColumnKeys,
@@ -148,7 +149,6 @@ export function LedgerTable({
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   const [exportWindowOpen, setExportWindowOpen] = useState(false);
-  const [deletedView, setDeletedView] = useState(false);
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<readonly string[]>(() => normalizeLedgerColumnKeys(initialVisibleColumnKeys, defaultColumnKeys));
   const [columnOrderKeys, setColumnOrderKeys] = useState<readonly string[]>(() => normalizeLedgerColumnOrder(initialColumnOrderKeys));
   const [exportColumnKeys, setExportColumnKeys] = useState<readonly string[]>(() => normalizeLedgerExportColumnKeys(initialExportColumnKeys, defaultExportColumnKeys));
@@ -164,7 +164,7 @@ export function LedgerTable({
   const [scrollLeft, setScrollLeft] = useState(0);
   const [maxScrollLeft, setMaxScrollLeft] = useState(0);
   const [fadeFrame, setFadeFrame] = useState<FadeFrame | null>(null);
-  const tableEntries = deletedView ? deletedEntries.items : entries;
+  const tableEntries = entries;
 
   const visibleKeySet = useMemo(() => new Set(visibleColumnKeys), [visibleColumnKeys]);
   const orderedVisibleColumnKeys = useMemo(
@@ -472,19 +472,12 @@ export function LedgerTable({
         <div className="tableCommandTools" aria-label="FileMaker commands">
           <button type="button" className="toolbarButton" onClick={openExportWindow}>出力</button>
           <a className="toolbarButton" href={showAllHref(params)}>全件表示</a>
-          <button
-            type="button"
-            className={deletedView ? 'toolbarButton activeToggle' : 'toolbarButton'}
-            onClick={() => {
-              setOpenColumnKey(null);
-              setColumnMenuOpen(false);
-              setPresetMenuOpen(false);
-              setExportWindowOpen(false);
-              setDeletedView((current) => !current);
-            }}
+          <a
+            className={deletedOnly ? 'toolbarButton activeToggle' : 'toolbarButton'}
+            href={deletedOnly ? normalEntriesHref(params) : deletedEntriesHref(params)}
           >
-            {deletedView ? '通常表示' : '削除済'}
-          </button>
+            {deletedOnly ? '通常表示' : '削除済'}
+          </a>
           <a className="toolbarButton" href={unsortHref(params)}>標準ソート</a>
         </div>
         <div className="tableViewTools">
@@ -1713,6 +1706,18 @@ function clearFilterHref(params: Record<string, string | string[] | undefined>, 
 
 function showAllHref(params: Record<string, string | string[] | undefined>): string {
   return '/';
+}
+
+function deletedEntriesHref(params: Record<string, string | string[] | undefined>): string {
+  const next = paramsWithout(params, { keys: ['ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
+  next.set('deleted', '1');
+  return `/?${next.toString()}`;
+}
+
+function normalEntriesHref(params: Record<string, string | string[] | undefined>): string {
+  const next = paramsWithout(params, { keys: ['deleted', 'ledgerNo', 'page', 'actionMessage', 'clearDraft'] });
+  const query = next.toString();
+  return query ? `/?${query}` : '/';
 }
 
 function applyFilterHref(params: Record<string, string | string[] | undefined>, column: ColumnDefinition, value: string): string {
