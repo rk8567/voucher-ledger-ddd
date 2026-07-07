@@ -1274,8 +1274,8 @@ button:disabled {
   right: 0;
   bottom: 0;
   z-index: 2;
-  width: 7px;
-  min-width: 7px;
+  width: 5px;
+  min-width: 5px;
   min-height: 0;
   border: 0;
   border-radius: 0;
@@ -1284,12 +1284,12 @@ button:disabled {
     linear-gradient(
       90deg,
       transparent 0,
-      transparent 3px,
+      transparent 2px,
+      var(--line) 2px,
       var(--line) 3px,
-      var(--line) 4px,
-      transparent 4px
+      transparent 3px
     )
-    center / 7px calc(100% - 14px) no-repeat;
+    center / 5px calc(100% - 14px) no-repeat;
   color: inherit;
   cursor: col-resize;
   font: inherit;
@@ -1306,12 +1306,12 @@ button:disabled {
     linear-gradient(
       90deg,
       transparent 0,
-      transparent 3px,
+      transparent 2px,
+      var(--accent) 2px,
       var(--accent) 3px,
-      var(--accent) 4px,
-      transparent 4px
+      transparent 3px
     )
-    center / 7px calc(100% - 14px) no-repeat;
+    center / 5px calc(100% - 14px) no-repeat;
   color: inherit;
 }
 

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
+import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 
 import type { LedgerEntryListRecord, LedgerEntryRecord } from '@/application/repositories/VoucherLedgerRepository';
 import type { LedgerFormOptions } from '@/server/ledger';
@@ -87,13 +87,16 @@ type SortScrollPosition = Readonly<{
   windowY: number;
   tableScrollLeft: number;
 }>;
-type ColumnResizeDrag = Readonly<{
+type ColumnResizeDrag = {
   pointerId: number;
   key: string;
   startX: number;
   startWidth: number;
+  currentWidth: number;
   minWidth: number;
-}>;
+  didMove: boolean;
+  frozenWidths: Readonly<Record<string, number>>;
+};
 
 const columnStorageKey = 'voucher-ledger:visible-columns';
 const columnOrderStorageKey = 'voucher-ledger:column-order';
@@ -110,6 +113,8 @@ const headerHorizontalPaddingPx = 20;
 const headerControlGapPx = 6;
 const headerSortButtonWidthPx = 28;
 const resizeHandleReservePx = 12;
+const cellHorizontalPaddingPx = 20;
+const cellTextBufferPx = 2;
 const columns = ledgerColumns;
 const exportColumns = ledgerExportColumns;
 const defaultColumnKeys = defaultLedgerColumnKeys;
@@ -293,16 +298,17 @@ export function LedgerTable({
 
   function startColumnResize(event: ReactPointerEvent<HTMLButtonElement>, column: ColumnDefinition) {
     const key = String(column.key);
-    const renderedWidth = event.currentTarget.closest('th')?.getBoundingClientRect().width;
-    const startWidth = renderedWidth && Number.isFinite(renderedWidth)
-      ? Math.round(renderedWidth)
-      : columnWidthsRef.current.get(key) ?? columnWidth(column, tableEntries);
+    const frozenWidths = renderedColumnWidths(event.currentTarget.closest('tr'), visibleColumns);
+    const startWidth = frozenWidths[key] ?? columnWidthsRef.current.get(key) ?? columnWidth(column, tableEntries);
     columnResizeDragRef.current = {
       pointerId: event.pointerId,
       key,
       startX: event.clientX,
       startWidth,
+      currentWidth: startWidth,
       minWidth: minimumColumnWidth(column),
+      didMove: false,
+      frozenWidths,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
     event.preventDefault();
@@ -312,9 +318,14 @@ export function LedgerTable({
   function moveColumnResize(event: ReactPointerEvent<HTMLButtonElement>) {
     const drag = columnResizeDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if ((event.buttons & 1) !== 1) return;
     const nextWidth = Math.max(drag.minWidth, Math.round(drag.startWidth + event.clientX - drag.startX));
+    if (nextWidth === drag.currentWidth) return;
+    drag.currentWidth = nextWidth;
+    drag.didMove = true;
     setColumnWidthOverrides((current) => ({
       ...current,
+      ...drag.frozenWidths,
       [drag.key]: nextWidth,
     }));
   }
@@ -322,12 +333,28 @@ export function LedgerTable({
   function endColumnResize(event: ReactPointerEvent<HTMLButtonElement>) {
     const drag = columnResizeDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    const nextWidth = Math.max(drag.minWidth, Math.round(drag.startWidth + event.clientX - drag.startX));
     columnResizeDragRef.current = null;
+    if (!drag.didMove) return;
     setColumnWidthOverrides((current) => {
       const next = {
         ...current,
-        [drag.key]: nextWidth,
+        ...drag.frozenWidths,
+        [drag.key]: drag.currentWidth,
+      };
+      persistColumnWidthOverrides(next);
+      return next;
+    });
+  }
+
+  function fitColumnToCurrentPage(event: ReactMouseEvent<HTMLButtonElement>, column: ColumnDefinition) {
+    event.preventDefault();
+    event.stopPropagation();
+    const key = String(column.key);
+    const nextWidth = fittedColumnWidth(column, tableEntries);
+    setColumnWidthOverrides((current) => {
+      const next = {
+        ...current,
+        [key]: nextWidth,
       };
       persistColumnWidthOverrides(next);
       return next;
@@ -603,6 +630,7 @@ export function LedgerTable({
                       onPointerMove={moveColumnResize}
                       onPointerUp={endColumnResize}
                       onPointerCancel={endColumnResize}
+                      onDoubleClick={(event) => fitColumnToCurrentPage(event, column)}
                     />
                     {column.filterable !== false && openColumnKey === column.key ? (
                       <ColumnFilterPopover
@@ -1502,6 +1530,19 @@ function visibleTableBounds(tableWrap: HTMLDivElement | null): DOMRect | null {
   return new DOMRect(left, top, right - left, bottom - top);
 }
 
+function renderedColumnWidths(row: HTMLTableRowElement | null, columns: readonly ColumnDefinition[]): Readonly<Record<string, number>> {
+  const cells = row ? Array.from(row.cells) : [];
+  const widths: Record<string, number> = {};
+  for (const [index, column] of columns.entries()) {
+    const cell = cells[index];
+    if (!cell) continue;
+    const width = Math.round(cell.getBoundingClientRect().width);
+    if (!Number.isFinite(width) || width <= 0) continue;
+    widths[String(column.key)] = Math.max(width, minimumColumnWidth(column));
+  }
+  return widths;
+}
+
 function columnWidth(column: ColumnDefinition, entries: LedgerEntryListRecord['items']): number {
   const currentPageMax = entries.reduce((maxLength, entry) => {
     const cellLength = displayCell(entry, column).length;
@@ -1511,6 +1552,17 @@ function columnWidth(column: ColumnDefinition, entries: LedgerEntryListRecord['i
   const headerWidth = minimumColumnWidth(column);
   const contentWidth = currentPageMax * contentCharWidth + (column.sortable ? 52 : 24);
   return clampNumber(Math.max(headerWidth, contentWidth), 96, 260);
+}
+
+function fittedColumnWidth(column: ColumnDefinition, entries: LedgerEntryListRecord['items']): number {
+  const widestCell = entries.reduce((maxWidth, entry) => {
+    const text = tableCellMeasureText(entry, column);
+    return Math.max(maxWidth, tableCellTextWidth(text));
+  }, 0);
+  return Math.ceil(Math.max(
+    minimumColumnWidth(column),
+    widestCell + cellHorizontalPaddingPx + cellTextBufferPx,
+  ));
 }
 
 function minimumColumnWidth(column: ColumnDefinition): number {
@@ -1534,6 +1586,24 @@ function headerTextWidth(value: string): number {
   if (!headerMeasureContext) return value.length * 14;
   headerMeasureContext.font = '700 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   return headerMeasureContext.measureText(value).width + 2;
+}
+
+let cellMeasureContext: CanvasRenderingContext2D | null | undefined;
+
+function tableCellTextWidth(value: string): number {
+  if (typeof document === 'undefined') return value.length * 12;
+  if (cellMeasureContext === undefined) {
+    const canvas = document.createElement('canvas');
+    cellMeasureContext = canvas.getContext('2d');
+  }
+  if (!cellMeasureContext) return value.length * 12;
+  cellMeasureContext.font = '13px Arial, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif';
+  return cellMeasureContext.measureText(value).width;
+}
+
+function tableCellMeasureText(entry: LedgerEntryRecord, column: ColumnDefinition): string {
+  if (column.key === 'ledgerNo') return `#${entry.ledgerNo}`;
+  return displayCell(entry, column);
 }
 
 function isNumeric(column: ColumnDefinition): boolean {
