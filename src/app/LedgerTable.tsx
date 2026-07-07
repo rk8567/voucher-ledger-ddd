@@ -24,7 +24,7 @@ import {
   visibleLedgerColumnCookieName,
   type LedgerColumnDefinition,
 } from './ledgerColumns';
-import { dateOnly, yen } from './ledgerDisplayFormat';
+import { dateOnly, dateTime, yen } from './ledgerDisplayFormat';
 import { tokyoTimestampForFileName, type LedgerExportFormat } from './ledgerExportFormat';
 import { firstParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
 
@@ -1663,8 +1663,11 @@ function sortIcon(columnKey: string, currentSortKey: string, currentSortDirectio
 
 function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string {
   const value = entry[column.key as keyof LedgerEntryRecord];
-  if (column.key === 'processingDate' || column.key === 'applicationDate' || column.key.toLowerCase().endsWith('at')) {
+  if (column.kind === 'date') {
     return typeof value === 'string' ? dateOnly(value) ?? '-' : '-';
+  }
+  if (column.kind === 'datetime') {
+    return typeof value === 'string' ? dateTime(value) ?? '-' : '-';
   }
   if (column.key === 'otherAmountYen') return yen(Number(value ?? 0));
   if (typeof value === 'boolean') return value ? 'true' : 'false';
