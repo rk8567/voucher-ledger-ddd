@@ -24,7 +24,7 @@ import {
   visibleLedgerColumnCookieName,
   type LedgerColumnDefinition,
 } from './ledgerColumns';
-import { dateOnly, limitText, yen } from './ledgerDisplayFormat';
+import { dateOnly, yen } from './ledgerDisplayFormat';
 import { tokyoTimestampForFileName, type LedgerExportFormat } from './ledgerExportFormat';
 import { firstParam, paramsWithout, sortDirectionParam, sortKeyParam } from './ledgerSearchParams';
 
@@ -1599,8 +1599,7 @@ function displayCell(entry: LedgerEntryRecord, column: ColumnDefinition): string
   if (column.key === 'otherAmountYen') return yen(Number(value ?? 0));
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (value == null || value === '') return '-';
-  const text = String(value);
-  return column.kind === 'text' ? limitText(text, 10) : text;
+  return String(value);
 }
 
 function filterValueFromEntry(entry: LedgerEntryRecord, column: ColumnDefinition): string | null {
