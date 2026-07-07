@@ -517,7 +517,7 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
         continue;
       }
       if (filterColumn.kind === 'exactText') {
-        where.push(`${filterColumn.expression} ILIKE ${add(likePattern(trimmed))}`);
+        where.push(`${filterColumn.expression} ILIKE ${add(trimmed)}`);
         continue;
       }
       where.push(`${filterColumn.expression} ILIKE ${add(likePattern(trimmed))}`);
