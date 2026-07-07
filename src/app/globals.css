@@ -110,6 +110,17 @@ a:hover {
   text-decoration: none;
 }
 
+.headerTitleLink:hover,
+.headerTitleLink:focus,
+.headerTitleLink:focus-visible {
+  text-decoration: none;
+}
+
+.headerTitleLink p,
+.headerTitleLink h1 {
+  text-decoration: none;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: var(--accent-dark);
