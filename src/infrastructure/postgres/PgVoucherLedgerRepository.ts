@@ -106,6 +106,20 @@ function mapEntry(row: Record<string, unknown>): LedgerEntryRecord {
   };
 }
 
+const LEDGER_ENTRY_FROM = `
+    FROM voucher_ledger_entries e
+    LEFT JOIN branches b ON b.branch_code = e.branch_code
+    LEFT JOIN departments d ON d.department_code = e.department_code
+    LEFT JOIN entry_types et ON et.code = e.entry_type_code
+    LEFT JOIN transaction_categories tc ON tc.code = e.transaction_category_code
+    LEFT JOIN branches cb ON cb.branch_code = e.counterparty_branch_code
+    LEFT JOIN companies c ON c.company_code = e.company_code
+    LEFT JOIN employees responsible ON responsible.employee_no = e.responsible_employee_no
+    LEFT JOIN red_voucher_statuses rvs ON rvs.code = e.red_voucher_status_code
+    LEFT JOIN employees registered_by ON registered_by.employee_no = e.registered_by_employee_no
+    LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no
+`;
+
 const LEDGER_ENTRY_SELECT = `
   SELECT e.*,
          COUNT(*) OVER() AS total_count,
@@ -119,17 +133,7 @@ const LEDGER_ENTRY_SELECT = `
          rvs.name_japanese AS red_voucher_status_name,
          registered_by.employee_name AS registered_by_employee_name,
          updated_by.employee_name AS updated_by_employee_name
-    FROM voucher_ledger_entries e
-    LEFT JOIN branches b ON b.branch_code = e.branch_code
-    LEFT JOIN departments d ON d.department_code = e.department_code
-    LEFT JOIN entry_types et ON et.code = e.entry_type_code
-    LEFT JOIN transaction_categories tc ON tc.code = e.transaction_category_code
-    LEFT JOIN branches cb ON cb.branch_code = e.counterparty_branch_code
-    LEFT JOIN companies c ON c.company_code = e.company_code
-    LEFT JOIN employees responsible ON responsible.employee_no = e.responsible_employee_no
-    LEFT JOIN red_voucher_statuses rvs ON rvs.code = e.red_voucher_status_code
-    LEFT JOIN employees registered_by ON registered_by.employee_no = e.registered_by_employee_no
-    LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no
+${LEDGER_ENTRY_FROM}
 `;
 
 const LEDGER_SORT_EXPRESSIONS: Record<NonNullable<LedgerEntryListFilter['sortKey']>, string> = {
@@ -546,15 +550,7 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
   private async countLedgerEntries(whereSql: string, values: readonly unknown[]): Promise<number> {
     const result = await this.db.query(
       `SELECT COUNT(*) AS total_count
-         FROM voucher_ledger_entries e
-         LEFT JOIN branches b ON b.branch_code = e.branch_code
-         LEFT JOIN departments d ON d.department_code = e.department_code
-         LEFT JOIN entry_types et ON et.code = e.entry_type_code
-         LEFT JOIN transaction_categories tc ON tc.code = e.transaction_category_code
-         LEFT JOIN companies c ON c.company_code = e.company_code
-         LEFT JOIN employees responsible ON responsible.employee_no = e.responsible_employee_no
-         LEFT JOIN employees registered_by ON registered_by.employee_no = e.registered_by_employee_no
-         LEFT JOIN employees updated_by ON updated_by.employee_no = e.updated_by_employee_no
+${LEDGER_ENTRY_FROM}
         ${whereSql}`,
       [...values],
     );
