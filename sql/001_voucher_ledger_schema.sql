@@ -36,7 +36,7 @@ COMMENT ON COLUMN branches.opening_balance_amount_legacy IS 'Legacy M拠点L::�
 
 CREATE TABLE IF NOT EXISTS companies (
   company_code integer PRIMARY KEY CHECK (company_code > 0),
-  company_name text NOT NULL CHECK (length(btrim(company_name)) > 0),
+  company_name text CHECK (company_name IS NULL OR length(btrim(company_name)) > 0),
   official_name text,
   abbreviation text,
   legacy_uuid text UNIQUE,
@@ -45,6 +45,19 @@ CREATE TABLE IF NOT EXISTS companies (
 );
 
 COMMENT ON TABLE companies IS 'Legacy 各種マスター::M会社.';
+
+ALTER TABLE companies
+  ALTER COLUMN company_name DROP NOT NULL,
+  DROP CONSTRAINT IF EXISTS companies_company_name_check,
+  DROP CONSTRAINT IF EXISTS companies_company_name_not_blank;
+
+ALTER TABLE companies
+  ADD CONSTRAINT companies_company_name_not_blank
+  CHECK (company_name IS NULL OR length(btrim(company_name)) > 0)
+  NOT VALID;
+
+ALTER TABLE companies
+  VALIDATE CONSTRAINT companies_company_name_not_blank;
 
 CREATE TABLE IF NOT EXISTS departments (
   department_code integer PRIMARY KEY CHECK (department_code > 0),

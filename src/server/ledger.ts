@@ -270,7 +270,7 @@ async function getLedgerFormOptions(): Promise<LedgerFormOptions> {
        ORDER BY code
     `),
     pgPool.query<{ value: number; label: string }>(`
-      SELECT company_code AS value, company_name AS label
+      SELECT company_code AS value, COALESCE(company_name, company_code::text) AS label
         FROM companies
        ORDER BY company_code
     `),

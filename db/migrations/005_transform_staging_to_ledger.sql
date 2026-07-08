@@ -73,7 +73,7 @@ WHERE s.counterparty_branch_code IS NOT NULL
 ON CONFLICT (branch_code) DO NOTHING;
 
 INSERT INTO companies (company_code, company_name)
-SELECT DISTINCT s.company_code, 'Legacy company ' || s.company_code
+SELECT DISTINCT s.company_code, NULL::text
 FROM legacy_filemaker_voucher_ledger_staging s
 WHERE s.company_code IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM companies c WHERE c.company_code = s.company_code)

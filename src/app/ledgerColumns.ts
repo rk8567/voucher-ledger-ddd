@@ -29,6 +29,7 @@ export const ledgerColumns: readonly LedgerColumnDefinition[] = [
   { key: 'departmentName', label: '部門', kind: 'text', optionsKey: 'departments', sortable: true },
   { key: 'transactionCategoryName', label: '出納区分', kind: 'text', optionsKey: 'transactionCategories', sortable: true },
   { key: 'counterpartyBranchName', label: '入出拠点', kind: 'text', optionsKey: 'branches', sortable: true },
+  { key: 'companyCode', label: '会社CD', kind: 'integer', sortable: true },
   { key: 'companyName', label: '会社', kind: 'text', optionsKey: 'companies', sortable: true },
   { key: 'remarks', label: '備考', kind: 'text', sortable: true },
   { key: 'otherAmountNote', label: 'その他金額備考', kind: 'text', sortable: true },

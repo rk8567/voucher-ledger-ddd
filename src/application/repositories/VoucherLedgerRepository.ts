@@ -103,6 +103,7 @@ export type LedgerEntrySortKey =
   | 'entryTypeName'
   | 'transactionCategoryName'
   | 'counterpartyBranchName'
+  | 'companyCode'
   | 'companyName'
   | 'responsibleEmployeeName'
   | 'description'

@@ -511,7 +511,7 @@ async function upsertCompanies(client: PoolClient, mapped: Record<string, string
        updated_at = now()`,
     [
       asRequiredInt(mapped.company_code, 'company_code'),
-      mapped.company_name || `Company ${mapped.company_code}`,
+      mapped.company_name || null,
       mapped.official_name || null,
       mapped.abbreviation || null,
       mapped.legacy_uuid || null,
@@ -544,7 +544,7 @@ async function upsertEmployees(client: PoolClient, mapped: Record<string, string
   const companyCode = asNullableInt(mapped.company_code);
   const departmentCode = asNullableInt(mapped.department_code);
   const branchCode = asNullableInt(mapped.branch_code);
-  const companyName = mapped.company_name || (companyCode == null ? null : `Legacy company ${companyCode}`);
+  const companyName = mapped.company_name || null;
   const departmentName = mapped.department_name || (departmentCode == null ? null : `Legacy department ${departmentCode}`);
   const branchName = mapped.branch_name || (branchCode == null ? null : `Legacy branch ${branchCode}`);
 
@@ -553,7 +553,7 @@ async function upsertEmployees(client: PoolClient, mapped: Record<string, string
       `INSERT INTO companies (company_code, company_name)
        VALUES ($1,$2)
        ON CONFLICT (company_code) DO UPDATE SET
-         company_name = EXCLUDED.company_name,
+         company_name = COALESCE(EXCLUDED.company_name, companies.company_name),
          updated_at = now()`,
       [companyCode, companyName],
     );
