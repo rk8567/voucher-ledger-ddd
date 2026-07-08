@@ -16,8 +16,6 @@ export type LedgerEntryRecord = Readonly<{
   branchName: string | null;
   departmentCode: number | null;
   departmentName: string | null;
-  periodYear: number | null;
-  periodMonth: number | null;
   applicationDate: string | null;
   processingDate: string;
   dailySequence: number;
@@ -50,12 +48,6 @@ export type LedgerEntryRecord = Readonly<{
   updatedByEmployeeNo: number | null;
   updatedByEmployeeName: string | null;
   postedAt: string | null;
-  filemakerCreatedAt: string | null;
-  filemakerCreatedBy: string | null;
-  filemakerModifiedAt: string | null;
-  filemakerModifiedBy: string | null;
-  filemakerLoginEmployeeNo: number | null;
-  filemakerLoginEmployeeName: string | null;
   createdAt: string | null;
 }>;
 
@@ -90,8 +82,6 @@ export type InventoryCheckRecord = Readonly<{
 
 export type LedgerEntryListFilter = Readonly<{
   branchCode?: number | null;
-  periodYear?: number | null;
-  periodMonth?: number | null;
   processingDateFrom?: string | null;
   processingDateTo?: string | null;
   entryTypeCode?: EntryTypeCode | null;
@@ -110,8 +100,6 @@ export type LedgerEntrySortKey =
   | 'applicationDate'
   | 'branchName'
   | 'departmentName'
-  | 'periodYear'
-  | 'periodMonth'
   | 'entryTypeName'
   | 'transactionCategoryName'
   | 'counterpartyBranchName'

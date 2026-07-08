@@ -24,8 +24,6 @@ export const DEFAULT_LEDGER_PAGE_SIZE = 50;
 
 export type LedgerSearchInput = Readonly<{
   branchCode?: number | null;
-  periodYear?: number | null;
-  periodMonth?: number | null;
   processingDateFrom?: string | null;
   processingDateTo?: string | null;
   entryTypeCode?: EntryTypeCode | null;
@@ -188,8 +186,6 @@ function withDefaultProcessingDateRange(input: LedgerSearchInput): LedgerSearchI
 function ledgerFilterFromInput(input: LedgerSearchInput): LedgerEntryListFilter {
   return {
     branchCode: input.branchCode,
-    periodYear: input.periodYear,
-    periodMonth: input.periodMonth,
     processingDateFrom: input.processingDateFrom,
     processingDateTo: input.processingDateTo,
     entryTypeCode: input.entryTypeCode,

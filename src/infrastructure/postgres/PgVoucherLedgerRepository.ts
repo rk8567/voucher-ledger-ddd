@@ -60,8 +60,6 @@ function mapEntry(row: Record<string, unknown>): LedgerEntryRecord {
     branchName: nullableStringOf(row.branch_name),
     departmentCode: nullableNumberOf(row.department_code),
     departmentName: nullableStringOf(row.department_name),
-    periodYear: nullableNumberOf(row.period_year),
-    periodMonth: nullableNumberOf(row.period_month),
     applicationDate: nullableDateOnlyOf(row.application_date),
     processingDate: nullableDateOnlyOf(row.processing_date) ?? '',
     dailySequence: numberOf(row.daily_sequence),
@@ -96,12 +94,6 @@ function mapEntry(row: Record<string, unknown>): LedgerEntryRecord {
     updatedByEmployeeNo: nullableNumberOf(row.updated_by_employee_no),
     updatedByEmployeeName: nullableStringOf(row.updated_by_employee_name),
     postedAt: nullableStringOf(row.posted_at),
-    filemakerCreatedAt: nullableStringOf(row.filemaker_created_at),
-    filemakerCreatedBy: nullableStringOf(row.filemaker_created_by),
-    filemakerModifiedAt: nullableStringOf(row.filemaker_modified_at),
-    filemakerModifiedBy: nullableStringOf(row.filemaker_modified_by),
-    filemakerLoginEmployeeNo: nullableNumberOf(row.filemaker_login_employee_no),
-    filemakerLoginEmployeeName: nullableStringOf(row.filemaker_login_employee_name),
     createdAt: nullableStringOf(row.created_at),
   };
 }
@@ -142,8 +134,6 @@ const LEDGER_SORT_EXPRESSIONS: Record<NonNullable<LedgerEntryListFilter['sortKey
   applicationDate: 'e.application_date',
   branchName: 'b.branch_name',
   departmentName: 'd.department_name',
-  periodYear: 'e.period_year',
-  periodMonth: 'e.period_month',
   entryTypeName: 'et.name_japanese',
   transactionCategoryName: 'tc.name_japanese',
   counterpartyBranchName: 'cb.branch_name',
@@ -171,8 +161,6 @@ const LEDGER_COLUMN_FILTER_EXPRESSIONS: Record<string, { expression: string; kin
   applicationDate: { expression: 'e.application_date', kind: 'date' },
   branchName: { expression: 'b.branch_name', kind: 'exactText' },
   departmentName: { expression: 'd.department_name', kind: 'exactText' },
-  periodYear: { expression: 'e.period_year', kind: 'number' },
-  periodMonth: { expression: 'e.period_month', kind: 'number' },
   entryTypeName: { expression: 'et.name_japanese', kind: 'exactText' },
   transactionCategoryName: { expression: 'tc.name_japanese', kind: 'exactText' },
   counterpartyBranchName: { expression: 'cb.branch_name', kind: 'exactText' },
@@ -212,7 +200,6 @@ function normalizeDateFilter(value: string): string {
 }
 
 function numberFilterBounds(columnKey: string): { min?: number; max?: number } {
-  if (columnKey === 'periodMonth') return { min: 1, max: 12 };
   return { min: 0 };
 }
 
@@ -300,8 +287,6 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
       `INSERT INTO voucher_ledger_entries (
          branch_code,
          department_code,
-         period_year,
-         period_month,
          application_date,
          processing_date,
          daily_sequence,
@@ -324,14 +309,12 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
        ) VALUES (
          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
          $11, $12, $13, $14, $15, $16, $17, $18,
-         $19, $20, $21, $22, $22
+         $19, $20, $20
        )
        RETURNING *`,
       [
         input.branchCode,
         input.departmentCode ?? null,
-        input.periodYear ?? null,
-        input.periodMonth ?? null,
         input.applicationDate ?? null,
         input.processingDate,
         input.dailySequence,
@@ -488,8 +471,6 @@ export class PgVoucherLedgerRepository implements VoucherLedgerRepository {
     }
 
     if (filter.branchCode != null) where.push(`e.branch_code = ${add(filter.branchCode)}`);
-    if (filter.periodYear != null) where.push(`e.period_year = ${add(filter.periodYear)}`);
-    if (filter.periodMonth != null) where.push(`e.period_month = ${add(filter.periodMonth)}`);
     if (filter.processingDateFrom != null) where.push(`e.processing_date >= ${add(filter.processingDateFrom)}`);
     if (filter.processingDateTo != null) where.push(`e.processing_date <= ${add(filter.processingDateTo)}`);
     if (filter.entryTypeCode != null) where.push(`e.entry_type_code = ${add(filter.entryTypeCode)}`);

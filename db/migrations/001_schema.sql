@@ -137,8 +137,6 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
   -- Scope/date
   branch_code integer NOT NULL REFERENCES branches(branch_code),             -- 拠点CD
   department_code integer REFERENCES departments(department_code),           -- 部門CD
-  period_year smallint CHECK (period_year BETWEEN 1900 AND 2200),            -- 年
-  period_month smallint CHECK (period_month BETWEEN 1 AND 12),               -- 月
   application_date date,                                                     -- 申請処理日
   processing_date date NOT NULL,                                             -- 処理日
   daily_sequence integer NOT NULL CHECK (daily_sequence >= 0),               -- 連番
@@ -178,14 +176,6 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
   -- posted_at is the domain immutability boundary. Insert draft -> insert quantities -> set posted_at.
   posted_at timestamptz,
 
-  -- FileMaker internal audit fields, if imported.
-  filemaker_created_at timestamptz,
-  filemaker_created_by text,
-  filemaker_modified_at timestamptz,
-  filemaker_modified_by text,
-  filemaker_login_employee_no integer,
-  filemaker_login_employee_name text,
-
   created_at timestamptz NOT NULL DEFAULT now(),
 
   CHECK (counterparty_branch_code IS NULL OR counterparty_branch_code <> branch_code),
@@ -194,6 +184,16 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
 
 ALTER TABLE voucher_ledger_entries
   DROP CONSTRAINT IF EXISTS voucher_ledger_entries_other_amount_check;
+
+ALTER TABLE voucher_ledger_entries
+  DROP COLUMN IF EXISTS period_year,
+  DROP COLUMN IF EXISTS period_month,
+  DROP COLUMN IF EXISTS filemaker_login_employee_no,
+  DROP COLUMN IF EXISTS filemaker_login_employee_name,
+  DROP COLUMN IF EXISTS filemaker_created_at,
+  DROP COLUMN IF EXISTS filemaker_created_by,
+  DROP COLUMN IF EXISTS filemaker_modified_at,
+  DROP COLUMN IF EXISTS filemaker_modified_by;
 
 COMMENT ON TABLE voucher_ledger_entries IS 'Source-of-truth ledger rows migrated from T切手出納台帳 / T金券管理台帳.';
 COMMENT ON COLUMN voucher_ledger_entries.ledger_no IS 'Legacy 出納No. Currently treated as globally unique. (branch_code, ledger_no) is also indexed to make the branch-scoped legacy identity explicit.';
@@ -209,8 +209,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_voucher_entries_branch_ledger_no
 CREATE INDEX IF NOT EXISTS idx_voucher_entries_branch_processing_date
   ON voucher_ledger_entries(branch_code, processing_date, daily_sequence, ledger_no);
 
-CREATE INDEX IF NOT EXISTS idx_voucher_entries_period
-  ON voucher_ledger_entries(branch_code, period_year, period_month, ledger_no);
+DROP INDEX IF EXISTS idx_voucher_entries_period;
 
 CREATE INDEX IF NOT EXISTS idx_voucher_entries_red_links
   ON voucher_ledger_entries(original_ledger_no, reversal_ledger_no, correction_ledger_no);
@@ -218,7 +217,7 @@ CREATE INDEX IF NOT EXISTS idx_voucher_entries_red_links
 DROP INDEX IF EXISTS uq_voucher_opening_balance_per_branch;
 DROP INDEX IF EXISTS uq_voucher_opening_balance_per_branch_period;
 CREATE INDEX IF NOT EXISTS idx_voucher_opening_balance_lookup
-  ON voucher_ledger_entries(branch_code, period_year, period_month, ledger_no)
+  ON voucher_ledger_entries(branch_code, ledger_no)
   WHERE entry_type_code = 99 AND is_deleted = false;
 
 CREATE TABLE IF NOT EXISTS voucher_ledger_entry_denominations (
@@ -368,8 +367,6 @@ BEGIN
     IF ROW(
       OLD.branch_code,
       OLD.department_code,
-      OLD.period_year,
-      OLD.period_month,
       OLD.application_date,
       OLD.processing_date,
       OLD.daily_sequence,
@@ -386,8 +383,6 @@ BEGIN
     ) IS DISTINCT FROM ROW(
       NEW.branch_code,
       NEW.department_code,
-      NEW.period_year,
-      NEW.period_month,
       NEW.application_date,
       NEW.processing_date,
       NEW.daily_sequence,

@@ -106,8 +106,6 @@ const tablePresetStorageKey = 'voucher-ledger:table-presets';
 const tableSortScrollStorageKey = 'voucher-ledger:sort-scroll';
 const columnCookieMaxAgeSeconds = 60 * 60 * 24 * 365;
 const filterPrefix = 'filter_';
-const minYear = 1990;
-const maxYear = 2035;
 const minTableWidthPx = 680;
 const headerHorizontalPaddingPx = 20;
 const headerControlGapPx = 6;
@@ -121,8 +119,6 @@ const defaultColumnKeys = defaultLedgerColumnKeys;
 const defaultExportColumnKeys = defaultLedgerExportColumnKeys;
 const tablePresetParamKeys = [
   'branchCode',
-  'periodYear',
-  'periodMonth',
   'entryTypeCode',
   'dateRange',
   'processingDateFrom',
@@ -1291,18 +1287,6 @@ function FilterControl({
     );
   }
 
-  if (column.kind === 'year') {
-    return (
-      <NumberField label="年" min={minYear} max={maxYear} value={clampNumber(numericValue(value, new Date().getFullYear()), minYear, maxYear)} onChange={(next) => onValueChange(String(next))} showLabel={false} />
-    );
-  }
-
-  if (column.kind === 'month') {
-    return (
-      <NumberField label="月" min={1} max={12} value={clampNumber(numericValue(value, 1), 1, 12)} onChange={(next) => onValueChange(String(next))} showLabel={false} />
-    );
-  }
-
   const numericBounds = numericFilterBounds(column);
   return (
     <label>
@@ -1324,40 +1308,6 @@ function FilterControl({
 function numericFilterBounds(column: ColumnDefinition): { min?: number; max?: number } {
   if (column.kind !== 'integer' && column.kind !== 'money') return {};
   return { min: 0 };
-}
-
-function NumberField({
-  label,
-  min,
-  max,
-  value,
-  onChange,
-  showLabel = true,
-}: Readonly<{
-  label: string;
-  min: number;
-  max: number;
-  value: number;
-  onChange: (value: number) => void;
-  showLabel?: boolean;
-}>) {
-  return (
-    <label className={showLabel ? 'numberFilterField' : 'numberFilterField numberFilterFieldCompact'}>
-      {showLabel ? <span>{label}</span> : null}
-      <input
-        type="number"
-        inputMode="numeric"
-        min={min}
-        max={max}
-        step="1"
-        value={value}
-        aria-label={label}
-        title={label}
-        placeholder={label}
-        onChange={(event) => onChange(clampNumber(Number(event.target.value), min, max))}
-      />
-    </label>
-  );
 }
 
 function filterName(columnKey: string): string {
@@ -1601,7 +1551,7 @@ function tableCellMeasureText(entry: LedgerEntryRecord, column: ColumnDefinition
 }
 
 function isNumeric(column: ColumnDefinition): boolean {
-  return column.kind === 'integer' || column.kind === 'money' || column.kind === 'year' || column.kind === 'month';
+  return column.kind === 'integer' || column.kind === 'money';
 }
 
 function cellClassName(column: ColumnDefinition): string | undefined {

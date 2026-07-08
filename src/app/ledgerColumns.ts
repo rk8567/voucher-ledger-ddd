@@ -5,7 +5,7 @@ export type LedgerColumnKey = keyof LedgerEntryRecord | 'otherAmountYen';
 type LedgerColumnBase = Readonly<{
   key: LedgerColumnKey;
   label: string;
-  kind: 'text' | 'integer' | 'money' | 'date' | 'year' | 'month' | 'datetime';
+  kind: 'text' | 'integer' | 'money' | 'date' | 'datetime';
   optionsKey?: keyof LedgerFormOptions;
   defaultVisible?: boolean;
   filterable?: boolean;
@@ -27,8 +27,6 @@ export const ledgerColumns: readonly LedgerColumnDefinition[] = [
   { key: 'otherAmountYen', label: 'その他', kind: 'money', defaultVisible: true, sortable: true },
   { key: 'applicationDate', label: '申請処理日', kind: 'date', sortable: true },
   { key: 'departmentName', label: '部門', kind: 'text', optionsKey: 'departments', sortable: true },
-  { key: 'periodYear', label: '対象年', kind: 'year', sortable: true },
-  { key: 'periodMonth', label: '対象月', kind: 'month', sortable: true },
   { key: 'transactionCategoryName', label: '出納区分', kind: 'text', optionsKey: 'transactionCategories', sortable: true },
   { key: 'counterpartyBranchName', label: '入出拠点', kind: 'text', optionsKey: 'branches', sortable: true },
   { key: 'companyName', label: '会社', kind: 'text', optionsKey: 'companies', sortable: true },

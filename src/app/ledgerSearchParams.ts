@@ -94,8 +94,6 @@ export function parseLedgerSearchParams(
   const entryType = numberParam(params.entryTypeCode);
   return {
     branchCode: numberParam(params.branchCode),
-    periodYear: numberParam(params.periodYear),
-    periodMonth: numberParam(params.periodMonth),
     processingDateFrom: dateParam(params.processingDateFrom),
     processingDateTo: dateParam(params.processingDateTo),
     entryTypeCode: entryType == null ? null : (entryType as EntryTypeCode),
@@ -113,8 +111,6 @@ export function parseLedgerExportSearchParams(params: URLSearchParams): LedgerSe
   const entryType = numberParam(urlParam(params, 'entryTypeCode'));
   return {
     branchCode: numberParam(urlParam(params, 'branchCode')),
-    periodYear: numberParam(urlParam(params, 'periodYear')),
-    periodMonth: numberParam(urlParam(params, 'periodMonth')),
     processingDateFrom: dateParam(urlParam(params, 'processingDateFrom')),
     processingDateTo: dateParam(urlParam(params, 'processingDateTo')),
     entryTypeCode: entryType == null ? null : (entryType as EntryTypeCode),

@@ -9,14 +9,10 @@ const STAGING_INSERT = `
 INSERT INTO legacy_filemaker_voucher_ledger_staging (
   source_file,
   raw_record,
-  filemaker_login_employee_no,
-  filemaker_login_employee_name,
   legacy_uuid,
   ledger_no,
   department_code,
   branch_code,
-  period_year,
-  period_month,
   application_date,
   processing_date,
   daily_sequence,
@@ -42,10 +38,6 @@ INSERT INTO legacy_filemaker_voucher_ledger_staging (
   registered_by_employee_no,
   updated_at,
   updated_by_employee_no,
-  filemaker_created_at,
-  filemaker_created_by,
-  filemaker_modified_at,
-  filemaker_modified_by,
   quantity_rep_01,
   quantity_rep_02,
   quantity_rep_03,
@@ -63,18 +55,14 @@ INSERT INTO legacy_filemaker_voucher_ledger_staging (
   quantity_rep_15,
   quantity_rep_16
 ) VALUES (
-  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,$53,$54,$55
+  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47
 )
 ON CONFLICT (ledger_no) DO UPDATE SET
   source_file = EXCLUDED.source_file,
   raw_record = EXCLUDED.raw_record,
-  filemaker_login_employee_no = EXCLUDED.filemaker_login_employee_no,
-  filemaker_login_employee_name = EXCLUDED.filemaker_login_employee_name,
   legacy_uuid = COALESCE(EXCLUDED.legacy_uuid, legacy_filemaker_voucher_ledger_staging.legacy_uuid),
   department_code = EXCLUDED.department_code,
   branch_code = EXCLUDED.branch_code,
-  period_year = EXCLUDED.period_year,
-  period_month = EXCLUDED.period_month,
   application_date = EXCLUDED.application_date,
   processing_date = EXCLUDED.processing_date,
   daily_sequence = EXCLUDED.daily_sequence,
@@ -100,10 +88,6 @@ ON CONFLICT (ledger_no) DO UPDATE SET
   registered_by_employee_no = EXCLUDED.registered_by_employee_no,
   updated_at = EXCLUDED.updated_at,
   updated_by_employee_no = EXCLUDED.updated_by_employee_no,
-  filemaker_created_at = EXCLUDED.filemaker_created_at,
-  filemaker_created_by = EXCLUDED.filemaker_created_by,
-  filemaker_modified_at = EXCLUDED.filemaker_modified_at,
-  filemaker_modified_by = EXCLUDED.filemaker_modified_by,
   quantity_rep_01 = EXCLUDED.quantity_rep_01,
   quantity_rep_02 = EXCLUDED.quantity_rep_02,
   quantity_rep_03 = EXCLUDED.quantity_rep_03,
@@ -266,14 +250,10 @@ async function importRawLedgerRows(
     const result = await client.query(STAGING_INSERT, [
       filePath,
       JSON.stringify({ rowNumber: index + 1, row }),
-      asNullableInt(row['gログイン社員番号']),
-      row['ログイン社員NM'] || null,
       null,
       ledgerNo,
       asNullableInt(row.部門CD),
       branchCode,
-      asNullableInt(row.年),
-      asNullableInt(row.月),
       asNullableDate(row.申請処理日),
       processingDate,
       asNullableInt(row.連番) ?? index + 1,
@@ -299,10 +279,6 @@ async function importRawLedgerRows(
       registeredByEmployeeNo,
       asNullableTimestamp(row.更新日時) ?? asNullableTimestamp(row.登録日時),
       updatedByEmployeeNo,
-      null,
-      null,
-      null,
-      null,
       ...quantities,
     ]);
 

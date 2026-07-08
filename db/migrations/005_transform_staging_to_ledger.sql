@@ -20,14 +20,6 @@ SELECT
     'existing_ledger_entries', (SELECT count(*) FROM voucher_ledger_entries)
   );
 
-ALTER TABLE legacy_filemaker_voucher_ledger_staging
-  ADD COLUMN IF NOT EXISTS filemaker_login_employee_no integer,
-  ADD COLUMN IF NOT EXISTS filemaker_login_employee_name text;
-
-ALTER TABLE voucher_ledger_entries
-  ADD COLUMN IF NOT EXISTS filemaker_login_employee_no integer,
-  ADD COLUMN IF NOT EXISTS filemaker_login_employee_name text;
-
 DO $$
 DECLARE
   duplicate_ledger_no bigint;
@@ -138,9 +130,7 @@ SET branch_code = s.branch_code,
       ELSE NULL
     END,
     registered_at = COALESCE(s.registered_at, e.registered_at),
-    updated_at = COALESCE(s.updated_at, e.updated_at),
-    filemaker_login_employee_no = s.filemaker_login_employee_no,
-    filemaker_login_employee_name = s.filemaker_login_employee_name
+    updated_at = COALESCE(s.updated_at, e.updated_at)
 FROM legacy_filemaker_voucher_ledger_staging s
 WHERE s.ledger_no = e.ledger_no
   AND (
@@ -175,8 +165,6 @@ WHERE s.ledger_no = e.ledger_no
     END
     OR (s.registered_at IS NOT NULL AND e.registered_at IS DISTINCT FROM s.registered_at)
     OR (s.updated_at IS NOT NULL AND e.updated_at IS DISTINCT FROM s.updated_at)
-    OR e.filemaker_login_employee_no IS DISTINCT FROM s.filemaker_login_employee_no
-    OR e.filemaker_login_employee_name IS DISTINCT FROM s.filemaker_login_employee_name
   );
 
 INSERT INTO voucher_ledger_entries (
@@ -184,8 +172,6 @@ INSERT INTO voucher_ledger_entries (
   ledger_no,
   branch_code,
   department_code,
-  period_year,
-  period_month,
   application_date,
   processing_date,
   daily_sequence,
@@ -208,21 +194,13 @@ INSERT INTO voucher_ledger_entries (
   registered_by_employee_no,
   updated_at,
   updated_by_employee_no,
-  posted_at,
-  filemaker_created_at,
-  filemaker_created_by,
-  filemaker_modified_at,
-  filemaker_modified_by,
-  filemaker_login_employee_no,
-  filemaker_login_employee_name
+  posted_at
 )
 SELECT
   s.legacy_uuid,
   s.ledger_no,
   s.branch_code,
   s.department_code,
-  s.period_year,
-  s.period_month,
   s.application_date,
   s.processing_date,
   COALESCE(s.daily_sequence, 0),
@@ -268,13 +246,7 @@ SELECT
   s.registered_by_employee_no,
   COALESCE(s.updated_at, s.registered_at, s.imported_at, now()),
   s.updated_by_employee_no,
-  COALESCE(s.registered_at, s.imported_at, now()),
-  s.filemaker_created_at,
-  s.filemaker_created_by,
-  s.filemaker_modified_at,
-  s.filemaker_modified_by,
-  s.filemaker_login_employee_no,
-  s.filemaker_login_employee_name
+  COALESCE(s.registered_at, s.imported_at, now())
 FROM legacy_filemaker_voucher_ledger_staging s
 WHERE s.ledger_no IS NOT NULL
   AND s.branch_code IS NOT NULL

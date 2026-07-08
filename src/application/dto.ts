@@ -9,8 +9,6 @@ export type ActorContext = Readonly<{
 export type RegisterOpeningBalanceCommand = Readonly<{
   branchCode: number;
   processingDate: string;
-  periodYear?: number | null;
-  periodMonth?: number | null;
   applicationDate?: string | null;
   quantities: QuantityInput;
   otherAmountYen?: number;
@@ -24,8 +22,6 @@ export type RegisterVoucherMovementCommand = Readonly<{
   branchCode: number;
   processingDate: string;
   applicationDate?: string | null;
-  periodYear?: number | null;
-  periodMonth?: number | null;
   entryTypeCode: EntryTypeCode.Incoming | EntryTypeCode.Outgoing | EntryTypeCode.IncomingAlt | EntryTypeCode.OutgoingAlt;
   transactionCategoryCode?: number | null;
   counterpartyBranchCode?: number | null;
@@ -45,8 +41,6 @@ export type RegisterInventoryCheckCommand = Readonly<{
   branchCode: number;
   processingDate: string;
   applicationDate?: string | null;
-  periodYear?: number | null;
-  periodMonth?: number | null;
   responsibleEmployeeNo?: number | null;
   description?: string | null;
   remarks?: string | null;
@@ -59,8 +53,6 @@ export type RegisterInventoryCheckCommand = Readonly<{
 export type CorrectedVoucherMovementInput = Readonly<{
   processingDate: string;
   applicationDate?: string | null;
-  periodYear?: number | null;
-  periodMonth?: number | null;
   entryTypeCode: EntryTypeCode.Incoming | EntryTypeCode.Outgoing | EntryTypeCode.IncomingAlt | EntryTypeCode.OutgoingAlt;
   transactionCategoryCode?: number | null;
   counterpartyBranchCode?: number | null;
@@ -88,8 +80,6 @@ export type IssueRedVoucherCorrectionCommand = Readonly<{
 export type DraftLedgerEntryInput = Readonly<{
   branchCode: number;
   departmentCode?: number | null;
-  periodYear?: number | null;
-  periodMonth?: number | null;
   applicationDate?: string | null;
   processingDate: string;
   dailySequence: number;

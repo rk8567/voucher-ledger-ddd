@@ -95,12 +95,10 @@ export default async function Page({ searchParams }: PageProps) {
     const data = await getLedgerDashboardData(input);
     const selected = data.selectedEntry;
     const defaultProcessingDate = selected?.processingDate ?? displayDateRange.to;
-    const defaultPeriodYear = input.periodYear ?? selected?.periodYear ?? Number(defaultProcessingDate.slice(0, 4));
-    const defaultPeriodMonth = input.periodMonth ?? selected?.periodMonth ?? Number(defaultProcessingDate.slice(5, 7));
     const firstBranchCode = data.formOptions.branches[0]?.value ?? null;
     const defaultBranchCode = input.branchCode ?? data.currentBalance?.branchCode ?? selected?.branchCode ?? firstBranchCode;
     const defaultResponsibleEmployeeNo = selected?.responsibleEmployeeNo ?? null;
-    const defaultActorEmployeeNo = selected?.filemakerLoginEmployeeNo ?? selected?.updatedByEmployeeNo ?? null;
+    const defaultActorEmployeeNo = selected?.updatedByEmployeeNo ?? selected?.registeredByEmployeeNo ?? null;
     const actionMessage = firstParam(params.actionMessage);
     const clearDraft = firstParam(params.clearDraft);
     const detailWindowOpen = firstParam(params.detailWindow) === '1';
@@ -153,8 +151,6 @@ export default async function Page({ searchParams }: PageProps) {
         <EntryActionModals
           defaultBranchCode={defaultBranchCode}
           defaultProcessingDate={defaultProcessingDate}
-          defaultPeriodYear={defaultPeriodYear}
-          defaultPeriodMonth={defaultPeriodMonth}
           defaultResponsibleEmployeeNo={defaultResponsibleEmployeeNo}
           defaultActorEmployeeNo={defaultActorEmployeeNo}
           clearDraft={clearDraft === 'movement' || clearDraft === 'inventory' || clearDraft === 'correction' ? clearDraft : null}
@@ -327,7 +323,6 @@ function SelectedEntryDetails({
           ['備考', selected.remarks],
           ['処理日', dateOnly(selected.processingDate)],
           ['申請処理日', dateOnly(selected.applicationDate)],
-          ['対象年月', periodText(selected.periodYear, selected.periodMonth)],
           ['連番', selected.dailySequence],
           ['登録済', dateTime(selected.postedAt)],
         ]}
@@ -725,11 +720,6 @@ function codeName(code: number | null | undefined, name: string | null | undefin
   if (code == null && !name) return '-';
   if (code == null) return name ?? '-';
   return name ? `${code} ${name}` : String(code);
-}
-
-function periodText(year: number | null, month: number | null): string {
-  if (year == null && month == null) return '-';
-  return `${year ?? '-'} / ${month ?? '-'}`;
 }
 
 function pageRangeText(currentPage: number, pageSize: number, itemCount: number, totalCount: number): string {

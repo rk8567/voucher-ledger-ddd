@@ -39,8 +39,6 @@ export class RegisterVoucherMovementUseCase {
       const draft = await voucherLedger.insertDraftEntry({
         branchCode: command.branchCode,
         departmentCode: command.departmentCode,
-        periodYear: command.periodYear,
-        periodMonth: command.periodMonth,
         applicationDate: command.applicationDate,
         processingDate: command.processingDate,
         dailySequence,

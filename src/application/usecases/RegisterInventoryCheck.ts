@@ -31,8 +31,6 @@ export class RegisterInventoryCheckUseCase {
       const dailySequence = await voucherLedger.nextDailySequence(command.branchCode, command.processingDate);
       const draft = await voucherLedger.insertDraftEntry({
         branchCode: command.branchCode,
-        periodYear: command.periodYear,
-        periodMonth: command.periodMonth,
         processingDate: command.processingDate,
         dailySequence,
         entryTypeCode: EntryTypeCode.InventoryCheck,

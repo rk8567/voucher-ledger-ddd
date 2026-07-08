@@ -45,8 +45,6 @@ export class IssueRedVoucherCorrectionUseCase {
       const reversalDraft = await voucherLedger.insertDraftEntry({
         branchCode: original.branchCode,
         departmentCode: original.departmentCode,
-        periodYear: original.periodYear,
-        periodMonth: original.periodMonth,
         applicationDate: command.reversalApplicationDate ?? command.reversalProcessingDate,
         processingDate: command.reversalProcessingDate,
         dailySequence: reversalDailySequence,
@@ -126,8 +124,6 @@ export class IssueRedVoucherCorrectionUseCase {
     const draft = await voucherLedger.insertDraftEntry({
       branchCode,
       departmentCode: input.departmentCode,
-      periodYear: input.periodYear,
-      periodMonth: input.periodMonth,
       applicationDate: input.applicationDate,
       processingDate: input.processingDate,
       dailySequence,

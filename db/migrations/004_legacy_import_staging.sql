@@ -9,14 +9,10 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
   source_file text NOT NULL DEFAULT 'DB金券管理台帳_fmp12.xml',
   raw_record jsonb,
 
-  filemaker_login_employee_no integer,
-  filemaker_login_employee_name text,
   legacy_uuid text,
   ledger_no bigint,
   department_code integer,
   branch_code integer,
-  period_year smallint,
-  period_month smallint,
   application_date date,
   processing_date date,
   daily_sequence integer,
@@ -43,11 +39,6 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
   registered_by_employee_no integer,
   updated_at timestamptz,
   updated_by_employee_no integer,
-  filemaker_created_at timestamptz,
-  filemaker_created_by text,
-  filemaker_modified_at timestamptz,
-  filemaker_modified_by text,
-
   -- FileMaker repeating field 枚数N[1..16]
   quantity_rep_01 integer,
   quantity_rep_02 integer,
@@ -68,14 +59,10 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
 );
 
 ALTER TABLE legacy_filemaker_voucher_ledger_staging
-  ADD COLUMN IF NOT EXISTS filemaker_login_employee_no integer,
-  ADD COLUMN IF NOT EXISTS filemaker_login_employee_name text,
   ADD COLUMN IF NOT EXISTS legacy_uuid text,
   ADD COLUMN IF NOT EXISTS ledger_no bigint,
   ADD COLUMN IF NOT EXISTS department_code integer,
   ADD COLUMN IF NOT EXISTS branch_code integer,
-  ADD COLUMN IF NOT EXISTS period_year smallint,
-  ADD COLUMN IF NOT EXISTS period_month smallint,
   ADD COLUMN IF NOT EXISTS application_date date,
   ADD COLUMN IF NOT EXISTS processing_date date,
   ADD COLUMN IF NOT EXISTS daily_sequence integer,
@@ -102,10 +89,6 @@ ALTER TABLE legacy_filemaker_voucher_ledger_staging
   ADD COLUMN IF NOT EXISTS registered_by_employee_no integer,
   ADD COLUMN IF NOT EXISTS updated_at timestamptz,
   ADD COLUMN IF NOT EXISTS updated_by_employee_no integer,
-  ADD COLUMN IF NOT EXISTS filemaker_created_at timestamptz,
-  ADD COLUMN IF NOT EXISTS filemaker_created_by text,
-  ADD COLUMN IF NOT EXISTS filemaker_modified_at timestamptz,
-  ADD COLUMN IF NOT EXISTS filemaker_modified_by text,
   ADD COLUMN IF NOT EXISTS quantity_rep_01 integer,
   ADD COLUMN IF NOT EXISTS quantity_rep_02 integer,
   ADD COLUMN IF NOT EXISTS quantity_rep_03 integer,
@@ -122,6 +105,16 @@ ALTER TABLE legacy_filemaker_voucher_ledger_staging
   ADD COLUMN IF NOT EXISTS quantity_rep_14 integer,
   ADD COLUMN IF NOT EXISTS quantity_rep_15 integer,
   ADD COLUMN IF NOT EXISTS quantity_rep_16 integer;
+
+ALTER TABLE legacy_filemaker_voucher_ledger_staging
+  DROP COLUMN IF EXISTS period_year,
+  DROP COLUMN IF EXISTS period_month,
+  DROP COLUMN IF EXISTS filemaker_login_employee_no,
+  DROP COLUMN IF EXISTS filemaker_login_employee_name,
+  DROP COLUMN IF EXISTS filemaker_created_at,
+  DROP COLUMN IF EXISTS filemaker_created_by,
+  DROP COLUMN IF EXISTS filemaker_modified_at,
+  DROP COLUMN IF EXISTS filemaker_modified_by;
 
 COMMENT ON TABLE legacy_filemaker_voucher_ledger_staging IS 'Raw import staging for legacy T切手出納台帳. Not used by the application layer.';
 

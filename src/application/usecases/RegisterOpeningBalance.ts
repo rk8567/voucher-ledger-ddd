@@ -26,8 +26,6 @@ export class RegisterOpeningBalanceUseCase {
 
       const draft = await voucherLedger.insertDraftEntry({
         branchCode: command.branchCode,
-        periodYear: command.periodYear,
-        periodMonth: command.periodMonth,
         applicationDate: command.applicationDate,
         processingDate: command.processingDate,
         dailySequence: 0,

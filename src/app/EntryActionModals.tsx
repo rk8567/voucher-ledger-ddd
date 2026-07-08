@@ -17,8 +17,6 @@ import { initialEntryActionState, type EntryActionState } from './entryActionSta
 type EntryActionModalsProps = Readonly<{
   defaultBranchCode: number | null;
   defaultProcessingDate: string;
-  defaultPeriodYear: number | null;
-  defaultPeriodMonth: number | null;
   defaultResponsibleEmployeeNo: number | null;
   defaultActorEmployeeNo: number | null;
   clearDraft: Workflow | null;
@@ -34,8 +32,6 @@ type CorrectionSelectedEntry = Readonly<{
   branchCode: number;
   branchName: string | null;
   departmentCode: number | null;
-  periodYear: number | null;
-  periodMonth: number | null;
   applicationDate: string | null;
   processingDate: string;
   entryTypeCode: EntryTypeCode;
@@ -283,14 +279,6 @@ function BaseEntryFields({ includeDescription }: Readonly<{ includeDescription: 
           defaultValue={fieldValue(values, 'processingDate')}
           required
         />
-      </label>
-      <label className={fieldClass(errors, 'periodYear')}>
-        <span>年</span>
-        <input name="periodYear" type="number" min="1900" max="2200" step="1" defaultValue={fieldValue(values, 'periodYear')} />
-      </label>
-      <label className={fieldClass(errors, 'periodMonth')}>
-        <span>月</span>
-        <input name="periodMonth" type="number" min="1" max="12" step="1" defaultValue={fieldValue(values, 'periodMonth')} />
       </label>
       <label className={fieldClass(errors, 'applicationDate')}>
         <span>申請処理日</span>
@@ -548,8 +536,6 @@ function correctionInitialValues(props: EntryActionModalsProps): DraftValues {
       ...props,
       defaultBranchCode: selected.branchCode,
       defaultProcessingDate: selected.processingDate,
-      defaultPeriodYear: selected.periodYear,
-      defaultPeriodMonth: selected.periodMonth,
       defaultResponsibleEmployeeNo: selected.responsibleEmployeeNo,
     }),
     reversalProcessingDate: dateInputText(selected.processingDate),
@@ -574,8 +560,6 @@ function baseInitialValues(props: EntryActionModalsProps): DraftValues {
   return {
     branchCode: props.defaultBranchCode == null ? '' : String(props.defaultBranchCode),
     processingDate: dateInputText(props.defaultProcessingDate),
-    periodYear: props.defaultPeriodYear == null ? '' : String(props.defaultPeriodYear),
-    periodMonth: props.defaultPeriodMonth == null ? '' : String(props.defaultPeriodMonth),
     applicationDate: '',
     responsibleEmployeeNo: props.defaultResponsibleEmployeeNo == null ? '' : String(props.defaultResponsibleEmployeeNo),
     actorEmployeeNo: props.defaultActorEmployeeNo == null ? '' : String(props.defaultActorEmployeeNo),
