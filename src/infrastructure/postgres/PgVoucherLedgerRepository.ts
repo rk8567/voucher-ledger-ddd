@@ -84,9 +84,6 @@ function mapEntry(row: Record<string, unknown>): LedgerEntryRecord {
     reversalLedgerNo: nullableNumberOf(row.reversal_ledger_no),
     correctionLedgerNo: nullableNumberOf(row.correction_ledger_no),
     isDeleted: Boolean(row.is_deleted),
-    legacyRegisteredButtonClicked: row.legacy_registered_button_clicked == null
-      ? false
-      : Boolean(row.legacy_registered_button_clicked),
     registeredAt: nullableStringOf(row.registered_at),
     registeredByEmployeeNo: nullableNumberOf(row.registered_by_employee_no),
     registeredByEmployeeName: nullableStringOf(row.registered_by_employee_name),

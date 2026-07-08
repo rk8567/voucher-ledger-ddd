@@ -15,7 +15,3 @@ export function dateOnly(value: string | null | undefined): string | null {
 export function dateTime(value: string | null | undefined): string | null {
   return tokyoDateTimeText(value);
 }
-
-export function legacyRegistrationFlagText(value: boolean): string {
-  return value ? '登録済' : '未登録';
-}

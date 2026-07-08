@@ -168,7 +168,6 @@ WHERE s.ledger_no = e.ledger_no
   );
 
 INSERT INTO voucher_ledger_entries (
-  legacy_uuid,
   ledger_no,
   branch_code,
   department_code,
@@ -197,7 +196,6 @@ INSERT INTO voucher_ledger_entries (
   posted_at
 )
 SELECT
-  s.legacy_uuid,
   s.ledger_no,
   s.branch_code,
   s.department_code,

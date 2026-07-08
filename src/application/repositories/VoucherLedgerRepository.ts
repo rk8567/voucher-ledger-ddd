@@ -40,7 +40,6 @@ export type LedgerEntryRecord = Readonly<{
   reversalLedgerNo: number | null;
   correctionLedgerNo: number | null;
   isDeleted: boolean;
-  legacyRegisteredButtonClicked: boolean;
   registeredAt: string | null;
   registeredByEmployeeNo: number | null;
   registeredByEmployeeName: string | null;

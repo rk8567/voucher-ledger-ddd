@@ -337,7 +337,6 @@ function makeEntry(overrides: Partial<MutablePostedEntry> & { ledgerNo: number }
     reversalLedgerNo: overrides.reversalLedgerNo ?? null,
     correctionLedgerNo: overrides.correctionLedgerNo ?? null,
     isDeleted: overrides.isDeleted ?? false,
-    legacyRegisteredButtonClicked: overrides.legacyRegisteredButtonClicked ?? true,
     registeredAt: overrides.registeredAt ?? null,
     registeredByEmployeeNo: overrides.registeredByEmployeeNo ?? null,
     registeredByEmployeeName: overrides.registeredByEmployeeName ?? null,

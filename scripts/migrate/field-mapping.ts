@@ -1,17 +1,14 @@
 /** M拠点L from 金券管理台帳.fmp12 → branches */
 export const BRANCH_HTML_COLUMNS: Record<string, string> = {
-  主キー: 'legacy_uuid',
   拠点CD: 'branch_code',
   拠点NM: 'branch_name',
   省略形: 'abbreviation',
   有効: 'active',
-  開始残高S: 'opening_balance_amount_legacy',
   備考: 'notes',
 };
 
 /** M会社 from 各種マスター.fmp12 → companies */
 export const COMPANY_HTML_COLUMNS: Record<string, string> = {
-  主キー: 'legacy_uuid',
   会社CD: 'company_code',
   会社NM: 'company_name',
   正式名称: 'official_name',
@@ -20,14 +17,12 @@ export const COMPANY_HTML_COLUMNS: Record<string, string> = {
 
 /** M部門 from 各種マスター.fmp12 → departments */
 export const DEPARTMENT_HTML_COLUMNS: Record<string, string> = {
-  主キー: 'legacy_uuid',
   部門CD: 'department_code',
   部門NM: 'department_name',
 };
 
 /** M社員 from 各種マスター.fmp12 → employees */
 export const EMPLOYEE_HTML_COLUMNS: Record<string, string> = {
-  主キー: 'legacy_uuid',
   社員番号: 'employee_no',
   会社CD: 'company_code',
   会社NM: 'company_name',

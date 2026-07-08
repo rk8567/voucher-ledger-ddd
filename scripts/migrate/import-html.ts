@@ -9,7 +9,6 @@ const STAGING_INSERT = `
 INSERT INTO legacy_filemaker_voucher_ledger_staging (
   source_file,
   raw_record,
-  legacy_uuid,
   ledger_no,
   department_code,
   branch_code,
@@ -55,12 +54,11 @@ INSERT INTO legacy_filemaker_voucher_ledger_staging (
   quantity_rep_15,
   quantity_rep_16
 ) VALUES (
-  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47
+  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46
 )
 ON CONFLICT (ledger_no) DO UPDATE SET
   source_file = EXCLUDED.source_file,
   raw_record = EXCLUDED.raw_record,
-  legacy_uuid = COALESCE(EXCLUDED.legacy_uuid, legacy_filemaker_voucher_ledger_staging.legacy_uuid),
   department_code = EXCLUDED.department_code,
   branch_code = EXCLUDED.branch_code,
   application_date = EXCLUDED.application_date,
@@ -250,7 +248,6 @@ async function importRawLedgerRows(
     const result = await client.query(STAGING_INSERT, [
       filePath,
       JSON.stringify({ rowNumber: index + 1, row }),
-      null,
       ledgerNo,
       asNullableInt(row.部門CD),
       branchCode,
@@ -477,62 +474,54 @@ async function upsertBranches(client: PoolClient, mapped: Record<string, string>
   const explicitActive = asNullableBoolean(mapped.active);
   await client.query(
     `INSERT INTO branches (
-      branch_code, branch_name, abbreviation, active, opening_balance_amount_legacy, notes, legacy_uuid
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+      branch_code, branch_name, abbreviation, active, notes
+    ) VALUES ($1,$2,$3,$4,$5)
     ON CONFLICT (branch_code) DO UPDATE SET
       branch_name = EXCLUDED.branch_name,
       abbreviation = COALESCE(EXCLUDED.abbreviation, branches.abbreviation),
       active = EXCLUDED.active,
-      opening_balance_amount_legacy = COALESCE(EXCLUDED.opening_balance_amount_legacy, branches.opening_balance_amount_legacy),
       notes = COALESCE(EXCLUDED.notes, branches.notes),
-      legacy_uuid = COALESCE(EXCLUDED.legacy_uuid, branches.legacy_uuid),
       updated_at = now()`,
     [
       asRequiredInt(mapped.branch_code, 'branch_code'),
       mapped.branch_name || `Branch ${mapped.branch_code}`,
       mapped.abbreviation || null,
       explicitActive ?? Boolean(mapped.branch_name),
-      asNullableBigInt(mapped.opening_balance_amount_legacy)?.toString() ?? null,
       mapped.notes || null,
-      mapped.legacy_uuid || null,
     ],
   );
 }
 
 async function upsertCompanies(client: PoolClient, mapped: Record<string, string>): Promise<void> {
   await client.query(
-    `INSERT INTO companies (company_code, company_name, official_name, abbreviation, legacy_uuid)
-     VALUES ($1,$2,$3,$4,$5)
+    `INSERT INTO companies (company_code, company_name, official_name, abbreviation)
+     VALUES ($1,$2,$3,$4)
      ON CONFLICT (company_code) DO UPDATE SET
        company_name = EXCLUDED.company_name,
        official_name = COALESCE(EXCLUDED.official_name, companies.official_name),
        abbreviation = COALESCE(EXCLUDED.abbreviation, companies.abbreviation),
-       legacy_uuid = COALESCE(EXCLUDED.legacy_uuid, companies.legacy_uuid),
        updated_at = now()`,
     [
       asRequiredInt(mapped.company_code, 'company_code'),
       mapped.company_name || null,
       mapped.official_name || null,
       mapped.abbreviation || null,
-      mapped.legacy_uuid || null,
     ],
   );
 }
 
 async function upsertDepartments(client: PoolClient, mapped: Record<string, string>): Promise<void> {
   await client.query(
-    `INSERT INTO departments (department_code, department_name, active, legacy_uuid)
-     VALUES ($1,$2,$3,$4)
+    `INSERT INTO departments (department_code, department_name, active)
+     VALUES ($1,$2,$3)
      ON CONFLICT (department_code) DO UPDATE SET
        department_name = EXCLUDED.department_name,
        active = EXCLUDED.active,
-       legacy_uuid = COALESCE(EXCLUDED.legacy_uuid, departments.legacy_uuid),
        updated_at = now()`,
     [
       asRequiredInt(mapped.department_code, 'department_code'),
       mapped.department_name || `Department ${mapped.department_code}`,
       Boolean(mapped.department_name),
-      mapped.legacy_uuid || null,
     ],
   );
 }
@@ -587,8 +576,8 @@ async function upsertEmployees(client: PoolClient, mapped: Record<string, string
   await client.query(
     `INSERT INTO employees (
       employee_no, employee_name, company_code, department_code, branch_code,
-      account_name, is_approver, is_admin, active, retired_on, legacy_uuid
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      account_name, is_approver, is_admin, active, retired_on
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     ON CONFLICT (employee_no) DO UPDATE SET
       employee_name = EXCLUDED.employee_name,
       company_code = COALESCE(EXCLUDED.company_code, employees.company_code),
@@ -599,7 +588,6 @@ async function upsertEmployees(client: PoolClient, mapped: Record<string, string
       is_admin = EXCLUDED.is_admin,
       active = EXCLUDED.active,
       retired_on = COALESCE(EXCLUDED.retired_on, employees.retired_on),
-      legacy_uuid = COALESCE(EXCLUDED.legacy_uuid, employees.legacy_uuid),
       updated_at = now()`,
     [
       employeeNo,
@@ -612,7 +600,6 @@ async function upsertEmployees(client: PoolClient, mapped: Record<string, string
       asNullableBoolean(mapped.is_admin) ?? false,
       retiredOn ? false : true,
       retiredOn,
-      mapped.legacy_uuid || null,
     ],
   );
 }

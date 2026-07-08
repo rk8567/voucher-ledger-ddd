@@ -27,7 +27,7 @@ import {
   parseLedgerColumnOrderCookie,
   visibleLedgerColumnCookieName,
 } from './ledgerColumns';
-import { dateOnly, dateTime, legacyRegistrationFlagText, yen } from './ledgerDisplayFormat';
+import { dateOnly, dateTime, yen } from './ledgerDisplayFormat';
 import { firstParam, paramsWithout, parseLedgerSearchParams } from './ledgerSearchParams';
 import { ReturnTopButton } from './ReturnTopButton';
 import { DetailWindowBackdrop } from './DetailWindowBackdrop';
@@ -333,7 +333,6 @@ function SelectedEntryDetails({
           ['入出区分', codeName(selected.entryTypeCode, selected.entryTypeName ?? entryTypeName(selected.entryTypeCode))],
           ['出納区分', codeName(selected.transactionCategoryCode, selected.transactionCategoryName)],
           ['状態CD', selected.statusCode],
-          ['登録ボタン', legacyRegistrationFlagText(selected.legacyRegisteredButtonClicked)],
         ]}
       />
       <DetailSection

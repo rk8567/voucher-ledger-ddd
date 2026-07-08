@@ -24,22 +24,22 @@ CREATE TABLE IF NOT EXISTS branches (
   branch_name text NOT NULL CHECK (length(btrim(branch_name)) > 0),
   abbreviation text,
   active boolean NOT NULL DEFAULT true,
-  opening_balance_amount_legacy bigint,
   notes text,
-  legacy_uuid text UNIQUE,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE branches IS 'Legacy M拠点L / M拠点. 新規登録では active=true の拠点のみ使用する。';
-COMMENT ON COLUMN branches.opening_balance_amount_legacy IS 'Legacy M拠点L::開始残高S, preserved for migration/reference only.';
+
+ALTER TABLE branches
+  DROP COLUMN IF EXISTS opening_balance_amount_legacy,
+  DROP COLUMN IF EXISTS legacy_uuid;
 
 CREATE TABLE IF NOT EXISTS companies (
   company_code integer PRIMARY KEY CHECK (company_code > 0),
   company_name text CHECK (company_name IS NULL OR length(btrim(company_name)) > 0),
   official_name text,
   abbreviation text,
-  legacy_uuid text UNIQUE,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -50,6 +50,9 @@ ALTER TABLE companies
   ALTER COLUMN company_name DROP NOT NULL,
   DROP CONSTRAINT IF EXISTS companies_company_name_check,
   DROP CONSTRAINT IF EXISTS companies_company_name_not_blank;
+
+ALTER TABLE companies
+  DROP COLUMN IF EXISTS legacy_uuid;
 
 ALTER TABLE companies
   ADD CONSTRAINT companies_company_name_not_blank
@@ -63,12 +66,14 @@ CREATE TABLE IF NOT EXISTS departments (
   department_code integer PRIMARY KEY CHECK (department_code > 0),
   department_name text NOT NULL CHECK (length(btrim(department_name)) > 0),
   active boolean NOT NULL DEFAULT true,
-  legacy_uuid text UNIQUE,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE departments IS 'Legacy M部門. Optional in this bounded context but kept because T切手出納台帳 has 部門CD.';
+
+ALTER TABLE departments
+  DROP COLUMN IF EXISTS legacy_uuid;
 
 CREATE TABLE IF NOT EXISTS employees (
   employee_no integer PRIMARY KEY CHECK (employee_no > 0),
@@ -81,12 +86,14 @@ CREATE TABLE IF NOT EXISTS employees (
   is_admin boolean NOT NULL DEFAULT false,
   active boolean NOT NULL DEFAULT true,
   retired_on date,
-  legacy_uuid text UNIQUE,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE employees IS 'Legacy 各種マスター::M社員. Referenced by 担当者CD / 登録担当CD / 更新担当CD.';
+
+ALTER TABLE employees
+  DROP COLUMN IF EXISTS legacy_uuid;
 
 CREATE TABLE IF NOT EXISTS entry_types (
   code integer PRIMARY KEY,
@@ -143,8 +150,6 @@ COMMENT ON TABLE denominations IS 'Stamp/voucher denominations. legacy_repetitio
 CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  -- Legacy identifiers
-  legacy_uuid text UNIQUE,
   ledger_no bigint NOT NULL UNIQUE DEFAULT nextval('voucher_ledger_no_seq'), -- 出納No
 
   -- Scope/date
@@ -180,7 +185,6 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
 
   -- Deletion/commit/audit
   is_deleted boolean NOT NULL DEFAULT false,                                  -- Is削除
-  legacy_registered_button_clicked boolean NOT NULL DEFAULT true,             -- 登録ボタンクリックフラグ
 
   -- registered_at/by preserve FileMaker 登録日時/登録担当CD semantics.
   registered_at timestamptz NOT NULL DEFAULT now(),
@@ -207,6 +211,10 @@ CREATE TABLE IF NOT EXISTS voucher_ledger_entries (
 
 ALTER TABLE voucher_ledger_entries
   DROP CONSTRAINT IF EXISTS voucher_ledger_entries_other_amount_check;
+
+ALTER TABLE voucher_ledger_entries
+  DROP COLUMN IF EXISTS legacy_uuid,
+  DROP COLUMN IF EXISTS legacy_registered_button_clicked;
 
 COMMENT ON TABLE voucher_ledger_entries IS 'Source-of-truth ledger rows migrated from T切手出納台帳 / T金券管理台帳.';
 COMMENT ON COLUMN voucher_ledger_entries.ledger_no IS 'Legacy 出納No. Use voucher_ledger_no_seq for new rows; reset sequence after importing legacy rows.';
@@ -759,7 +767,6 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
 
   filemaker_login_employee_no integer,
   filemaker_login_employee_name text,
-  legacy_uuid text,
   ledger_no bigint,
   department_code integer,
   branch_code integer,
@@ -813,6 +820,9 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
 );
 
 COMMENT ON TABLE legacy_filemaker_voucher_ledger_staging IS 'Raw import staging for legacy T切手出納台帳. Not used by the application layer.';
+
+ALTER TABLE legacy_filemaker_voucher_ledger_staging
+  DROP COLUMN IF EXISTS legacy_uuid;
 
 CREATE INDEX IF NOT EXISTS idx_legacy_voucher_staging_ledger_no
   ON legacy_filemaker_voucher_ledger_staging(ledger_no);

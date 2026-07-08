@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
   source_file text NOT NULL DEFAULT 'DB金券管理台帳_fmp12.xml',
   raw_record jsonb,
 
-  legacy_uuid text,
   ledger_no bigint,
   department_code integer,
   branch_code integer,
@@ -59,7 +58,6 @@ CREATE TABLE IF NOT EXISTS legacy_filemaker_voucher_ledger_staging (
 );
 
 ALTER TABLE legacy_filemaker_voucher_ledger_staging
-  ADD COLUMN IF NOT EXISTS legacy_uuid text,
   ADD COLUMN IF NOT EXISTS ledger_no bigint,
   ADD COLUMN IF NOT EXISTS department_code integer,
   ADD COLUMN IF NOT EXISTS branch_code integer,
@@ -109,6 +107,7 @@ ALTER TABLE legacy_filemaker_voucher_ledger_staging
 ALTER TABLE legacy_filemaker_voucher_ledger_staging
   DROP COLUMN IF EXISTS period_year,
   DROP COLUMN IF EXISTS period_month,
+  DROP COLUMN IF EXISTS legacy_uuid,
   DROP COLUMN IF EXISTS filemaker_login_employee_no,
   DROP COLUMN IF EXISTS filemaker_login_employee_name,
   DROP COLUMN IF EXISTS filemaker_created_at,
